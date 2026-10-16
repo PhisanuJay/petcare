@@ -1,21 +1,45 @@
 # PetCare
 
-โปรเจค PetCare — โครงเปล่าสำหรับเริ่มพัฒนาภายหลัง
+โปรเจค React (Vite) สำหรับระบบ PetCare — **โครงแยกตามบทบาทจาก Page 17**
 
-## สถานะ
+สถานะตอนนี้: สร้างไฟล์โครงไว้แล้ว **ยังไม่ต้องลง dependency / ยังไม่มี UI จริง**
 
-ยังไม่มีโค้ดหรือแอปพลิเคชันในตอนนี้ ใช้ repo นี้เป็นจุดเริ่มต้นสำหรับฟีเจอร์ต่อไป เช่น การจัดการสัตว์เลี้ยง นัดหมาย หรือบันทึกสุขภาพ
+## เอกสาร
 
-## เริ่มต้นใช้งาน
+| ไฟล์ | เนื้อหา |
+|------|---------|
+| [docs/PAGE-17-SITEMAP.md](docs/PAGE-17-SITEMAP.md) | แผนผังหน้าทุก role + ตารางไฟล์/route |
+| [docs/STRUCTURE.md](docs/STRUCTURE.md) | โครงสร้างโฟลเดอร์และกติกาแยกงาน |
+| [docs/OWNERSHIP.md](docs/OWNERSHIP.md) | ใครรับผิดชอบส่วนไหน |
 
-เมื่อพร้อมสร้างแอปแล้ว ให้ clone repo นี้แล้วเพิ่มโค้ดตามสแต็กที่เลือก
+## โครงตาม Role (Page 17)
+
+```text
+src/features/
+  pet-owner/           ← มะแอ่ว
+  veterinarian/        ← มะแอ่ว
+  medical-assistant/   ← เอิร์ท
+  pet-profile/         ← เอิร์ท, ปร่ย
+  pet-hotel/           ← ฟ่าง, เจ
+  pet-transport/       ← โมเดล
+  adoption/            ← ปร่ย
+  admin/               ← เจ
+  super-admin/         ← ฟ่าง
+```
+
+Route รวมอยู่ที่ `src/routes/roleRoutes.jsx`
+
+## เมื่อพร้อมเริ่มพัฒนา
 
 ```bash
 git clone <repository-url>
-cd PetCare
+cd petcare
+npm install
+npm run dev
 ```
 
 ## แผนต่อไป
 
-- กำหนดสแต็กและโครงสร้างแอป
-- สร้างฟีเจอร์หลักของ PetCare
+- ลง package แล้วรัน Vite
+- ใส่ UI / logic ในโฟลเดอร์ role ของแต่ละคน
+- เชื่อม API ตามฟีเจอร์จริง
