@@ -1,45 +1,42 @@
 # PetCare
 
-โปรเจค React (Vite) สำหรับระบบ PetCare — **โครงแยกตามบทบาทจาก Page 17**
-
-สถานะตอนนี้: สร้างไฟล์โครงไว้แล้ว **ยังไม่ต้องลง dependency / ยังไม่มี UI จริง**
-
-## เอกสาร
-
-| ไฟล์ | เนื้อหา |
-|------|---------|
-| [docs/PAGE-17-SITEMAP.md](docs/PAGE-17-SITEMAP.md) | แผนผังหน้าทุก role + ตารางไฟล์/route |
-| [docs/STRUCTURE.md](docs/STRUCTURE.md) | โครงสร้างโฟลเดอร์และกติกาแยกงาน |
-| [docs/OWNERSHIP.md](docs/OWNERSHIP.md) | ใครรับผิดชอบส่วนไหน |
-
-## โครงตาม Role (Page 17)
+แยก **frontend** / **backend** ตามบทบาทจาก Page 17
 
 ```text
-src/features/
-  pet-owner/           ← มะแอ่ว
-  veterinarian/        ← มะแอ่ว
-  medical-assistant/   ← เอิร์ท
-  pet-profile/         ← เอิร์ท, ปร่ย
-  pet-hotel/           ← ฟ่าง, เจ
-  pet-transport/       ← โมเดล
-  adoption/            ← ปร่ย
-  admin/               ← เจ
-  super-admin/         ← ฟ่าง
+petcare/
+├── frontend/     # React (Vite)
+│   └── src/features/<role>/
+└── backend/      # Express API
+    └── src/modules/<role>/
 ```
 
-Route รวมอยู่ที่ `src/routes/roleRoutes.jsx`
+## Role folders
 
-## เมื่อพร้อมเริ่มพัฒนา
+| Role | ผู้รับผิดชอบ | Frontend | Backend |
+|------|--------------|----------|---------|
+| Pet Owner | มะแอ่ว | `frontend/src/features/pet-owner/` | `backend/src/modules/pet-owner/` |
+| Veterinarian | มะแอ่ว | `frontend/src/features/veterinarian/` | `backend/src/modules/veterinarian/` |
+| Medical Assistant | เอิร์ท | `frontend/src/features/medical-assistant/` | `backend/src/modules/medical-assistant/` |
+| Pet Profile | เอิร์ท, ปร่ย | `frontend/src/features/pet-profile/` | `backend/src/modules/pet-profile/` |
+| Pet Hotel | ฟ่าง, เจ | `frontend/src/features/pet-hotel/` | `backend/src/modules/pet-hotel/` |
+| Pet Transport | โมเดล | `frontend/src/features/pet-transport/` | `backend/src/modules/pet-transport/` |
+| Adoption | ปร่ย | `frontend/src/features/adoption/` | `backend/src/modules/adoption/` |
+| Admin | เจ | `frontend/src/features/admin/` | `backend/src/modules/admin/` |
+| Super Admin | ฟ่าง | `frontend/src/features/super-admin/` | `backend/src/modules/super-admin/` |
+
+## รัน
 
 ```bash
-git clone <repository-url>
-cd petcare
+# Frontend
+cd frontend
+npm install
+npm run dev
+
+# Backend (อีกเทอร์มินัล)
+cd backend
 npm install
 npm run dev
 ```
 
-## แผนต่อไป
-
-- ลง package แล้วรัน Vite
-- ใส่ UI / logic ในโฟลเดอร์ role ของแต่ละคน
-- เชื่อม API ตามฟีเจอร์จริง
+- Frontend: Vite (ดูพอร์ตในเทอร์มินัล)
+- Backend: `http://localhost:3001` — health ที่ `/health`

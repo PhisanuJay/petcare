@@ -1,0 +1,15 @@
+{
+  "name": "petcare-backend",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "PetCare API — role-based modules (Page 17)",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.0.0"
+  }
+}
