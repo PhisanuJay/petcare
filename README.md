@@ -1,6 +1,6 @@
 # PetCare
 
-แยก **frontend** / **backend** ตามบทบาทจาก Page 17
+แยก **frontend** / **backend**
 
 ```text
 petcare/
