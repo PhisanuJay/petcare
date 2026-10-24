@@ -2,6 +2,8 @@ import { Route } from 'react-router-dom';
 
 import PetOwnerDashboardPage from '../features/pet-owner/pages/Dashboard.jsx';
 import MyPetsPage from '../features/pet-owner/pages/MyPets.jsx';
+import PetFormPage from '../features/pet-owner/pages/PetForm.jsx';
+import PetDetailPage from '../features/pet-owner/pages/PetDetail.jsx';
 import ServicesPage from '../features/pet-owner/pages/Services.jsx';
 import BookingPage from '../features/pet-owner/pages/Booking.jsx';
 import MedicalPage from '../features/pet-owner/pages/Medical.jsx';
@@ -64,21 +66,28 @@ import SettingsPage from '../features/super-admin/pages/Settings.jsx';
  * Route map aligned with Page 17 sitemap.
  * Keep each role under its own path prefix so teams do not overlap.
  */
+
+/** Pet Owner — มะแอ่ว. Rendered inside CustomerLayout and requires login (see App.jsx). */
+export const petOwnerRoutes = (
+  <Route path="pet-owner">
+    <Route index element={<PetOwnerDashboardPage />} />
+    <Route path="my-pets" element={<MyPetsPage />} />
+    <Route path="my-pets/new" element={<PetFormPage />} />
+    <Route path="my-pets/:petId" element={<PetDetailPage />} />
+    <Route path="my-pets/:petId/edit" element={<PetFormPage />} />
+    <Route path="services" element={<ServicesPage />} />
+    <Route path="booking" element={<BookingPage />} />
+    <Route path="medical" element={<MedicalPage />} />
+    <Route path="cat-hotel" element={<CatHotelPage />} />
+    <Route path="transport" element={<TransportPage />} />
+    <Route path="adoption" element={<PetOwnerAdoptionPage />} />
+    <Route path="cctv" element={<PetOwnerCctvPage />} />
+  </Route>
+);
+
+/** Staff role modules — rendered inside the legacy AppShell. */
 export const roleRoutes = (
   <>
-    {/* Pet Owner — มะแอ่ว */}
-    <Route path="pet-owner">
-      <Route index element={<PetOwnerDashboardPage />} />
-      <Route path="my-pets" element={<MyPetsPage />} />
-      <Route path="services" element={<ServicesPage />} />
-      <Route path="booking" element={<BookingPage />} />
-      <Route path="medical" element={<MedicalPage />} />
-      <Route path="cat-hotel" element={<CatHotelPage />} />
-      <Route path="transport" element={<TransportPage />} />
-      <Route path="adoption" element={<PetOwnerAdoptionPage />} />
-      <Route path="cctv" element={<PetOwnerCctvPage />} />
-    </Route>
-
     {/* Veterinarian — มะแอ่ว */}
     <Route path="veterinarian">
       <Route index element={<VeterinarianDashboardPage />} />
