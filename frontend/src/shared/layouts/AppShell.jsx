@@ -6,7 +6,7 @@ import { Link, Outlet } from 'react-router-dom';
  */
 export default function AppShell() {
   return (
-    <div>
+    <div className="app-shell">
       <header>
         <nav aria-label="Role modules">
           <ul>

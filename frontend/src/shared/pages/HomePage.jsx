@@ -1,44 +1,34 @@
-import { Link } from 'react-router-dom';
+import HeroSection from './home/HeroSection.jsx';
+import HotelSection from './home/HotelSection.jsx';
+import AdoptionSection from './home/AdoptionSection.jsx';
+import {
+  AboutSection,
+  ContactSection,
+  PromoSection,
+  ReviewsSection,
+  ServicesSection,
+  VetsSection,
+  WhySection,
+} from './home/InfoSections.jsx';
+import { useMemberLink } from './home/NeedLoginModal.jsx';
 
-/**
- * Landing index for the skeleton — links into each role module from Page 17.
- */
+/** Customer landing page (Soft Blue Pastel, based on clinic-home-mockup/design-2). */
 export default function HomePage() {
+  const { go, modal } = useMemberLink();
+
   return (
-    <section>
-      <h1>PetCare</h1>
-      <p>
-        Frontend แยกตามบทบาท — คู่กับ <code>backend/src/modules/</code>
-      </p>
-      <ul>
-        <li>
-          <Link to="/pet-owner">Pet Owner (มะแอ่ว)</Link>
-        </li>
-        <li>
-          <Link to="/veterinarian">Veterinarian (มะแอ่ว)</Link>
-        </li>
-        <li>
-          <Link to="/medical-assistant">Medical Assistant (เอิร์ท)</Link>
-        </li>
-        <li>
-          <Link to="/pet-profile">Pet Profile (เอิร์ท, ปร่ย)</Link>
-        </li>
-        <li>
-          <Link to="/pet-hotel">Pet Hotel (ฟ่าง, เจ)</Link>
-        </li>
-        <li>
-          <Link to="/pet-transport">Pet Transport (โมเดล)</Link>
-        </li>
-        <li>
-          <Link to="/adoption">Adoption (ปร่ย)</Link>
-        </li>
-        <li>
-          <Link to="/admin">Admin (เจ)</Link>
-        </li>
-        <li>
-          <Link to="/super-admin">Super Admin (ฟ่าง)</Link>
-        </li>
-      </ul>
-    </section>
+    <>
+      <HeroSection go={go} />
+      <AboutSection />
+      <ServicesSection />
+      <HotelSection go={go} />
+      <AdoptionSection go={go} />
+      <WhySection />
+      <VetsSection />
+      <PromoSection go={go} />
+      <ReviewsSection />
+      <ContactSection />
+      {modal}
+    </>
   );
 }
