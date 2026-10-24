@@ -1,6 +1,9 @@
 /** Pet Owner module — Owner: มะแอ่ว */
 export { default as DashboardPage } from './pages/Dashboard.jsx';
 export { default as MyPetsPage } from './pages/MyPets.jsx';
+export { default as PetFormPage } from './pages/PetForm.jsx';
+export { default as PetDetailPage } from './pages/PetDetail.jsx';
+export { usePets } from './usePets.js';
 export { default as ServicesPage } from './pages/Services.jsx';
 export { default as BookingPage } from './pages/Booking.jsx';
 export { default as MedicalPage } from './pages/Medical.jsx';
