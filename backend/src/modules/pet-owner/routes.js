@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
+import { cancelBooking, createBooking, listBookings } from './bookingStore.js';
 import { createPet, deletePet, findPet, listPets, updatePet } from './store.js';
 
 /**
@@ -114,6 +115,90 @@ router.get('/adoption', (_req, res) => {
 router.get('/cctv', (_req, res) => {
   res.json({ module: 'pet-owner', page: 'cctv', status: 'placeholder' });
 });
+
+/* ---------- Bookings ---------- */
+
+// Keep in sync with BOOKING_SERVICES / OPENING_HOURS in frontend/src/features/pet-owner/bookingOptions.js
+const BOOKING_SERVICES = {
+  checkup: 'ตรวจสุขภาพทั่วไป',
+  vaccine: 'ฉีดวัคซีน',
+  parasite: 'ถ่ายพยาธิ / เห็บหมัด',
+  followup: 'ติดตามอาการ',
+  other: 'อื่นๆ',
+};
+
+/**
+ * Clinic opening hours, taken from the home page (frontend/src/shared/pages/home/InfoSections.jsx):
+ * Mon–Fri 08:00–22:00, Sat–Sun 09:00–21:00. Slots are 30 minutes and the last one starts
+ * 30 minutes before closing. Emergency care (24h) is not booked online. Public holidays are not handled.
+ */
+const WEEKDAY_HOURS = { open: '08:00', close: '22:00' };
+const WEEKEND_HOURS = { open: '09:00', close: '21:00' };
+
+const toMinutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
+
+function bookableSlots(dateString) {
+  const [y, m, d] = dateString.split('-').map(Number);
+  const day = new Date(y, m - 1, d).getDay(); // 0 = Sunday, 6 = Saturday
+  const { open, close } = day === 0 || day === 6 ? WEEKEND_HOURS : WEEKDAY_HOURS;
+  const slots = [];
+  for (let t = toMinutes(open); t + 30 <= toMinutes(close); t += 30) {
+    slots.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${t % 60 === 0 ? '00' : '30'}`);
+  }
+  return slots;
+}
+
+function nowTimeString() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function todayString() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+router.use('/bookings', requireOwner);
+
+router.get('/bookings', wrap(async (req, res) => {
+  res.json(await listBookings(req.ownerId));
+}));
+
+router.post('/bookings', wrap(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
+  const { petId, service, date, time } = body;
+  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : '';
+
+  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกสัตว์เลี้ยง');
+  const pet = await findPet(req.ownerId, petId);
+  if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
+  if (!Object.hasOwn(BOOKING_SERVICES, service)) throw httpError(400, 'กรุณาเลือกบริการ');
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(date).getTime())) {
+    throw httpError(400, 'กรุณาเลือกวันที่');
+  }
+  if (date < todayString()) throw httpError(400, 'ไม่สามารถจองวันที่ผ่านมาแล้ว');
+  if (typeof time !== 'string' || !time) throw httpError(400, 'กรุณาเลือกเวลา');
+  if (!bookableSlots(date).includes(time)) throw httpError(400, 'เวลานี้อยู่นอกเวลาทำการของคลินิก');
+  if (date === todayString() && time <= nowTimeString()) throw httpError(400, 'เวลานี้ผ่านไปแล้ว');
+
+  const booking = await createBooking(req.ownerId, {
+    petId,
+    petName: pet.name,
+    petSpecies: pet.species,
+    service,
+    serviceLabel: BOOKING_SERVICES[service],
+    date,
+    time,
+    note,
+  });
+  res.status(201).json(booking);
+}));
+
+router.post('/bookings/:id/cancel', wrap(async (req, res) => {
+  res.json(await cancelBooking(req.ownerId, req.params.id));
+}));
 
 /* Errors from this module's routes (e.g. 404 from the store) become JSON responses. */
 router.use((err, _req, res, _next) => {
