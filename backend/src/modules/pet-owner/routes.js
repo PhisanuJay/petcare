@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { cancelBooking, createBooking, listBookings } from './bookingStore.js';
 import { cancelReservation, createReservation, listReservations } from './hotelStore.js';
+import { findAdoptionAnimal, listAdoptionAnimals } from './adoptionAnimals.js';
+import { cancelAdoptionRequest, createAdoptionRequest, listAdoptionRequests } from './adoptionStore.js';
 import { cancelTransportRequest, createTransportRequest, listTransportRequests } from './transportStore.js';
 import { createPet, deletePet, findPet, listPets, updatePet } from './store.js';
 
@@ -317,6 +319,60 @@ router.post('/transport/requests', wrap(async (req, res) => {
 
 router.post('/transport/requests/:id/cancel', wrap(async (req, res) => {
   res.json(await cancelTransportRequest(req.ownerId, req.params.id));
+}));
+
+/* ---------- Adoption ---------- */
+
+// Keep in sync with HOUSING_OPTIONS / EXPERIENCE_OPTIONS in frontend/src/features/pet-owner/adoptionOptions.js
+const HOUSING = ['house', 'townhome', 'condo', 'apartment', 'other'];
+const EXPERIENCE = ['none', 'some', 'experienced'];
+
+router.get('/adoption/animals', wrap(async (_req, res) => {
+  res.json(await listAdoptionAnimals());
+}));
+
+router.use('/adoption/requests', requireOwner);
+
+router.get('/adoption/requests', wrap(async (req, res) => {
+  res.json(await listAdoptionRequests(req.ownerId));
+}));
+
+router.post('/adoption/requests', wrap(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
+  const text = (v) => (typeof v === 'string' ? v.trim() : '');
+  const fullName = text(body.fullName);
+  const phone = text(body.phone).replace(/[-\s]/g, '');
+  const address = text(body.address);
+  const reason = text(body.reason);
+
+  const animal = typeof body.animalId === 'string' ? await findAdoptionAnimal(body.animalId) : null;
+  if (!animal) throw httpError(404, 'ไม่พบน้องที่ต้องการขอรับเลี้ยง');
+  if (fullName.length < 2 || fullName.length > 100) throw httpError(400, 'กรุณากรอกชื่อ-นามสกุล');
+  if (!/^0\d{8,9}$/.test(phone)) throw httpError(400, 'เบอร์โทร 9-10 หลัก ขึ้นต้นด้วย 0');
+  if (address.length < 10 || address.length > 300) throw httpError(400, 'กรุณากรอกที่อยู่ให้ละเอียด');
+  if (!HOUSING.includes(body.housing)) throw httpError(400, 'กรุณาเลือกประเภทที่พักอาศัย');
+  if (typeof body.hasOtherPets !== 'boolean') throw httpError(400, 'กรุณาระบุว่ามีสัตว์เลี้ยงอื่นหรือไม่');
+  if (!EXPERIENCE.includes(body.experience)) throw httpError(400, 'กรุณาเลือกประสบการณ์การเลี้ยงสัตว์');
+  if (reason.length < 10) throw httpError(400, 'กรุณาเล่าเหตุผลที่อยากรับเลี้ยงอย่างน้อย 10 ตัวอักษร');
+  if (reason.length > 1000) throw httpError(400, 'เหตุผลยาวเกินไป');
+
+  const request = await createAdoptionRequest(req.ownerId, {
+    animalId: animal.id,
+    animalName: animal.name,
+    fullName,
+    phone,
+    address,
+    housing: body.housing,
+    hasOtherPets: body.hasOtherPets,
+    experience: body.experience,
+    reason,
+  });
+  res.status(201).json(request);
+}));
+
+router.post('/adoption/requests/:id/cancel', wrap(async (req, res) => {
+  res.json(await cancelAdoptionRequest(req.ownerId, req.params.id));
 }));
 
 /* Errors from this module's routes (e.g. 404 from the store) become JSON responses. */
