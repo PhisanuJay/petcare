@@ -6,6 +6,7 @@ import {
   BOOKING_SERVICES,
   BOOKING_STATUS,
   CLINIC_PHONE,
+  OWNER_CANCELLABLE,
   OPENING_HOURS,
   availableSlots,
   todayString,
@@ -154,7 +155,7 @@ function BookingForm({ pets, defaultPetId, defaultService, onSubmit }) {
 function BookingItem({ booking, onCancel, busy }) {
   const status = BOOKING_STATUS[booking.status] ?? BOOKING_STATUS.pending;
   const service = BOOKING_SERVICES.find((s) => s.value === booking.service);
-  const canCancel = booking.status !== 'cancelled' && booking.date >= todayString();
+  const canCancel = OWNER_CANCELLABLE.includes(booking.status) && booking.date >= todayString();
 
   return (
     <div className="tl-item">
@@ -170,6 +171,12 @@ function BookingItem({ booking, onCancel, busy }) {
         <span className={`tag ${status.tone}`}>{status.label}</span>
       </div>
       {booking.note && <div className="small text-muted mt-1">{booking.note}</div>}
+      {booking.clinicNote && (
+        <div className="small mt-1">
+          <i className="bi bi-chat-left-text me-1" />
+          จากคลินิก: {booking.clinicNote}
+        </div>
+      )}
       {canCancel && (
         <button
           type="button"
@@ -192,8 +199,9 @@ export default function BookingPage() {
   const [busyId, setBusyId] = useState('');
 
   const today = todayString();
-  const upcoming = bookings.filter((b) => b.status !== 'cancelled' && b.date >= today);
-  const history = bookings.filter((b) => b.status === 'cancelled' || b.date < today).reverse();
+  const isOpen = (b) => OWNER_CANCELLABLE.includes(b.status) && b.date >= today;
+  const upcoming = bookings.filter(isOpen);
+  const history = bookings.filter((b) => !isOpen(b)).reverse();
 
   async function handleCancel(booking) {
     const text = `ยกเลิกนัดของ "${booking.petName}" วันที่ ${formatDate(booking.date)} เวลา ${booking.time} น.?`;

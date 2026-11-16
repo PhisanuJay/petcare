@@ -45,8 +45,14 @@ export function availableSlots(dateString) {
 export const BOOKING_STATUS = {
   pending: { label: 'รอยืนยัน', tone: 'warn' },
   confirmed: { label: 'ยืนยันแล้ว', tone: 'ok' },
+  completed: { label: 'เสร็จสิ้น', tone: 'sky' },
+  no_show: { label: 'ไม่มาตามนัด', tone: 'danger' },
+  rejected: { label: 'คลินิกไม่สามารถรับนัดได้', tone: 'danger' },
   cancelled: { label: 'ยกเลิกแล้ว', tone: '' },
 };
+
+/** Bookings the owner can still cancel (the backend enforces the same rule). */
+export const OWNER_CANCELLABLE = ['pending', 'confirmed'];
 
 export function todayString() {
   const d = new Date();
