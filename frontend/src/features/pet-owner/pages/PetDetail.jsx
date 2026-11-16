@@ -229,8 +229,14 @@ export default function PetDetailPage() {
                     <tbody>
                       {parasites.map((p) => (
                         <tr key={p.id}>
-                          <td className="fw-medium">{labelOf(PARASITE_TYPES, p.type)}</td>
-                          <td>{p.product || '-'}</td>
+                          <td className="fw-medium">
+                            {labelOf(PARASITE_TYPES, p.type)}
+                            {p.source === 'vet' && <span className="tag ok ms-2">บันทึกโดยคลินิก</span>}
+                          </td>
+                          <td>
+                            {p.product || '-'}
+                            {p.vet && <div className="small text-muted">{p.vet}</div>}
+                          </td>
                           <td>{formatDate(p.date)}</td>
                           <td>{dueTag(p.nextDate) ?? '-'}</td>
                         </tr>

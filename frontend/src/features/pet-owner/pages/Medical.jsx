@@ -43,9 +43,10 @@ function buildEntries(pets) {
         key: `p-${p.id}`,
         pet,
         kind: 'parasite',
+        byClinic: p.source === 'vet',
         date: p.date,
         title: labelOf(PARASITE_TYPES, p.type),
-        lines: [p.product && `ผลิตภัณฑ์: ${p.product}`],
+        lines: [p.product && `ผลิตภัณฑ์: ${p.product}`, p.vet && `สัตวแพทย์: ${p.vet}`],
         nextDate: p.nextDate,
         nextLabel: 'ครั้งถัดไป',
       });

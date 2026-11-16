@@ -2,19 +2,30 @@ import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VetLayout from '../components/VetLayout.jsx';
 import { usePatient, usePatients } from '../usePatients.js';
-import { createMedicalRecord, updateMedicalRecord } from '../useMedicalRecords.js';
+import {
+  createMedicalRecord,
+  createParasiteRecord,
+  updateMedicalRecord,
+  updateParasiteRecord,
+} from '../useMedicalRecords.js';
 import { DEFAULT_CLINIC, readVetName, saveVetName } from '../vetName.js';
 import { todayString } from '../../pet-owner/bookingOptions.js';
-import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
+import { PARASITE_TYPES, ageText, formatDate, labelOf, speciesOf } from '../../pet-owner/petUtils.js';
 
 /**
  * Medical Records — Role: Veterinarian (มะแอ่ว)
- * Record an examination / treatment for a patient. Records are saved in the pet's treatment list,
- * the same list the owner sees on the Medical page (marked "บันทึกโดยคลินิก"). Owners cannot edit
- * records written here; the vet can edit them afterwards.
+ * Record what was done for a patient. Two kinds:
+ *  - ตรวจ / รักษา  → the pet's treatment list (owner sees it under "การรักษา")
+ *  - ให้ยาถ่ายพยาธิ / เห็บหมัด → the pet's parasite list (owner sees it under "ถ่ายพยาธิ / เห็บหมัด")
+ * Both are marked "บันทึกโดยคลินิก" for the owner, who cannot edit them; the vet can edit them afterwards.
  */
 
-const emptyForm = () => ({
+const KINDS = [
+  { value: 'treatment', label: 'ตรวจ / รักษา', icon: 'bi-journal-medical' },
+  { value: 'parasite', label: 'ให้ยาถ่ายพยาธิ / เห็บหมัด', icon: 'bi-bug' },
+];
+
+const emptyTreatment = () => ({
   date: todayString(),
   vet: readVetName(),
   clinic: DEFAULT_CLINIC,
@@ -24,11 +35,33 @@ const emptyForm = () => ({
   followUp: '',
 });
 
+const emptyParasite = () => ({
+  type: 'deworm',
+  product: '',
+  date: todayString(),
+  vet: readVetName(),
+  place: DEFAULT_CLINIC,
+});
+
 const byDateDesc = (a, b) => (b.date || '').localeCompare(a.date || '');
 
-function RecordForm({ patient, editing, onSaved, onCancel }) {
+function SaveButtons({ editing, saving, onCancel }) {
+  return (
+    <div className="d-flex justify-content-end gap-2 mt-3">
+      {editing && (
+        <button type="button" className="btn btn-soft" onClick={onCancel} disabled={saving}>ยกเลิก</button>
+      )}
+      <button type="submit" className="btn btn-sky" disabled={saving}>
+        <i className="bi bi-check2 me-1" />
+        {saving ? 'กำลังบันทึก...' : editing ? 'บันทึกการแก้ไข' : 'บันทึก'}
+      </button>
+    </div>
+  );
+}
+
+function TreatmentForm({ patient, editing, onSaved, onCancel }) {
   const [form, setForm] = useState(() =>
-    editing ? { ...emptyForm(), ...editing, followUp: editing.followUp ?? '' } : emptyForm(),
+    editing ? { ...emptyTreatment(), ...editing, followUp: editing.followUp ?? '' } : emptyTreatment(),
   );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -62,14 +95,8 @@ function RecordForm({ patient, editing, onSaved, onCancel }) {
   }
 
   return (
-    <form className="card-soft mb-4" onSubmit={handleSubmit}>
-      <div className="section-label">
-        <i className="bi bi-journal-plus" />
-        {editing ? 'แก้ไขบันทึกการรักษา' : `บันทึกการรักษาใหม่ของ ${patient.name}`}
-      </div>
-
+    <form onSubmit={handleSubmit}>
       {error && <div className="alert alert-danger py-2">{error}</div>}
-
       <div className="row g-3">
         <div className="col-md-4">
           <label className="form-label" htmlFor="mr-date">วันที่ตรวจ</label>
@@ -101,37 +128,106 @@ function RecordForm({ patient, editing, onSaved, onCancel }) {
           <div className="form-text">ไม่บังคับ ใช้บันทึกวันที่ควรกลับมาติดตามผล</div>
         </div>
       </div>
-
-      <div className="d-flex justify-content-end gap-2 mt-3">
-        {editing && (
-          <button type="button" className="btn btn-soft" onClick={onCancel} disabled={saving}>ยกเลิก</button>
-        )}
-        <button type="submit" className="btn btn-sky" disabled={saving}>
-          <i className="bi bi-check2 me-1" />
-          {saving ? 'กำลังบันทึก...' : editing ? 'บันทึกการแก้ไข' : 'บันทึกการรักษา'}
-        </button>
-      </div>
+      <SaveButtons editing={editing} saving={saving} onCancel={onCancel} />
     </form>
   );
 }
 
-function RecordList({ records, onEdit, editingId }) {
-  if (records.length === 0) {
+function ParasiteForm({ patient, editing, onSaved, onCancel }) {
+  const [form, setForm] = useState(() => (editing ? { ...emptyParasite(), ...editing } : emptyParasite()));
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.vet.trim()) return setError('กรุณากรอกชื่อสัตวแพทย์');
+    setSaving(true);
+    setError('');
+    try {
+      const data = { type: form.type, product: form.product, date: form.date, place: form.place, vet: form.vet };
+      if (editing) await updateParasiteRecord(patient.id, editing.id, data);
+      else await createParasiteRecord(patient.id, data);
+      saveVetName(form.vet.trim());
+      await onSaved();
+    } catch (err) {
+      setError(err.message);
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {error && <div className="alert alert-danger py-2">{error}</div>}
+      <div className="row g-3">
+        <div className="col-md-6">
+          <label className="form-label" htmlFor="pr-type">ประเภท</label>
+          <select id="pr-type" className="form-select" value={form.type} onChange={set('type')}>
+            {PARASITE_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-md-6">
+          <label className="form-label" htmlFor="pr-product">ชื่อยา / ผลิตภัณฑ์</label>
+          <input
+            id="pr-product"
+            className="form-control"
+            maxLength={100}
+            placeholder="ไม่บังคับ เช่น NexGard, Drontal"
+            value={form.product}
+            onChange={set('product')}
+          />
+        </div>
+        <div className="col-md-4">
+          <label className="form-label" htmlFor="pr-date">วันที่ให้ยา</label>
+          <input id="pr-date" type="date" className="form-control" max={todayString()} value={form.date} onChange={set('date')} />
+        </div>
+        <div className="col-md-4">
+          <label className="form-label" htmlFor="pr-vet">สัตวแพทย์</label>
+          <input id="pr-vet" className="form-control" maxLength={100} value={form.vet} onChange={set('vet')} />
+        </div>
+        <div className="col-md-4">
+          <label className="form-label" htmlFor="pr-place">สถานที่</label>
+          <input id="pr-place" className="form-control" maxLength={100} value={form.place} onChange={set('place')} />
+        </div>
+      </div>
+      <SaveButtons editing={editing} saving={saving} onCancel={onCancel} />
+    </form>
+  );
+}
+
+/** Treatments and parasite doses of one patient as a single list, newest first. */
+function buildHistory(patient) {
+  return [
+    ...(patient.treatments ?? []).map((row) => ({ kind: 'treatment', row })),
+    ...(patient.parasites ?? []).map((row) => ({ kind: 'parasite', row })),
+  ].sort((a, b) => byDateDesc(a.row, b.row));
+}
+
+function HistoryList({ history, onEdit, editing }) {
+  if (history.length === 0) {
     return (
       <div className="empty-box py-3">
         <i className="bi bi-journal-medical" />
-        ยังไม่มีประวัติการรักษา
+        ยังไม่มีประวัติ
       </div>
     );
   }
   return (
     <div className="timeline">
-      {records.map((t) => (
-        <div className="tl-item" key={t.id}>
+      {history.map(({ kind, row: t }) => (
+        <div className="tl-item" key={`${kind}-${t.id}`}>
           <div className="date d-flex flex-wrap align-items-center gap-2">
             <span>
               {formatDate(t.date)}
-              {(t.vet || t.clinic) && ` · ${[t.vet, t.clinic].filter(Boolean).join(' · ')}`}
+              {kind === 'treatment' && (t.vet || t.clinic) && ` · ${[t.vet, t.clinic].filter(Boolean).join(' · ')}`}
+              {kind === 'parasite' && (t.vet || t.place) && ` · ${[t.vet, t.place].filter(Boolean).join(' · ')}`}
+            </span>
+            <span className="tag">
+              <i className={`bi ${kind === 'parasite' ? 'bi-bug' : 'bi-journal-medical'} me-1`} />
+              {kind === 'parasite' ? 'ถ่ายพยาธิ / เห็บหมัด' : 'ตรวจ / รักษา'}
             </span>
             {t.source === 'vet' ? (
               <span className="tag ok">บันทึกโดยคลินิก</span>
@@ -139,16 +235,27 @@ function RecordList({ records, onEdit, editingId }) {
               <span className="tag">บันทึกโดยเจ้าของ</span>
             )}
           </div>
-          <div className="fw-medium">{t.diagnosis || t.symptoms || 'ไม่ระบุ'}</div>
-          {t.symptoms && t.diagnosis && <div className="small text-muted">อาการ: {t.symptoms}</div>}
-          {t.treatment && <div className="small">การรักษา: {t.treatment}</div>}
-          {t.followUp && <div className="small mt-1">นัดติดตาม: {formatDate(t.followUp)}</div>}
+
+          {kind === 'treatment' ? (
+            <>
+              <div className="fw-medium">{t.diagnosis || t.symptoms || 'ไม่ระบุ'}</div>
+              {t.symptoms && t.diagnosis && <div className="small text-muted">อาการ: {t.symptoms}</div>}
+              {t.treatment && <div className="small">การรักษา: {t.treatment}</div>}
+              {t.followUp && <div className="small mt-1">นัดติดตาม: {formatDate(t.followUp)}</div>}
+            </>
+          ) : (
+            <div className="fw-medium">
+              {labelOf(PARASITE_TYPES, t.type)}
+              {t.product && <span className="fw-normal text-muted"> · {t.product}</span>}
+            </div>
+          )}
+
           {t.source === 'vet' && (
             <button
               type="button"
               className="btn btn-sm btn-soft mt-2"
-              disabled={editingId === t.id}
-              onClick={() => onEdit(t)}
+              disabled={editing?.row.id === t.id}
+              onClick={() => onEdit({ kind, row: t })}
             >
               <i className="bi bi-pencil-square me-1" />
               แก้ไข
@@ -205,13 +312,16 @@ function PatientPicker({ patients, loading, onSelect }) {
 export default function MedicalRecordsPage() {
   const [params, setParams] = useSearchParams();
   const petId = params.get('pet') ?? '';
+  const initialKind = params.get('kind') === 'parasite' ? 'parasite' : 'treatment';
   const { patients, loading: listLoading, error: listError } = usePatients();
   const detail = usePatient(petId);
-  const [editing, setEditing] = useState(null);
+  const [kind, setKind] = useState(initialKind);
+  const [editing, setEditing] = useState(null); // { kind, row }
   const [savedAt, setSavedAt] = useState(0);
 
   const patient = detail.patient;
-  const records = patient ? [...(patient.treatments ?? [])].sort(byDateDesc) : [];
+  const history = patient ? buildHistory(patient) : [];
+  const activeKind = editing ? editing.kind : kind;
 
   async function handleSaved() {
     setEditing(null);
@@ -221,8 +331,11 @@ export default function MedicalRecordsPage() {
 
   const choose = (id) => {
     setEditing(null);
-    setParams({ pet: id });
+    setSavedAt(0);
+    setParams(kind === 'parasite' ? { pet: id, kind: 'parasite' } : { pet: id });
   };
+
+  const FormComponent = activeKind === 'parasite' ? ParasiteForm : TreatmentForm;
 
   return (
     <VetLayout>
@@ -231,7 +344,7 @@ export default function MedicalRecordsPage() {
           <div className="page-head">
             <div>
               <h1>ประวัติการรักษา</h1>
-              <p>บันทึกการตรวจและการรักษา เจ้าของจะเห็นในหน้าประวัติสุขภาพของน้อง</p>
+              <p>บันทึกการตรวจ การรักษา และการให้ยาถ่ายพยาธิ เจ้าของจะเห็นในหน้าประวัติสุขภาพของน้อง</p>
             </div>
             {patient && (
               <div className="d-flex gap-2">
@@ -270,20 +383,43 @@ export default function MedicalRecordsPage() {
                 )}
                 {savedAt > 0 && !editing && <div className="alert alert-success py-2">บันทึกเรียบร้อยแล้ว</div>}
 
-                <RecordForm
-                  key={editing?.id ?? 'new'}
-                  patient={patient}
-                  editing={editing}
-                  onSaved={handleSaved}
-                  onCancel={() => setEditing(null)}
-                />
+                <div className="card-soft mb-4">
+                  <div className="d-flex flex-wrap gap-2 mb-3">
+                    {KINDS.map((k) => (
+                      <button
+                        type="button"
+                        key={k.value}
+                        className={`btn btn-sm ${activeKind === k.value ? 'btn-sky' : 'btn-soft'}`}
+                        disabled={Boolean(editing)}
+                        onClick={() => {
+                          setKind(k.value);
+                          setSavedAt(0);
+                        }}
+                      >
+                        <i className={`bi ${k.icon} me-1`} />
+                        {k.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="section-label">
+                    <i className={`bi ${activeKind === 'parasite' ? 'bi-bug' : 'bi-journal-plus'}`} />
+                    {editing ? 'แก้ไขบันทึก' : `บันทึกใหม่ของ ${patient.name}`}
+                  </div>
+                  <FormComponent
+                    key={`${activeKind}-${editing?.row.id ?? 'new'}-${patient.id}`}
+                    patient={patient}
+                    editing={editing?.row ?? null}
+                    onSaved={handleSaved}
+                    onCancel={() => setEditing(null)}
+                  />
+                </div>
 
                 <div className="card-soft">
                   <div className="section-label">
                     <i className="bi bi-journal-medical" />
-                    ประวัติของ {patient.name} ({records.length})
+                    ประวัติของ {patient.name} ({history.length})
                   </div>
-                  <RecordList records={records} onEdit={setEditing} editingId={editing?.id} />
+                  <HistoryList history={history} onEdit={setEditing} editing={editing} />
                 </div>
               </>
             )

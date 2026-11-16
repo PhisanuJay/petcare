@@ -12,6 +12,10 @@ import { getPetById, listAllPets, updatePetAsClinic } from '../pet-owner/store.j
  */
 const router = Router();
 
+// Keep in sync with PARASITE_TYPES in frontend/src/features/pet-owner/petUtils.js
+const PARASITE_LABELS = { deworm: 'ถ่ายพยาธิ', flea: 'ป้องกันเห็บหมัด', heartworm: 'ป้องกันพยาธิหนอนหัวใจ' };
+const PARASITE_TYPES = Object.keys(PARASITE_LABELS);
+
 function httpError(status, message) {
   const error = new Error(message);
   error.status = status;
@@ -157,67 +161,89 @@ function parseRecord(body) {
   return record;
 }
 
+/**
+ * Clinic-written entries in one of the pet's health lists (`treatments`, `vaccines`, `parasites`).
+ * Entries carry `source: 'vet'`; owners cannot create, change or remove them (see the Pet Owner store).
+ * Both helpers run inside the store's write queue.
+ */
+async function addClinicEntry(petId, listKey, record) {
+  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกคนไข้');
+  const now = new Date().toISOString();
+  const entry = { ...record, id: randomUUID(), source: 'vet', createdAt: now, updatedAt: now };
+  await updatePetAsClinic(petId, (pet) => ({ ...pet, [listKey]: [...(pet[listKey] ?? []), entry] }));
+  return entry;
+}
+
+async function editClinicEntry(petId, listKey, recordId, record, notFoundMessage) {
+  let updated;
+  await updatePetAsClinic(petId, (pet) => {
+    const list = pet[listKey] ?? [];
+    const index = list.findIndex((row) => row.id === recordId);
+    if (index === -1) throw httpError(404, notFoundMessage);
+    if (list[index].source !== 'vet') throw httpError(403, 'แก้ไขได้เฉพาะบันทึกที่คลินิกเป็นผู้บันทึก');
+    updated = { ...list[index], ...record, updatedAt: new Date().toISOString() };
+    const next = list.slice();
+    next[index] = updated;
+    return { ...pet, [listKey]: next };
+  });
+  return updated;
+}
+
 router.use('/medical-records', requireVet);
 
 // POST /medical-records  { petId, date, vet, clinic?, symptoms?, diagnosis?, treatment?, followUp? }
 router.post('/medical-records', wrap(async (req, res) => {
-  const petId = req.body?.petId;
-  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกคนไข้');
   const record = parseRecord(req.body);
-  const now = new Date().toISOString();
-  const entry = { ...record, id: randomUUID(), source: 'vet', createdAt: now, updatedAt: now };
-  await updatePetAsClinic(petId, (pet) => ({ ...pet, treatments: [...(pet.treatments ?? []), entry] }));
-  res.status(201).json(entry);
+  res.status(201).json(await addClinicEntry(req.body.petId, 'treatments', record));
 }));
 
 // PUT /medical-records/:petId/:recordId — only records written by the clinic can be changed
 router.put('/medical-records/:petId/:recordId', wrap(async (req, res) => {
   const record = parseRecord(req.body);
-  let updated;
-  await updatePetAsClinic(req.params.petId, (pet) => {
-    const list = pet.treatments ?? [];
-    const index = list.findIndex((t) => t.id === req.params.recordId);
-    if (index === -1) throw httpError(404, 'ไม่พบบันทึกการรักษานี้');
-    if (list[index].source !== 'vet') throw httpError(403, 'แก้ไขได้เฉพาะบันทึกที่คลินิกเป็นผู้บันทึก');
-    updated = { ...list[index], ...record, updatedAt: new Date().toISOString() };
-    const next = list.slice();
-    next[index] = updated;
-    return { ...pet, treatments: next };
-  });
-  res.json(updated);
+  res.json(await editClinicEntry(req.params.petId, 'treatments', req.params.recordId, record, 'ไม่พบบันทึกการรักษานี้'));
 }));
 
-/* ---------- Vaccination ---------- */
+/* ---------- Vaccination and parasite treatment ---------- */
 
-// A vaccination is one entry of the pet's `vaccines` list (the list the owner sees). Entries written
-// here carry `source: 'vet'` and a `vet` field; owners cannot edit or delete them.
+// Vaccinations go to the pet's `vaccines` list, parasite treatments to `parasites`: the same lists the
+// owner sees (the owner's health history has a separate category for each). Both carry a `vet` field.
 
-function parseVaccination(body) {
+function parseDose(body, { isVaccine }) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
   const record = {
-    name: text(body.name, 100),
     date: body.date,
     nextDate: body.nextDate || '',
     place: text(body.place, 100),
     vet: text(body.vet, 100),
-    lot: text(body.lot, 200),
   };
-  if (!record.name) throw httpError(400, 'กรุณากรอกชื่อวัคซีน');
-  if (!isDateString(record.date)) throw httpError(400, 'กรุณาเลือกวันที่ฉีด');
-  if (record.date > today()) throw httpError(400, 'วันที่ฉีดต้องไม่ใช่วันในอนาคต');
+  if (isVaccine) {
+    record.name = text(body.name, 100);
+    record.lot = text(body.lot, 200);
+    if (!record.name) throw httpError(400, 'กรุณากรอกชื่อวัคซีน');
+  } else {
+    record.type = body.type;
+    record.product = text(body.product, 100);
+    if (!PARASITE_TYPES.includes(record.type)) throw httpError(400, 'กรุณาเลือกประเภทการป้องกันพยาธิ');
+  }
+  if (!isDateString(record.date)) throw httpError(400, 'กรุณาเลือกวันที่');
+  if (record.date > today()) throw httpError(400, 'วันที่ต้องไม่ใช่วันในอนาคต');
   if (!record.vet) throw httpError(400, 'กรุณากรอกชื่อสัตวแพทย์');
   if (record.nextDate) {
     if (!isDateString(record.nextDate)) throw httpError(400, 'วันนัดครั้งถัดไปไม่ถูกต้อง');
-    if (record.nextDate <= record.date) throw httpError(400, 'วันนัดครั้งถัดไปต้องหลังวันที่ฉีด');
+    if (record.nextDate <= record.date) throw httpError(400, 'วันนัดครั้งถัดไปต้องหลังวันที่ให้บริการ');
   }
   return record;
 }
+
+const parseVaccination = (body) => parseDose(body, { isVaccine: true });
+const parseParasite = (body) => parseDose(body, { isVaccine: false });
 
 const normName = (name) => String(name ?? '').trim().toLowerCase();
 
 /**
  * Vaccines that are overdue or due within `days` days. Only the most recent dose of each vaccine
- * counts, so giving the next dose clears the old reminder.
+ * counts, so giving the next dose clears the old reminder. (Parasite treatment is just recorded when
+ * given; the clinic does not track it as a schedule.)
  */
 function dueVaccines(pets, days) {
   const limit = new Date();
@@ -226,31 +252,37 @@ function dueVaccines(pets, days) {
   const limitString = `${limit.getFullYear()}-${pad(limit.getMonth() + 1)}-${pad(limit.getDate())}`;
   const t = today();
   const due = [];
-  for (const pet of pets) {
+
+  const collect = (pet, rows, keyOf, describe) => {
     const latest = new Map();
-    for (const v of pet.vaccines ?? []) {
-      const key = normName(v.name) || v.id;
+    for (const row of rows) {
+      const key = keyOf(row) || row.id;
       const current = latest.get(key);
-      if (!current || (v.date ?? '') >= (current.date ?? '')) latest.set(key, v);
+      if (!current || (row.date ?? '') >= (current.date ?? '')) latest.set(key, row);
     }
-    for (const v of latest.values()) {
-      if (!v.nextDate || v.nextDate > limitString) continue;
+    for (const row of latest.values()) {
+      if (!row.nextDate || row.nextDate > limitString) continue;
       due.push({
+        ...describe(row),
         petId: pet.id,
         petName: pet.name,
         petSpecies: pet.species,
         petBreed: pet.breed,
-        vaccine: v.name,
-        lastDate: v.date || '',
-        nextDate: v.nextDate,
-        status: v.nextDate < t ? 'overdue' : 'soon',
+        lastDate: row.date || '',
+        nextDate: row.nextDate,
+        status: row.nextDate < t ? 'overdue' : 'soon',
       });
     }
+  };
+
+  for (const pet of pets) {
+    collect(pet, pet.vaccines ?? [], (v) => normName(v.name), (v) => ({ name: v.name }));
   }
   return due.sort((a, b) => a.nextDate.localeCompare(b.nextDate));
 }
 
 router.use('/vaccination', requireVet);
+router.use('/parasite', requireVet);
 
 // GET /vaccination/due?days=30
 router.get('/vaccination/due', wrap(async (req, res) => {
@@ -261,30 +293,27 @@ router.get('/vaccination/due', wrap(async (req, res) => {
 
 // POST /vaccination  { petId, name, date, nextDate?, place?, vet, lot? }
 router.post('/vaccination', wrap(async (req, res) => {
-  const petId = req.body?.petId;
-  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกคนไข้');
   const record = parseVaccination(req.body);
-  const now = new Date().toISOString();
-  const entry = { ...record, id: randomUUID(), source: 'vet', createdAt: now, updatedAt: now };
-  await updatePetAsClinic(petId, (pet) => ({ ...pet, vaccines: [...(pet.vaccines ?? []), entry] }));
-  res.status(201).json(entry);
+  res.status(201).json(await addClinicEntry(req.body.petId, 'vaccines', record));
 }));
 
 // PUT /vaccination/:petId/:recordId — only records written by the clinic can be changed
 router.put('/vaccination/:petId/:recordId', wrap(async (req, res) => {
   const record = parseVaccination(req.body);
-  let updated;
-  await updatePetAsClinic(req.params.petId, (pet) => {
-    const list = pet.vaccines ?? [];
-    const index = list.findIndex((v) => v.id === req.params.recordId);
-    if (index === -1) throw httpError(404, 'ไม่พบบันทึกวัคซีนนี้');
-    if (list[index].source !== 'vet') throw httpError(403, 'แก้ไขได้เฉพาะบันทึกที่คลินิกเป็นผู้บันทึก');
-    updated = { ...list[index], ...record, updatedAt: new Date().toISOString() };
-    const next = list.slice();
-    next[index] = updated;
-    return { ...pet, vaccines: next };
-  });
-  res.json(updated);
+  res.json(await editClinicEntry(req.params.petId, 'vaccines', req.params.recordId, record, 'ไม่พบบันทึกวัคซีนนี้'));
+}));
+
+// POST /parasite  { petId, type: 'deworm'|'flea'|'heartworm', product?, date, place?, vet, nextDate? }
+// Used by the Medical Records page: it only records that the treatment was given (nextDate is optional).
+router.post('/parasite', wrap(async (req, res) => {
+  const record = parseParasite(req.body);
+  res.status(201).json(await addClinicEntry(req.body.petId, 'parasites', record));
+}));
+
+// PUT /parasite/:petId/:recordId — only records written by the clinic can be changed
+router.put('/parasite/:petId/:recordId', wrap(async (req, res) => {
+  const record = parseParasite(req.body);
+  res.json(await editClinicEntry(req.params.petId, 'parasites', req.params.recordId, record, 'ไม่พบบันทึกนี้'));
 }));
 
 /* ---------- Not implemented yet ---------- */

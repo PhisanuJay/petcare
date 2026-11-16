@@ -9,9 +9,10 @@ import { ageText, daysUntil, formatDate, reminderText, speciesOf } from '../../p
 
 /**
  * Vaccination — Role: Veterinarian (มะแอ่ว)
- * Left: vaccines that are overdue or due soon, for every patient. Right: record a vaccination for a
- * patient. Records go into the pet's vaccine list, the same list the owner sees (marked "บันทึกโดยคลินิก");
- * owners cannot edit them, the vet can edit them afterwards.
+ * Left: vaccines that are overdue or due within 30 days, for every patient. Right: record a vaccination
+ * for a patient. Records go into the pet's vaccine list, the same list the owner sees (marked
+ * "บันทึกโดยคลินิก"); owners cannot edit them, the vet can edit them afterwards.
+ * (Parasite treatment is recorded on the Medical Records page, not here.)
  */
 
 // Common vaccines as suggestions only; the vet can type any name.
@@ -57,13 +58,13 @@ function DueList({ due, loading, error, reload, onPick }) {
           {due.map((d) => {
             const r = { days: daysUntil(d.nextDate) };
             return (
-              <div key={`${d.petId}-${d.vaccine}-${d.nextDate}`} className="p-2 rounded-4 border">
+              <div key={`${d.petId}-${d.name}-${d.nextDate}`} className="p-2 rounded-4 border">
                 <div className="d-flex flex-wrap align-items-center gap-2">
                   <span className="fw-medium">{speciesOf(d.petSpecies).emoji} {d.petName}</span>
                   <span className={`tag ${d.status === 'overdue' ? 'danger' : 'warn'}`}>{reminderText(r)}</span>
                 </div>
                 <div className="small">
-                  {d.vaccine} · กำหนด {formatDate(d.nextDate)}
+                  {d.name} · กำหนด {formatDate(d.nextDate)}
                   {d.lastDate && <span className="text-muted"> (ฉีดล่าสุด {formatDate(d.lastDate)})</span>}
                 </div>
                 <button type="button" className="btn btn-sm btn-sky mt-2" onClick={() => onPick(d)}>
@@ -320,7 +321,7 @@ export default function VaccinationPage() {
                 loading={dueState.loading}
                 error={dueState.error}
                 reload={dueState.reload}
-                onPick={(d) => choose(d.petId, d.vaccine)}
+                onPick={(d) => choose(d.petId, d.name)}
               />
             </div>
 

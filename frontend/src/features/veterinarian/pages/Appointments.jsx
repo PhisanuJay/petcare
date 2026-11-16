@@ -32,6 +32,13 @@ function addDays(dateString, days) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/** Where the vet records what was done, depending on the service the owner booked. */
+function recordLink(a) {
+  if (a.service === 'vaccine') return `/veterinarian/vaccination?pet=${a.pet.id}`;
+  if (a.service === 'parasite') return `/veterinarian/medical-records?pet=${a.pet.id}&kind=parasite`;
+  return `/veterinarian/medical-records?pet=${a.pet.id}`;
+}
+
 function PetInfo({ pet, fallbackName }) {
   if (!pet) {
     return <div className="fw-medium">{fallbackName} <span className="small text-muted">(ไม่พบข้อมูลสัตว์เลี้ยงแล้ว)</span></div>;
@@ -97,9 +104,9 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
             </>
           )}
           {['confirmed', 'completed'].includes(a.status) && a.pet && (
-            <Link to={`/veterinarian/medical-records?pet=${a.pet.id}`} className="btn btn-soft btn-sm">
+            <Link to={recordLink(a)} className="btn btn-soft btn-sm">
               <i className="bi bi-journal-plus me-1" />
-              บันทึกการรักษา
+              {a.service === 'vaccine' ? 'บันทึกการฉีดวัคซีน' : a.service === 'parasite' ? 'บันทึกการให้ยา' : 'บันทึกการรักษา'}
             </Link>
           )}
           {a.status === 'confirmed' && (

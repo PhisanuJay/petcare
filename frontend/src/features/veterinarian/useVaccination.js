@@ -9,7 +9,10 @@ export const createVaccination = (petId, data) =>
 export const updateVaccination = (petId, recordId, data) =>
   vetRequest(`/vaccination/${petId}/${recordId}`, { method: 'PUT', body: JSON.stringify(data) });
 
-/** Vaccines that are overdue or due within `days` days, for every patient. */
+/**
+ * Vaccines that are overdue or due within `days` days, for every patient.
+ * Each item has `name`, `petId`, `petName`, `lastDate`, `nextDate` and `status` ('overdue' | 'soon').
+ */
 export function useDueVaccines(days = 30) {
   const [due, setDue] = useState([]);
   const [loading, setLoading] = useState(true);
