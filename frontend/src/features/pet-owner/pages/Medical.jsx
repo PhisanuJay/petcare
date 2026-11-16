@@ -51,6 +51,7 @@ function buildEntries(pets) {
         key: `t-${t.id}`,
         pet,
         kind: 'treatment',
+        byClinic: t.source === 'vet',
         date: t.date,
         title: t.diagnosis || t.symptoms || 'การรักษา',
         lines: [
@@ -182,6 +183,7 @@ export default function MedicalPage() {
                           <i className={`bi ${kindMeta(e.kind).icon} me-1`} />
                           {kindMeta(e.kind).label}
                         </span>
+                        {e.byClinic && <span className="tag ok">บันทึกโดยคลินิก</span>}
                       </div>
                       <div className="date">{formatDate(e.date)}</div>
                       <div className="fw-medium">{e.title}</div>

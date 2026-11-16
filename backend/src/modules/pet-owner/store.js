@@ -27,13 +27,22 @@ export function createPet(ownerId, data) {
   return pets.update((all) => ({ records: [...all, pet], result: pet }));
 }
 
+/** Health record lists. Rows with `source: 'vet'` belong to the clinic and survive owner edits. */
+const RECORD_KEYS = ['vaccines', 'treatments', 'parasites'];
+
 export function updatePet(ownerId, id, data) {
   return pets.update((all) => {
     const index = all.findIndex((pet) => pet.id === id && pet.ownerId === ownerId);
     if (index === -1) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
+    const merged = { ...data };
+    for (const key of RECORD_KEYS) {
+      if (merged[key] === undefined) continue;
+      const clinicRows = (all[index][key] ?? []).filter((row) => row.source === 'vet');
+      merged[key] = [...merged[key], ...clinicRows];
+    }
     const pet = {
       ...all[index],
-      ...data,
+      ...merged,
       id,
       ownerId,
       createdAt: all[index].createdAt,
@@ -61,4 +70,19 @@ export function getPetById(id) {
 /** Every owner's pets (for the veterinarian side). */
 export function listAllPets() {
   return pets.read();
+}
+
+/**
+ * Change a pet on behalf of the clinic (any owner). `mutator(pet)` returns the new pet and may throw.
+ * Runs inside the store's write queue, so it cannot overwrite a concurrent owner edit.
+ */
+export function updatePetAsClinic(id, mutator) {
+  return pets.update((all) => {
+    const index = all.findIndex((pet) => pet.id === id);
+    if (index === -1) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
+    const pet = { ...mutator(all[index]), updatedAt: new Date().toISOString() };
+    const next = all.slice();
+    next[index] = pet;
+    return { records: next, result: pet };
+  });
 }

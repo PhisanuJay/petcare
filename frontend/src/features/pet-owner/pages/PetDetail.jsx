@@ -260,6 +260,7 @@ export default function PetDetailPage() {
                   {treatments.map((t) => (
                     <div className="tl-item" key={t.id}>
                       <div className="date">
+                        {t.source === 'vet' && <span className="tag ok me-2">บันทึกโดยคลินิก</span>}
                         {formatDate(t.date)}
                         {(t.vet || t.clinic) && ` · ${[t.vet, t.clinic].filter(Boolean).join(' · ')}`}
                       </div>

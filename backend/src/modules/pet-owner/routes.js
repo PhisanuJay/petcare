@@ -40,8 +40,16 @@ function requireOwner(req, _res, next) {
   next();
 }
 
+// Records written by the clinic carry `source: 'vet'`. Owners cannot create, change or remove them,
+// so any `source` sent by an owner is dropped here (and the store keeps the clinic's own records).
 const withIds = (rows) =>
-  rows.map((row) => (row && typeof row === 'object' ? { ...row, id: row.id || randomUUID() } : null)).filter(Boolean);
+  rows
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null;
+      const { source: _source, ...rest } = row;
+      return { ...rest, id: row.id || randomUUID() };
+    })
+    .filter(Boolean);
 
 /** Keep only known pet fields. With `partial`, fields that are absent are left out. */
 function sanitizePet(body, { partial = false } = {}) {

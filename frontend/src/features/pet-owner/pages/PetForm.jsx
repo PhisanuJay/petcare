@@ -58,7 +58,18 @@ function PetFormInner({ petId }) {
   const navigate = useNavigate();
   const existing = petId ? getPet(petId) : null;
 
-  const [form, setForm] = useState(() => ({ ...emptyPet(), ...existing }));
+  // Records written by the clinic (source 'vet') are read-only for owners and kept by the backend,
+  // so they are left out of the editable lists here.
+  const ownRows = (rows) => (rows ?? []).filter((r) => r.source !== 'vet');
+  const [form, setForm] = useState(() => {
+    const initial = { ...emptyPet(), ...existing };
+    return {
+      ...initial,
+      vaccines: ownRows(initial.vaccines),
+      treatments: ownRows(initial.treatments),
+      parasites: ownRows(initial.parasites),
+    };
+  });
   const [tab, setTab] = useState('general');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
