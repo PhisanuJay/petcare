@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { usePets } from '../usePets.js';
 import {
@@ -66,9 +67,20 @@ const byDateDesc = (a, b) => (b.date || '').localeCompare(a.date || '');
 
 export default function PetDetailPage() {
   const { petId } = useParams();
-  const { getPet, deletePet } = usePets();
+  const { getPet, deletePet, loading, error: loadError } = usePets();
   const navigate = useNavigate();
+  const [deleteError, setDeleteError] = useState('');
   const pet = getPet(petId);
+
+  if (!pet && loading) {
+    return (
+      <div className="page-wrap">
+        <div className="container">
+          <div className="card-soft empty-box">กำลังโหลดข้อมูล...</div>
+        </div>
+      </div>
+    );
+  }
 
   if (!pet) {
     return (
@@ -76,7 +88,7 @@ export default function PetDetailPage() {
         <div className="container">
           <div className="card-soft empty-box">
             <i className="bi bi-question-circle" />
-            ไม่พบข้อมูลสัตว์เลี้ยงนี้
+            {loadError || 'ไม่พบข้อมูลสัตว์เลี้ยงนี้'}
             <div className="mt-3">
               <Link to="/pet-owner/my-pets" className="btn btn-sky">กลับไปหน้าสัตว์เลี้ยง</Link>
             </div>
@@ -91,10 +103,14 @@ export default function PetDetailPage() {
   const parasites = [...(pet.parasites ?? [])].sort(byDateDesc);
   const treatments = [...(pet.treatments ?? [])].sort(byDateDesc);
 
-  function handleDelete() {
+  async function handleDelete() {
     if (window.confirm(`ลบข้อมูล "${pet.name}" และประวัติทั้งหมด? การลบไม่สามารถย้อนกลับได้`)) {
-      deletePet(pet.id);
-      navigate('/pet-owner/my-pets');
+      try {
+        await deletePet(pet.id);
+        navigate('/pet-owner/my-pets');
+      } catch (err) {
+        setDeleteError(err.message);
+      }
     }
   }
 
@@ -105,6 +121,8 @@ export default function PetDetailPage() {
           <i className="bi bi-arrow-left me-1" />
           สัตว์เลี้ยงของฉัน
         </Link>
+
+        {deleteError && <div className="alert alert-danger mt-2">{deleteError}</div>}
 
         <div className="card-soft mt-2 mb-4">
           <div className="d-flex flex-wrap align-items-center gap-4">
