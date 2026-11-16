@@ -159,7 +159,7 @@ export default function PetDetailPage() {
                   <span>
                     <strong>{r.title}</strong> · {formatDate(r.date)} ({reminderText(r)})
                   </span>
-                  <Link to="/pet-owner/booking" className="btn btn-sm btn-soft ms-auto">จองนัด</Link>
+                  <Link to={`/pet-owner/booking?petId=${pet.id}`} className="btn btn-sm btn-soft ms-auto">จองนัด</Link>
                 </div>
               ))}
             </div>
