@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { usePets } from '../usePets.js';
+import { useBookings } from '../useBookings.js';
+import { BOOKING_STATUS, OWNER_CANCELLABLE, todayString } from '../bookingOptions.js';
 import { ageText, careReminders, formatDate, reminderText, speciesOf } from '../petUtils.js';
 import PetPhoto from '../components/PetPhoto.jsx';
 
 /**
  * Pet Owner Dashboard — Role: Pet Owner (มะแอ่ว)
- * Summary of the owner's pets and upcoming vaccine / parasite reminders.
+ * Summary of the owner's pets, upcoming appointments and vaccine / parasite reminders.
  */
 
 const QUICK_LINKS = [
@@ -17,12 +19,6 @@ const QUICK_LINKS = [
 ];
 
 const SMALL_PHOTO = { width: 48, height: 48, fontSize: '1.4rem', borderWidth: 2 };
-
-const countRecords = (pets) =>
-  pets.reduce(
-    (sum, p) => sum + (p.vaccines?.length ?? 0) + (p.treatments?.length ?? 0) + (p.parasites?.length ?? 0),
-    0,
-  );
 
 function Stat({ value, label, tone }) {
   return (
@@ -38,9 +34,14 @@ function Stat({ value, label, tone }) {
 export default function PetOwnerDashboardPage() {
   const { currentUser } = useAuth();
   const { pets, loading, error, reload } = usePets();
+  const bookingState = useBookings();
 
   const reminders = careReminders(pets).filter((r) => r.status !== 'later');
   const overdue = reminders.filter((r) => r.status === 'overdue');
+  const today = todayString();
+  const upcomingBookings = bookingState.bookings.filter(
+    (b) => OWNER_CANCELLABLE.includes(b.status) && b.date >= today,
+  );
 
   return (
     <div className="page-wrap">
@@ -69,17 +70,57 @@ export default function PetOwnerDashboardPage() {
           <>
             <div className="row g-3 mb-4">
               <Stat value={pets.length} label="สัตว์เลี้ยง" />
-              <Stat value={reminders.length} label="นัดภายใน 30 วัน" />
+              <Stat value={upcomingBookings.length} label="นัดหมายที่กำลังจะถึง" />
+              <Stat value={reminders.length} label="วัคซีน/ยาใกล้ถึงกำหนด" />
               <Stat value={overdue.length} label="เลยกำหนด" tone={overdue.length ? 'text-danger' : ''} />
-              <Stat value={countRecords(pets)} label="รายการประวัติสุขภาพ" />
             </div>
 
             <div className="row g-4">
               <div className="col-lg-7">
-                <div className="card-soft h-100">
+                <div className="card-soft mb-4">
+                  <div className="d-flex align-items-start justify-content-between">
+                    <div className="section-label">
+                      <i className="bi bi-calendar2-check" />
+                      นัดหมายที่กำลังจะถึง ({upcomingBookings.length})
+                    </div>
+                    <Link to="/pet-owner/booking" className="small text-decoration-none">จองนัด / ดูทั้งหมด</Link>
+                  </div>
+                  {bookingState.error && <div className="small text-danger mb-2">{bookingState.error}</div>}
+                  {bookingState.loading ? (
+                    <div className="empty-box py-3">กำลังโหลด...</div>
+                  ) : upcomingBookings.length === 0 ? (
+                    <div className="empty-box py-3">
+                      <i className="bi bi-calendar-x" />
+                      ยังไม่มีนัดหมายที่กำลังจะถึง
+                    </div>
+                  ) : (
+                    <ul className="list-unstyled mb-0">
+                      {upcomingBookings.slice(0, 5).map((b) => {
+                        const status = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.pending;
+                        return (
+                          <li key={b.id} className="d-flex flex-wrap align-items-center gap-2 py-2 border-bottom">
+                            <span className="fw-medium" style={{ minWidth: 150 }}>
+                              {formatDate(b.date)} · {b.time} น.
+                            </span>
+                            <span>{b.petName}</span>
+                            <span className="tag">{b.serviceLabel}</span>
+                            <span className={`tag ${status.tone}`}>{status.label}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {upcomingBookings.length > 5 && (
+                    <Link to="/pet-owner/booking" className="small text-decoration-none d-block mt-2">
+                      ดูทั้งหมด ({upcomingBookings.length})
+                    </Link>
+                  )}
+                </div>
+
+                <div className="card-soft">
                   <div className="section-label">
                     <i className="bi bi-bell" />
-                    สิ่งที่ต้องทำ
+                    วัคซีนและยาที่ต้องทำ
                   </div>
                   {reminders.length === 0 ? (
                     <div className="empty-box py-3">
