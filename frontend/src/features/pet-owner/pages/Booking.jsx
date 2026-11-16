@@ -19,10 +19,10 @@ import { formatDate } from '../petUtils.js';
  * until the veterinarian side confirms it.
  */
 
-function BookingForm({ pets, defaultPetId, onSubmit }) {
+function BookingForm({ pets, defaultPetId, defaultService, onSubmit }) {
   const [form, setForm] = useState({
     petId: pets.some((p) => p.id === defaultPetId) ? defaultPetId : (pets[0]?.id ?? ''),
-    service: 'checkup',
+    service: BOOKING_SERVICES.some((s) => s.value === defaultService) ? defaultService : 'checkup',
     date: '',
     time: '',
     note: '',
@@ -239,7 +239,7 @@ export default function BookingPage() {
         ) : (
           <div className="row g-4">
             <div className="col-lg-6">
-              <BookingForm pets={pets} defaultPetId={params.get('petId')} onSubmit={addBooking} />
+              <BookingForm pets={pets} defaultPetId={params.get('petId')} defaultService={params.get('service')} onSubmit={addBooking} />
             </div>
 
             <div className="col-lg-6">
