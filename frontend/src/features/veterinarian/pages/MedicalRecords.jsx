@@ -1,3 +1,5 @@
+import VetLayout from '../components/VetLayout.jsx';
+
 /**
  * Placeholder — Medical Records
  * Role: Veterinarian
@@ -8,11 +10,21 @@
  */
 export default function MedicalRecordsPage() {
   return (
-    <section>
-      <h1>Medical Records</h1>
-      <p>Role: Veterinarian</p>
-      <p>Owner: มะแอ่ว</p>
-      <p>Placeholder page — not implemented yet.</p>
-    </section>
+    <VetLayout>
+      <div className="page-wrap">
+        <div className="container">
+          <div className="page-head">
+            <div>
+              <h1>ประวัติการรักษา</h1>
+              <p>บันทึกการตรวจและการรักษา</p>
+            </div>
+          </div>
+          <div className="card-soft empty-box">
+            <i className="bi bi-journal-medical" />
+            หน้านี้ยังอยู่ระหว่างการพัฒนา
+          </div>
+        </div>
+      </div>
+    </VetLayout>
   );
 }

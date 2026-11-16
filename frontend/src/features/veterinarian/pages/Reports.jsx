@@ -1,3 +1,5 @@
+import VetLayout from '../components/VetLayout.jsx';
+
 /**
  * Placeholder — Reports
  * Role: Veterinarian
@@ -8,11 +10,21 @@
  */
 export default function ReportsPage() {
   return (
-    <section>
-      <h1>Reports</h1>
-      <p>Role: Veterinarian</p>
-      <p>Owner: มะแอ่ว</p>
-      <p>Placeholder page — not implemented yet.</p>
-    </section>
+    <VetLayout>
+      <div className="page-wrap">
+        <div className="container">
+          <div className="page-head">
+            <div>
+              <h1>รายงาน</h1>
+              <p>สรุปรายงานของคลินิก</p>
+            </div>
+          </div>
+          <div className="card-soft empty-box">
+            <i className="bi bi-bar-chart-line" />
+            หน้านี้ยังอยู่ระหว่างการพัฒนา
+          </div>
+        </div>
+      </div>
+    </VetLayout>
   );
 }

@@ -1,0 +1,32 @@
+/*
+ * Veterinarian pages — scoped to .vet-site.
+ * The legacy AppShell paints every <a> blue (.app-shell a), which would turn button-styled links
+ * (btn-sky, btn-soft, ...) unreadable. These rules restore the customer-site button colours here only.
+ */
+.vet-site {
+  min-height: 0;
+  border-radius: 24px;
+  padding-bottom: 2rem;
+}
+.vet-site a {
+  color: var(--ink);
+}
+.vet-site a.btn-sky,
+.vet-site a.btn-sky:hover {
+  color: #fff;
+}
+.vet-site a.btn-soft-danger {
+  color: #c53030;
+}
+.vet-site .nav-shell {
+  top: 8px;
+  padding-top: 12px;
+}
+.vet-site .vet-badge {
+  font-size: 0.72rem;
+  background: var(--baby);
+  color: var(--sky-dark);
+  border-radius: 999px;
+  padding: 0.1rem 0.55rem;
+  font-weight: 500;
+}

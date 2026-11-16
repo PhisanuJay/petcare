@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAppointments } from '../useAppointments.js';
-import VetNav from '../components/VetNav.jsx';
+import VetLayout from '../components/VetLayout.jsx';
 import { BOOKING_STATUS, todayString } from '../../pet-owner/bookingOptions.js';
 import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 
@@ -144,10 +144,9 @@ export default function AppointmentsPage() {
   }
 
   return (
+    <VetLayout>
     <div className="page-wrap">
       <div className="container">
-        <VetNav />
-
         <div className="page-head">
           <div>
             <h1>นัดหมาย</h1>
@@ -234,5 +233,6 @@ export default function AppointmentsPage() {
         )}
       </div>
     </div>
+    </VetLayout>
   );
 }
