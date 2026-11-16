@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import VetLayout from '../components/VetLayout.jsx';
+import DayChart from '../components/DayChart.jsx';
 import { useReport } from '../useReports.js';
 import { BOOKING_STATUS, todayString } from '../../pet-owner/bookingOptions.js';
 import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
@@ -99,50 +100,6 @@ function BarList({ rows, empty = 'ไม่มีข้อมูลในช่�
           <span className="fw-medium text-end">{r.count}</span>
         </div>
       ))}
-    </div>
-  );
-}
-
-function DayChart({ columns }) {
-  const [active, setActive] = useState(null);
-  const max = Math.max(1, ...columns.map((c) => c.count));
-  const tickStep = Math.max(1, Math.ceil(columns.length / 8));
-  const hovered = active === null ? null : columns[active];
-  const total = columns.reduce((sum, c) => sum + c.count, 0);
-
-  if (total === 0) return <div className="small text-muted py-4 text-center">ไม่มีนัดหมายในช่วงนี้</div>;
-
-  return (
-    <div>
-      <div className="small text-muted mb-1">สูงสุด {max} นัด</div>
-      <div className="viz-columns" onMouseLeave={() => setActive(null)}>
-        {columns.map((c, i) => (
-          <button
-            type="button"
-            key={c.key}
-            className={`viz-col ${active === i ? 'active' : ''}`}
-            aria-label={`${c.title}: ${c.count} นัด`}
-            onMouseEnter={() => setActive(i)}
-            onFocus={() => setActive(i)}
-            onBlur={() => setActive(null)}
-          >
-            <span style={{ height: `${(c.count / max) * 100}%`, opacity: c.count === 0 ? 0.25 : 1 }} />
-          </button>
-        ))}
-        {hovered && (
-          <div className="viz-tooltip" style={{ left: `${((active + 0.5) / columns.length) * 100}%` }}>
-            <div>{hovered.title}</div>
-            <strong>{hovered.count} นัด</strong>
-          </div>
-        )}
-      </div>
-      <div className="d-flex mt-1" aria-hidden="true">
-        {columns.map((c, i) => (
-          <div key={c.key} className="small text-muted text-center" style={{ flex: '1 1 0', minWidth: 0, fontSize: '0.7rem' }}>
-            {i % tickStep === 0 ? c.label : ''}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
