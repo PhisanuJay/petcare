@@ -116,10 +116,6 @@ router.get('/adoption', (_req, res) => {
   res.json({ module: 'pet-owner', page: 'adoption', status: 'placeholder' });
 });
 
-router.get('/cctv', (_req, res) => {
-  res.json({ module: 'pet-owner', page: 'cctv', status: 'placeholder' });
-});
-
 /* ---------- Bookings ---------- */
 
 // Keep in sync with BOOKING_SERVICES / OPENING_HOURS in frontend/src/features/pet-owner/bookingOptions.js
@@ -373,6 +369,45 @@ router.post('/adoption/requests', wrap(async (req, res) => {
 
 router.post('/adoption/requests/:id/cancel', wrap(async (req, res) => {
   res.json(await cancelAdoptionRequest(req.ownerId, req.params.id));
+}));
+
+/* ---------- CCTV ---------- */
+
+/**
+ * Which of the owner's cat hotel stays can be watched. Only the owner's own stays are returned.
+ *   live     – confirmed and today is within check-in … check-out
+ *   upcoming – confirmed, check-in is still ahead
+ *   pending  – the hotel has not confirmed the stay yet
+ * `streamUrl` is null until the hotel team connects a camera to the stay (field not defined yet).
+ */
+function cctvAccess(reservation, today) {
+  if (reservation.status === 'pending') return 'pending';
+  if (reservation.status !== 'confirmed') return null;
+  if (today < reservation.checkIn) return 'upcoming';
+  if (today <= reservation.checkOut) return 'live';
+  return null;
+}
+
+router.use('/cctv', requireOwner);
+
+router.get('/cctv', wrap(async (req, res) => {
+  const today = todayString();
+  const stays = [];
+  for (const r of await listReservations(req.ownerId)) {
+    const access = cctvAccess(r, today);
+    if (!access) continue;
+    stays.push({
+      id: r.id,
+      petName: r.petName,
+      roomLabel: r.roomLabel,
+      checkIn: r.checkIn,
+      checkOut: r.checkOut,
+      status: r.status,
+      access,
+      streamUrl: access === 'live' ? (r.streamUrl ?? null) : null,
+    });
+  }
+  res.json(stays);
 }));
 
 /* Errors from this module's routes (e.g. 404 from the store) become JSON responses. */
