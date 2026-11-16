@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { BOOKING_STATUSES, listAllBookings, updateBookingStatus } from '../pet-owner/bookingStore.js';
-import { getPetById } from '../pet-owner/store.js';
+import { getPetById, listAllPets } from '../pet-owner/store.js';
 
 /**
  * Veterinarian API module
@@ -69,11 +69,65 @@ router.post('/appointments/:id/status', wrap(async (req, res) => {
   res.json({ ...booking, pet: petSummary(await getPetById(booking.petId)) });
 }));
 
-/* ---------- Not implemented yet ---------- */
+/* ---------- Patients ---------- */
 
-router.get('/patients', (_req, res) => {
-  res.json({ module: 'veterinarian', page: 'patients', status: 'placeholder' });
-});
+// A "patient" is any pet registered by an owner. Visit statistics come from the owners' bookings.
+
+const today = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** Visit statistics of one pet from its bookings (sorted by date and time). */
+function visitStats(bookings) {
+  const t = today();
+  const completed = bookings.filter((b) => b.status === 'completed');
+  const upcoming = bookings.filter((b) => ['pending', 'confirmed'].includes(b.status) && b.date >= t);
+  const next = upcoming[0];
+  return {
+    visitCount: completed.length,
+    lastVisit: completed.length ? completed[completed.length - 1].date : null,
+    nextAppointment: next ? { date: next.date, time: next.time, status: next.status, serviceLabel: next.serviceLabel } : null,
+  };
+}
+
+/** Pet fields for the list (no photo: it can be large). Owner id is not exposed. */
+function patientListItem(pet, bookings) {
+  const { id, name, species, breed, sex, birthDate, weight, allergies, chronicDiseases } = pet;
+  return { id, name, species, breed, sex, birthDate, weight, allergies, chronicDiseases, ...visitStats(bookings) };
+}
+
+const byPetId = (bookings) => {
+  const map = new Map();
+  for (const b of bookings) map.set(b.petId, [...(map.get(b.petId) ?? []), b]);
+  return map;
+};
+
+router.use('/patients', requireVet);
+
+router.get('/patients', wrap(async (_req, res) => {
+  const [pets, bookings] = await Promise.all([listAllPets(), listAllBookings()]);
+  const grouped = byPetId(bookings);
+  const list = pets.map((pet) => patientListItem(pet, grouped.get(pet.id) ?? []));
+  list.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  res.json(list);
+}));
+
+// Full record of one patient, with its appointments (newest first).
+router.get('/patients/:id', wrap(async (req, res) => {
+  const pet = await getPetById(req.params.id);
+  if (!pet) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
+  const bookings = (await listAllBookings()).filter((b) => b.petId === pet.id);
+  const { ownerId: _ownerId, ...record } = pet;
+  res.json({
+    ...record,
+    ...visitStats(bookings),
+    appointments: bookings.slice().reverse().map(({ ownerId: _o, ...b }) => b),
+  });
+}));
+
+/* ---------- Not implemented yet ---------- */
 
 router.get('/medical-records', (_req, res) => {
   res.json({ module: 'veterinarian', page: 'medical-records', status: 'placeholder' });

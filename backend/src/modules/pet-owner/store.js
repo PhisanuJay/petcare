@@ -57,3 +57,8 @@ export function deletePet(ownerId, id) {
 export function getPetById(id) {
   return pets.read().then((all) => all.find((pet) => pet.id === id) ?? null);
 }
+
+/** Every owner's pets (for the veterinarian side). */
+export function listAllPets() {
+  return pets.read();
+}
