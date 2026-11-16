@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppointments } from '../useAppointments.js';
 import VetLayout from '../components/VetLayout.jsx';
 import { BOOKING_STATUS, todayString } from '../../pet-owner/bookingOptions.js';
@@ -94,6 +95,12 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
                 ปฏิเสธ
               </button>
             </>
+          )}
+          {['confirmed', 'completed'].includes(a.status) && a.pet && (
+            <Link to={`/veterinarian/medical-records?pet=${a.pet.id}`} className="btn btn-soft btn-sm">
+              <i className="bi bi-journal-plus me-1" />
+              บันทึกการรักษา
+            </Link>
           )}
           {a.status === 'confirmed' && (
             <>

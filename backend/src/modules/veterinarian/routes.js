@@ -1,6 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { BOOKING_STATUSES, listAllBookings, updateBookingStatus } from '../pet-owner/bookingStore.js';
-import { getPetById, listAllPets } from '../pet-owner/store.js';
+import { getPetById, listAllPets, updatePetAsClinic } from '../pet-owner/store.js';
 
 /**
  * Veterinarian API module
@@ -127,11 +128,66 @@ router.get('/patients/:id', wrap(async (req, res) => {
   });
 }));
 
-/* ---------- Not implemented yet ---------- */
+/* ---------- Medical records ---------- */
 
-router.get('/medical-records', (_req, res) => {
-  res.json({ module: 'veterinarian', page: 'medical-records', status: 'placeholder' });
-});
+// A medical record is one entry of the pet's `treatments` list: the same list the owner sees on the
+// Medical page. Entries written here carry `source: 'vet'`; owners cannot edit or delete them.
+
+const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+function parseRecord(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
+  const record = {
+    date: body.date,
+    vet: text(body.vet, 100),
+    clinic: text(body.clinic, 100),
+    symptoms: text(body.symptoms, 2000),
+    diagnosis: text(body.diagnosis, 2000),
+    treatment: text(body.treatment, 2000),
+    followUp: body.followUp || '',
+  };
+  if (!isDateString(record.date)) throw httpError(400, 'กรุณาเลือกวันที่ตรวจ');
+  if (record.date > today()) throw httpError(400, 'วันที่ตรวจต้องไม่ใช่วันในอนาคต');
+  if (!record.vet) throw httpError(400, 'กรุณากรอกชื่อสัตวแพทย์');
+  if (!record.symptoms && !record.diagnosis) throw httpError(400, 'กรุณากรอกอาการหรือผลการวินิจฉัยอย่างน้อยหนึ่งอย่าง');
+  if (record.followUp) {
+    if (!isDateString(record.followUp)) throw httpError(400, 'วันนัดติดตามไม่ถูกต้อง');
+    if (record.followUp < record.date) throw httpError(400, 'วันนัดติดตามต้องไม่ก่อนวันที่ตรวจ');
+  }
+  return record;
+}
+
+router.use('/medical-records', requireVet);
+
+// POST /medical-records  { petId, date, vet, clinic?, symptoms?, diagnosis?, treatment?, followUp? }
+router.post('/medical-records', wrap(async (req, res) => {
+  const petId = req.body?.petId;
+  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกคนไข้');
+  const record = parseRecord(req.body);
+  const now = new Date().toISOString();
+  const entry = { ...record, id: randomUUID(), source: 'vet', createdAt: now, updatedAt: now };
+  await updatePetAsClinic(petId, (pet) => ({ ...pet, treatments: [...(pet.treatments ?? []), entry] }));
+  res.status(201).json(entry);
+}));
+
+// PUT /medical-records/:petId/:recordId — only records written by the clinic can be changed
+router.put('/medical-records/:petId/:recordId', wrap(async (req, res) => {
+  const record = parseRecord(req.body);
+  let updated;
+  await updatePetAsClinic(req.params.petId, (pet) => {
+    const list = pet.treatments ?? [];
+    const index = list.findIndex((t) => t.id === req.params.recordId);
+    if (index === -1) throw httpError(404, 'ไม่พบบันทึกการรักษานี้');
+    if (list[index].source !== 'vet') throw httpError(403, 'แก้ไขได้เฉพาะบันทึกที่คลินิกเป็นผู้บันทึก');
+    updated = { ...list[index], ...record, updatedAt: new Date().toISOString() };
+    const next = list.slice();
+    next[index] = updated;
+    return { ...pet, treatments: next };
+  });
+  res.json(updated);
+}));
+
+/* ---------- Not implemented yet ---------- */
 
 router.get('/vaccination', (_req, res) => {
   res.json({ module: 'veterinarian', page: 'vaccination', status: 'placeholder' });
