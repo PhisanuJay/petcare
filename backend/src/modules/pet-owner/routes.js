@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { cancelBooking, createBooking, listBookings } from './bookingStore.js';
 import { cancelReservation, createReservation, listReservations } from './hotelStore.js';
+import { cancelTransportRequest, createTransportRequest, listTransportRequests } from './transportStore.js';
 import { createPet, deletePet, findPet, listPets, updatePet } from './store.js';
 
 /**
@@ -261,6 +262,61 @@ router.post('/cat-hotel/reservations', wrap(async (req, res) => {
 
 router.post('/cat-hotel/reservations/:id/cancel', wrap(async (req, res) => {
   res.json(await cancelReservation(req.ownerId, req.params.id));
+}));
+
+/* ---------- Pet transport ---------- */
+
+// Keep in sync with TRANSPORT_DIRECTIONS in frontend/src/features/pet-owner/transportOptions.js
+const TRANSPORT_DIRECTIONS = {
+  to_clinic: 'รับจากบ้านไปคลินิก',
+  to_home: 'ส่งจากคลินิกกลับบ้าน',
+  round_trip: 'รับ-ส่ง ไป-กลับ',
+};
+
+router.use('/transport/requests', requireOwner);
+
+router.get('/transport/requests', wrap(async (req, res) => {
+  res.json(await listTransportRequests(req.ownerId));
+}));
+
+router.post('/transport/requests', wrap(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
+  const { petId, direction, date, time } = body;
+  const address = typeof body.address === 'string' ? body.address.trim() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.replace(/[-\s]/g, '') : '';
+  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : '';
+
+  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกสัตว์เลี้ยง');
+  const pet = await findPet(req.ownerId, petId);
+  if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
+  if (!Object.hasOwn(TRANSPORT_DIRECTIONS, direction)) throw httpError(400, 'กรุณาเลือกรูปแบบการรับ-ส่ง');
+  if (!isDateString(date)) throw httpError(400, 'กรุณาเลือกวันที่');
+  if (date < todayString()) throw httpError(400, 'ไม่สามารถเลือกวันที่ผ่านมาแล้ว');
+  if (typeof time !== 'string' || !time) throw httpError(400, 'กรุณาเลือกเวลา');
+  if (!bookableSlots(date).includes(time)) throw httpError(400, 'เวลานี้อยู่นอกเวลาทำการของคลินิก');
+  if (date === todayString() && time <= nowTimeString()) throw httpError(400, 'เวลานี้ผ่านไปแล้ว');
+  if (address.length < 10) throw httpError(400, 'กรุณากรอกที่อยู่ให้ละเอียด');
+  if (address.length > 300) throw httpError(400, 'ที่อยู่ยาวเกินไป');
+  if (!/^0\d{8,9}$/.test(phone)) throw httpError(400, 'เบอร์โทร 9-10 หลัก ขึ้นต้นด้วย 0');
+
+  const request = await createTransportRequest(req.ownerId, {
+    petId,
+    petName: pet.name,
+    petSpecies: pet.species,
+    direction,
+    directionLabel: TRANSPORT_DIRECTIONS[direction],
+    date,
+    time,
+    address,
+    phone,
+    note,
+  });
+  res.status(201).json(request);
+}));
+
+router.post('/transport/requests/:id/cancel', wrap(async (req, res) => {
+  res.json(await cancelTransportRequest(req.ownerId, req.params.id));
 }));
 
 /* Errors from this module's routes (e.g. 404 from the store) become JSON responses. */
