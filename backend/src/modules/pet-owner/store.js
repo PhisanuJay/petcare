@@ -52,3 +52,8 @@ export function deletePet(ownerId, id) {
     return { records: next, result: { ok: true } };
   });
 }
+
+/** A pet by id regardless of owner (for the veterinarian side). */
+export function getPetById(id) {
+  return pets.read().then((all) => all.find((pet) => pet.id === id) ?? null);
+}
