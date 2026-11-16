@@ -30,3 +30,91 @@
   padding: 0.1rem 0.55rem;
   font-weight: 500;
 }
+
+/* ---------- Reports: chart colours (one blue series, text stays in ink tokens) ---------- */
+.vet-site {
+  --viz-bar: #2a78d6;
+  --viz-bar-hover: #184f95;
+  --viz-track: #e3edf9;
+  --viz-grid: #d6e3f2;
+}
+.vet-site .viz-columns {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 180px;
+  border-bottom: 1px solid var(--viz-grid);
+  position: relative;
+}
+.vet-site .viz-col {
+  flex: 1 1 0;
+  min-width: 2px;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.vet-site .viz-col > span {
+  display: block;
+  width: 100%;
+  max-width: 28px;
+  margin: 0 auto;
+  min-height: 2px;
+  background: var(--viz-bar);
+  border-radius: 4px 4px 0 0;
+}
+.vet-site .viz-col:hover > span,
+.vet-site .viz-col:focus-visible > span,
+.vet-site .viz-col.active > span {
+  background: var(--viz-bar-hover);
+}
+.vet-site .viz-col:focus-visible {
+  outline: 2px solid var(--sky-dark);
+  outline-offset: 2px;
+}
+.vet-site .viz-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translate(-50%, -100%);
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--viz-grid);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(var(--shadow), 0.15);
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+.vet-site .viz-bar-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 38%) 1fr auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.25rem 0;
+  font-size: 0.9rem;
+}
+.vet-site .viz-bar-track {
+  height: 10px;
+  background: var(--viz-track);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.vet-site .viz-bar-fill {
+  height: 100%;
+  background: var(--viz-bar);
+  border-radius: 999px;
+  min-width: 2px;
+}
+@media (max-width: 575px) {
+  .vet-site .viz-bar-row {
+    grid-template-columns: 1fr auto;
+  }
+  .vet-site .viz-bar-row .viz-bar-track {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}

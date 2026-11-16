@@ -316,11 +316,86 @@ router.put('/parasite/:petId/:recordId', wrap(async (req, res) => {
   res.json(await editClinicEntry(req.params.petId, 'parasites', req.params.recordId, record, 'ไม่พบบันทึกนี้'));
 }));
 
-/* ---------- Not implemented yet ---------- */
+/* ---------- Reports ---------- */
 
-router.get('/reports', (_req, res) => {
-  res.json({ module: 'veterinarian', page: 'reports', status: 'placeholder' });
-});
+const MAX_REPORT_DAYS = 366;
+const dayNumber = (dateString) => Math.round(Date.parse(`${dateString}T00:00:00Z`) / 86400000);
+const addDaysTo = (dateString, days) => new Date((dayNumber(dateString) + days) * 86400000).toISOString().slice(0, 10);
+const inRange = (date, from, to) => typeof date === 'string' && date >= from && date <= to;
+
+function countBy(items, keyOf) {
+  const counts = new Map();
+  for (const item of items) counts.set(keyOf(item), (counts.get(keyOf(item)) ?? 0) + 1);
+  return counts;
+}
+
+/** `[{ key, label?, count }]`, biggest first. */
+const ranked = (counts, describe = (key) => ({ key })) =>
+  [...counts.entries()].map(([key, count]) => ({ ...describe(key), count })).sort((a, b) => b.count - a.count);
+
+router.use('/reports', requireVet);
+
+// GET /reports?from=YYYY-MM-DD&to=YYYY-MM-DD  (default: the last 30 days up to today, at most 366 days)
+router.get('/reports', wrap(async (req, res) => {
+  const to = req.query.to ?? today();
+  const from = req.query.from ?? addDaysTo(to, -29);
+  if (!isDateString(from) || !isDateString(to)) throw httpError(400, 'วันที่ไม่ถูกต้อง');
+  if (from > to) throw httpError(400, 'วันเริ่มต้นต้องไม่หลังวันสิ้นสุด');
+  const days = dayNumber(to) - dayNumber(from) + 1;
+  if (days > MAX_REPORT_DAYS) throw httpError(400, `เลือกช่วงเวลาได้ไม่เกิน ${MAX_REPORT_DAYS} วัน`);
+
+  const [pets, allBookings] = await Promise.all([listAllPets(), listAllBookings()]);
+
+  // Appointments
+  const bookings = allBookings.filter((b) => inRange(b.date, from, to));
+  const byStatus = Object.fromEntries(BOOKING_STATUSES.map((s) => [s, 0]));
+  for (const [status, count] of countBy(bookings, (b) => b.status)) byStatus[status] = count;
+  const byDayCounts = countBy(bookings, (b) => b.date);
+  const byDay = Array.from({ length: days }, (_, i) => {
+    const date = addDaysTo(from, i);
+    return { date, count: byDayCounts.get(date) ?? 0 };
+  });
+  const byService = ranked(countBy(bookings, (b) => b.service), (service) => ({
+    service,
+    label: bookings.find((b) => b.service === service)?.serviceLabel ?? service,
+  }));
+  // Of the appointments that were actually carried out or missed.
+  const decided = byStatus.completed + byStatus.no_show;
+
+  // Work the clinic recorded in this period (entries written by the clinic only, by the date they happened)
+  const clinicRows = (list) => pets.flatMap((p) => (p[list] ?? []).filter((r) => r.source === 'vet' && inRange(r.date, from, to)));
+  const treatments = clinicRows('treatments');
+  const vaccines = clinicRows('vaccines');
+  const parasites = clinicRows('parasites');
+
+  // Patients
+  const seenPetIds = new Set(bookings.filter((b) => b.status === 'completed').map((b) => b.petId));
+  const seenPets = pets.filter((p) => seenPetIds.has(p.id));
+
+  res.json({
+    range: { from, to, days },
+    appointments: {
+      total: bookings.length,
+      byStatus,
+      completionRate: decided ? byStatus.completed / decided : null,
+      noShowRate: decided ? byStatus.no_show / decided : null,
+      byService,
+      byDay,
+    },
+    records: {
+      treatments: treatments.length,
+      vaccinations: vaccines.length,
+      parasites: parasites.length,
+      topVaccines: ranked(countBy(vaccines, (v) => String(v.name ?? '').trim()), (name) => ({ name })).slice(0, 5),
+    },
+    patients: {
+      registered: pets.length,
+      newInRange: pets.filter((p) => inRange(String(p.createdAt ?? '').slice(0, 10), from, to)).length,
+      seen: seenPets.length,
+      seenBySpecies: ranked(countBy(seenPets, (p) => p.species), (species) => ({ species })),
+    },
+  });
+}));
 
 /* Errors from this module's routes become JSON responses. */
 router.use((err, _req, res, _next) => {
