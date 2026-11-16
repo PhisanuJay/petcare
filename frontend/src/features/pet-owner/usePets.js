@@ -1,26 +1,11 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { STORAGE_KEYS, readJSON } from '../../shared/utils/storage.js';
-
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
-const PETS_URL = `${API_BASE}/api/pet-owner/my-pets`;
+import { ownerRequest } from './api.js';
 
 /* ---------- API ---------- */
 
-async function request(ownerId, path = '', options = {}) {
-  let res;
-  try {
-    res = await fetch(`${PETS_URL}${path}`, {
-      ...options,
-      headers: { 'Content-Type': 'application/json', 'x-owner-id': ownerId },
-    });
-  } catch {
-    throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบว่า backend ทำงานอยู่');
-  }
-  const body = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(body?.error || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
-  return body;
-}
+const request = (ownerId, path = '', options = {}) => ownerRequest(ownerId, `/my-pets${path}`, options);
 
 /* ---------- shared store (one list for the logged-in owner) ---------- */
 

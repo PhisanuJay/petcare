@@ -1,55 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createJsonCollection, httpError } from './jsonCollection.js';
 
-const dataDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data');
-const dataFile = path.join(dataDir, 'pets.json');
-
-let queue = Promise.resolve();
-
-async function readPets() {
-  try {
-    const raw = await readFile(dataFile, 'utf8');
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    if (err?.code === 'ENOENT') return [];
-    throw err;
-  }
-}
-
-async function writePets(pets) {
-  await mkdir(dataDir, { recursive: true });
-  const tmp = path.join(dataDir, `pets.${process.pid}.tmp`);
-  await writeFile(tmp, JSON.stringify(pets, null, 2), 'utf8');
-  await rename(tmp, dataFile);
-}
-
-function updatePets(mutator) {
-  const run = queue.then(async () => {
-    const pets = await readPets();
-    const next = mutator(pets);
-    await writePets(next.pets);
-    return next.result;
-  });
-  queue = run.then(
-    () => {},
-    () => {},
-  );
-  return run;
-}
+const pets = createJsonCollection('pets.json');
 
 export function listPets(ownerId) {
-  return readPets().then((pets) =>
-    pets
+  return pets.read().then((all) =>
+    all
       .filter((pet) => pet.ownerId === ownerId)
       .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))),
   );
 }
 
 export function findPet(ownerId, id) {
-  return readPets().then((pets) => pets.find((pet) => pet.id === id && pet.ownerId === ownerId) ?? null);
+  return pets.read().then((all) => all.find((pet) => pet.id === id && pet.ownerId === ownerId) ?? null);
 }
 
 export function createPet(ownerId, data) {
@@ -61,39 +24,31 @@ export function createPet(ownerId, data) {
     createdAt: now,
     updatedAt: now,
   };
-  return updatePets((pets) => ({ pets: [...pets, pet], result: pet }));
+  return pets.update((all) => ({ records: [...all, pet], result: pet }));
 }
 
 export function updatePet(ownerId, id, data) {
-  return updatePets((pets) => {
-    const index = pets.findIndex((pet) => pet.id === id && pet.ownerId === ownerId);
-    if (index === -1) {
-      const error = new Error('ไม่พบข้อมูลสัตว์เลี้ยงนี้');
-      error.status = 404;
-      throw error;
-    }
+  return pets.update((all) => {
+    const index = all.findIndex((pet) => pet.id === id && pet.ownerId === ownerId);
+    if (index === -1) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
     const pet = {
-      ...pets[index],
+      ...all[index],
       ...data,
       id,
       ownerId,
-      createdAt: pets[index].createdAt,
+      createdAt: all[index].createdAt,
       updatedAt: new Date().toISOString(),
     };
-    const next = pets.slice();
+    const next = all.slice();
     next[index] = pet;
-    return { pets: next, result: pet };
+    return { records: next, result: pet };
   });
 }
 
 export function deletePet(ownerId, id) {
-  return updatePets((pets) => {
-    const next = pets.filter((pet) => !(pet.id === id && pet.ownerId === ownerId));
-    if (next.length === pets.length) {
-      const error = new Error('ไม่พบข้อมูลสัตว์เลี้ยงนี้');
-      error.status = 404;
-      throw error;
-    }
-    return { pets: next, result: { ok: true } };
+  return pets.update((all) => {
+    const next = all.filter((pet) => !(pet.id === id && pet.ownerId === ownerId));
+    if (next.length === all.length) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
+    return { records: next, result: { ok: true } };
   });
 }
