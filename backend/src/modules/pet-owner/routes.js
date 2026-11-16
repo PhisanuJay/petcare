@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { cancelBooking, createBooking, listBookings } from './bookingStore.js';
+import { cancelReservation, createReservation, listReservations } from './hotelStore.js';
 import { createPet, deletePet, findPet, listPets, updatePet } from './store.js';
 
 /**
@@ -198,6 +199,68 @@ router.post('/bookings', wrap(async (req, res) => {
 
 router.post('/bookings/:id/cancel', wrap(async (req, res) => {
   res.json(await cancelBooking(req.ownerId, req.params.id));
+}));
+
+/* ---------- Cat hotel ---------- */
+
+// Keep in sync with HOTEL_ROOMS in frontend/src/features/pet-owner/hotelOptions.js
+// (room names and prices are copied from the home page: shared/data/homeContent.js).
+const HOTEL_ROOMS = {
+  standard: { label: 'Standard', pricePerNight: 450 },
+  deluxe: { label: 'Deluxe', pricePerNight: 750 },
+  suite: { label: 'Suite', pricePerNight: 1200 },
+};
+const HOTEL_SPECIES = 'cat';
+const MAX_HOTEL_NIGHTS = 30;
+
+const isDateString = (v) =>
+  typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(v).getTime());
+
+const nightsBetween = (from, to) => Math.round((new Date(to) - new Date(from)) / 86400000);
+
+router.use('/cat-hotel/reservations', requireOwner);
+
+router.get('/cat-hotel/reservations', wrap(async (req, res) => {
+  res.json(await listReservations(req.ownerId));
+}));
+
+router.post('/cat-hotel/reservations', wrap(async (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
+  const { petId, roomType, checkIn, checkOut } = body;
+  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : '';
+
+  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกสัตว์เลี้ยง');
+  const pet = await findPet(req.ownerId, petId);
+  if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
+  if (pet.species !== HOTEL_SPECIES) throw httpError(400, 'โรงแรมนี้รับเฉพาะน้องแมว');
+  if (!Object.hasOwn(HOTEL_ROOMS, roomType)) throw httpError(400, 'กรุณาเลือกประเภทห้อง');
+  if (!isDateString(checkIn)) throw httpError(400, 'กรุณาเลือกวันเช็คอิน');
+  if (!isDateString(checkOut)) throw httpError(400, 'กรุณาเลือกวันเช็คเอาท์');
+  if (checkIn < todayString()) throw httpError(400, 'วันเช็คอินต้องไม่ใช่วันที่ผ่านมาแล้ว');
+  const nights = nightsBetween(checkIn, checkOut);
+  if (nights < 1) throw httpError(400, 'วันเช็คเอาท์ต้องหลังวันเช็คอินอย่างน้อย 1 วัน');
+  if (nights > MAX_HOTEL_NIGHTS) throw httpError(400, `ฝากได้ไม่เกิน ${MAX_HOTEL_NIGHTS} คืนต่อครั้ง`);
+
+  const room = HOTEL_ROOMS[roomType];
+  const reservation = await createReservation(req.ownerId, {
+    petId,
+    petName: pet.name,
+    petSpecies: pet.species,
+    roomType,
+    roomLabel: room.label,
+    pricePerNight: room.pricePerNight,
+    checkIn,
+    checkOut,
+    nights,
+    totalPrice: room.pricePerNight * nights,
+    note,
+  });
+  res.status(201).json(reservation);
+}));
+
+router.post('/cat-hotel/reservations/:id/cancel', wrap(async (req, res) => {
+  res.json(await cancelReservation(req.ownerId, req.params.id));
 }));
 
 /* Errors from this module's routes (e.g. 404 from the store) become JSON responses. */
