@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' })); // pet photos are sent as data URLs
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'petcare-backend' });
