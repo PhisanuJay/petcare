@@ -187,11 +187,107 @@ router.put('/medical-records/:petId/:recordId', wrap(async (req, res) => {
   res.json(updated);
 }));
 
-/* ---------- Not implemented yet ---------- */
+/* ---------- Vaccination ---------- */
 
-router.get('/vaccination', (_req, res) => {
-  res.json({ module: 'veterinarian', page: 'vaccination', status: 'placeholder' });
-});
+// A vaccination is one entry of the pet's `vaccines` list (the list the owner sees). Entries written
+// here carry `source: 'vet'` and a `vet` field; owners cannot edit or delete them.
+
+function parseVaccination(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
+  const record = {
+    name: text(body.name, 100),
+    date: body.date,
+    nextDate: body.nextDate || '',
+    place: text(body.place, 100),
+    vet: text(body.vet, 100),
+    lot: text(body.lot, 200),
+  };
+  if (!record.name) throw httpError(400, 'กรุณากรอกชื่อวัคซีน');
+  if (!isDateString(record.date)) throw httpError(400, 'กรุณาเลือกวันที่ฉีด');
+  if (record.date > today()) throw httpError(400, 'วันที่ฉีดต้องไม่ใช่วันในอนาคต');
+  if (!record.vet) throw httpError(400, 'กรุณากรอกชื่อสัตวแพทย์');
+  if (record.nextDate) {
+    if (!isDateString(record.nextDate)) throw httpError(400, 'วันนัดครั้งถัดไปไม่ถูกต้อง');
+    if (record.nextDate <= record.date) throw httpError(400, 'วันนัดครั้งถัดไปต้องหลังวันที่ฉีด');
+  }
+  return record;
+}
+
+const normName = (name) => String(name ?? '').trim().toLowerCase();
+
+/**
+ * Vaccines that are overdue or due within `days` days. Only the most recent dose of each vaccine
+ * counts, so giving the next dose clears the old reminder.
+ */
+function dueVaccines(pets, days) {
+  const limit = new Date();
+  limit.setDate(limit.getDate() + days);
+  const pad = (n) => String(n).padStart(2, '0');
+  const limitString = `${limit.getFullYear()}-${pad(limit.getMonth() + 1)}-${pad(limit.getDate())}`;
+  const t = today();
+  const due = [];
+  for (const pet of pets) {
+    const latest = new Map();
+    for (const v of pet.vaccines ?? []) {
+      const key = normName(v.name) || v.id;
+      const current = latest.get(key);
+      if (!current || (v.date ?? '') >= (current.date ?? '')) latest.set(key, v);
+    }
+    for (const v of latest.values()) {
+      if (!v.nextDate || v.nextDate > limitString) continue;
+      due.push({
+        petId: pet.id,
+        petName: pet.name,
+        petSpecies: pet.species,
+        petBreed: pet.breed,
+        vaccine: v.name,
+        lastDate: v.date || '',
+        nextDate: v.nextDate,
+        status: v.nextDate < t ? 'overdue' : 'soon',
+      });
+    }
+  }
+  return due.sort((a, b) => a.nextDate.localeCompare(b.nextDate));
+}
+
+router.use('/vaccination', requireVet);
+
+// GET /vaccination/due?days=30
+router.get('/vaccination/due', wrap(async (req, res) => {
+  const days = req.query.days === undefined ? 30 : Number(req.query.days);
+  if (!Number.isInteger(days) || days < 0 || days > 365) throw httpError(400, 'จำนวนวันไม่ถูกต้อง');
+  res.json(dueVaccines(await listAllPets(), days));
+}));
+
+// POST /vaccination  { petId, name, date, nextDate?, place?, vet, lot? }
+router.post('/vaccination', wrap(async (req, res) => {
+  const petId = req.body?.petId;
+  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกคนไข้');
+  const record = parseVaccination(req.body);
+  const now = new Date().toISOString();
+  const entry = { ...record, id: randomUUID(), source: 'vet', createdAt: now, updatedAt: now };
+  await updatePetAsClinic(petId, (pet) => ({ ...pet, vaccines: [...(pet.vaccines ?? []), entry] }));
+  res.status(201).json(entry);
+}));
+
+// PUT /vaccination/:petId/:recordId — only records written by the clinic can be changed
+router.put('/vaccination/:petId/:recordId', wrap(async (req, res) => {
+  const record = parseVaccination(req.body);
+  let updated;
+  await updatePetAsClinic(req.params.petId, (pet) => {
+    const list = pet.vaccines ?? [];
+    const index = list.findIndex((v) => v.id === req.params.recordId);
+    if (index === -1) throw httpError(404, 'ไม่พบบันทึกวัคซีนนี้');
+    if (list[index].source !== 'vet') throw httpError(403, 'แก้ไขได้เฉพาะบันทึกที่คลินิกเป็นผู้บันทึก');
+    updated = { ...list[index], ...record, updatedAt: new Date().toISOString() };
+    const next = list.slice();
+    next[index] = updated;
+    return { ...pet, vaccines: next };
+  });
+  res.json(updated);
+}));
+
+/* ---------- Not implemented yet ---------- */
 
 router.get('/reports', (_req, res) => {
   res.json({ module: 'veterinarian', page: 'reports', status: 'placeholder' });

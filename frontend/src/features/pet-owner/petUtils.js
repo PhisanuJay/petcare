@@ -64,16 +64,32 @@ export function daysUntil(value) {
 }
 
 /**
+ * Only the most recent dose of each vaccine (or parasite treatment type) should remind: once the next
+ * dose has been given, the older row's "next date" is no longer due. Rows without a name are kept as is.
+ */
+function latestDoses(rows, keyOf) {
+  const latest = new Map();
+  rows.forEach((row, index) => {
+    const key = keyOf(row) || `#${index}`;
+    const current = latest.get(key);
+    if (!current || (row.date ?? '') >= (current.date ?? '')) latest.set(key, row);
+  });
+  return [...latest.values()];
+}
+
+const nameKey = (value) => String(value ?? '').trim().toLowerCase();
+
+/**
  * Upcoming / overdue care items (vaccines, parasite prevention) across the given pets,
  * sorted by due date.
  */
 export function careReminders(pets) {
   const items = [];
   for (const pet of pets) {
-    for (const v of pet.vaccines ?? []) {
+    for (const v of latestDoses(pet.vaccines ?? [], (row) => nameKey(row.name))) {
       if (v.nextDate) items.push({ pet, kind: 'vaccine', title: `วัคซีน ${v.name || ''}`.trim(), date: v.nextDate });
     }
-    for (const p of pet.parasites ?? []) {
+    for (const p of latestDoses(pet.parasites ?? [], (row) => nameKey(row.type))) {
       if (p.nextDate) items.push({ pet, kind: 'parasite', title: labelOf(PARASITE_TYPES, p.type), date: p.nextDate });
     }
   }

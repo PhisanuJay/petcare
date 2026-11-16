@@ -198,11 +198,12 @@ export default function PetDetailPage() {
                         <tr key={v.id}>
                           <td className="fw-medium">
                             {v.name || '-'}
+                            {v.source === 'vet' && <span className="tag ok ms-2">บันทึกโดยคลินิก</span>}
                             {v.lot && <div className="small text-muted">{v.lot}</div>}
                           </td>
                           <td>{formatDate(v.date)}</td>
                           <td>{dueTag(v.nextDate) ?? '-'}</td>
-                          <td className="small">{v.place || '-'}</td>
+                          <td className="small">{[v.place, v.vet].filter(Boolean).join(' · ') || '-'}</td>
                         </tr>
                       ))}
                     </tbody>

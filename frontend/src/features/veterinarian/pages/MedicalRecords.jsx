@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import VetLayout from '../components/VetLayout.jsx';
 import { usePatient, usePatients } from '../usePatients.js';
 import { createMedicalRecord, updateMedicalRecord } from '../useMedicalRecords.js';
+import { DEFAULT_CLINIC, readVetName, saveVetName } from '../vetName.js';
 import { todayString } from '../../pet-owner/bookingOptions.js';
 import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 
@@ -12,24 +13,6 @@ import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
  * the same list the owner sees on the Medical page (marked "บันทึกโดยคลินิก"). Owners cannot edit
  * records written here; the vet can edit them afterwards.
  */
-
-const VET_NAME_KEY = 'petcare_vet_name';
-const DEFAULT_CLINIC = 'PetCare';
-
-const readVetName = () => {
-  try {
-    return localStorage.getItem(VET_NAME_KEY) ?? '';
-  } catch {
-    return '';
-  }
-};
-const saveVetName = (name) => {
-  try {
-    localStorage.setItem(VET_NAME_KEY, name);
-  } catch {
-    /* remembering the name is only a convenience */
-  }
-};
 
 const emptyForm = () => ({
   date: todayString(),

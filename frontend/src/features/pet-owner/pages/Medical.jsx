@@ -29,7 +29,11 @@ function buildEntries(pets) {
         kind: 'vaccine',
         date: v.date,
         title: v.name || 'วัคซีน',
-        lines: [v.place && `สถานที่: ${v.place}`, v.lot && `หมายเหตุ: ${v.lot}`],
+        byClinic: v.source === 'vet',
+        lines: [
+          (v.place || v.vet) && `สถานที่: ${[v.place, v.vet].filter(Boolean).join(' · ')}`,
+          v.lot && `หมายเหตุ: ${v.lot}`,
+        ],
         nextDate: v.nextDate,
         nextLabel: 'นัดครั้งถัดไป',
       });
