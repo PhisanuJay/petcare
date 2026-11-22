@@ -19,11 +19,14 @@ import MedicalRecordsPage from '../features/veterinarian/pages/MedicalRecords.js
 import VaccinationPage from '../features/veterinarian/pages/Vaccination.jsx';
 import VetReportsPage from '../features/veterinarian/pages/Reports.jsx';
 
+import MedicalAssistantLayout from '../features/medical-assistant/layout/MedicalAssistantLayout.jsx';
 import MedicalAssistantDashboardPage from '../features/medical-assistant/pages/Dashboard.jsx';
 import MaAppointmentsPage from '../features/medical-assistant/pages/Appointments.jsx';
 import MaPatientsPage from '../features/medical-assistant/pages/Patients.jsx';
+import MaPatientDetailPage from '../features/medical-assistant/pages/PatientDetail.jsx';
 import BookingManagementPage from '../features/medical-assistant/pages/BookingManagement.jsx';
 import MedicalSupportPage from '../features/medical-assistant/pages/MedicalSupport.jsx';
+import SupportCasePage from '../features/medical-assistant/pages/SupportCase.jsx';
 
 import PetProfile from '../features/pet-profile/PetProfile.jsx';
 
@@ -99,12 +102,14 @@ export const roleRoutes = (
     </Route>
 
     {/* Medical Assistant — เอิร์ท */}
-    <Route path="medical-assistant">
+    <Route path="medical-assistant" element={<MedicalAssistantLayout />}>
       <Route index element={<MedicalAssistantDashboardPage />} />
       <Route path="appointments" element={<MaAppointmentsPage />} />
       <Route path="patients" element={<MaPatientsPage />} />
+      <Route path="patients/:patientId" element={<MaPatientDetailPage />} />
       <Route path="booking-management" element={<BookingManagementPage />} />
       <Route path="medical-support" element={<MedicalSupportPage />} />
+      <Route path="medical-support/:appointmentId" element={<SupportCasePage />} />
     </Route>
 
     {/* Pet Profile (shared) — เอิร์ท, ปร่ย */}
