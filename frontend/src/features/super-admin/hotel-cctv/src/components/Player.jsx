@@ -32,7 +32,7 @@ function filterOfferSdp(sdp) {
   return `${(kept.length ? kept : lines.filter(Boolean)).join('\r\n')}\r\n`;
 }
 
-export default function Player({ cameraId, mode, tile = false, onPicture, onPhase }) {
+export default function Player({ cameraId, mode, tile = false, minimal = false, onPicture, onPhase }) {
   const videoRef = useRef(null);
   const stageRef = useRef(null);
   const peerRef = useRef(null);
@@ -183,8 +183,8 @@ export default function Player({ cameraId, mode, tile = false, onPicture, onPhas
   return (
     <section className={tile ? 'stage tile-stage' : 'stage'} ref={stageRef} data-live={phase === 'live' ? '1' : '0'}>
       <video ref={videoRef} autoPlay playsInline muted />
-      {tile ? null : phase === 'live' ? <span className="live-pill">LIVE</span> : null}
-      {!tile && phase !== 'live' ? (
+      {tile || minimal ? null : phase === 'live' ? <span className="live-pill">LIVE</span> : null}
+      {!tile && !minimal && phase !== 'live' ? (
         <div className="stage-message">
           <p>{message}</p>
           {phase === 'error' ? (
@@ -192,7 +192,7 @@ export default function Player({ cameraId, mode, tile = false, onPicture, onPhas
           ) : null}
         </div>
       ) : null}
-      {!tile && phase === 'live' ? (
+      {!tile && !minimal && phase === 'live' ? (
         <div className="stage-actions">
           <button className="button ghost" type="button" onClick={() => setAttempt((value) => value + 1)}>ลองใหม่</button>
           <button className="button ghost icon-btn" type="button" onClick={toggleFull} aria-label="เต็มจอ"><IconExpand /></button>

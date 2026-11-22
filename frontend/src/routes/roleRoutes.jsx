@@ -51,14 +51,7 @@ import AdminProvidersPage from '../features/admin/pages/Providers.jsx';
 import AdminBookingsPage from '../features/admin/pages/Bookings.jsx';
 import AdminReportsPage from '../features/admin/pages/Reports.jsx';
 
-import SuperAdminDashboardPage from '../features/super-admin/pages/Dashboard.jsx';
-import SuperAdminUsersPage from '../features/super-admin/pages/Users.jsx';
-import RolesPermissionsPage from '../features/super-admin/pages/RolesPermissions.jsx';
-import SuperAdminProvidersPage from '../features/super-admin/pages/Providers.jsx';
-import PricingPage from '../features/super-admin/pages/Pricing.jsx';
-import PromotionsPage from '../features/super-admin/pages/Promotions.jsx';
-import SuperAdminReportsPage from '../features/super-admin/pages/Reports.jsx';
-import SettingsPage from '../features/super-admin/pages/Settings.jsx';
+/* Super Admin (ฟ่าง) = Pet Hotel CCTV — mounted in App.jsx at /super-admin/* */
 
 /**
  * Route map aligned with Page 17 sitemap.
@@ -139,16 +132,6 @@ export const roleRoutes = (
       <Route path="reports" element={<AdminReportsPage />} />
     </Route>
 
-    {/* Super Admin — ฟ่าง */}
-    <Route path="super-admin">
-      <Route index element={<SuperAdminDashboardPage />} />
-      <Route path="users" element={<SuperAdminUsersPage />} />
-      <Route path="roles-permissions" element={<RolesPermissionsPage />} />
-      <Route path="providers" element={<SuperAdminProvidersPage />} />
-      <Route path="pricing" element={<PricingPage />} />
-      <Route path="promotions" element={<PromotionsPage />} />
-      <Route path="reports" element={<SuperAdminReportsPage />} />
-      <Route path="settings" element={<SettingsPage />} />
-    </Route>
+    {/* Super Admin — ฟ่าง: Pet Hotel CCTV → see App.jsx /super-admin/* */}
   </>
 );

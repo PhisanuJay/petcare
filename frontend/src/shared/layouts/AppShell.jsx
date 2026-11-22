@@ -38,7 +38,7 @@ export default function AppShell() {
               <Link to="/admin">Admin</Link>
             </li>
             <li>
-              <Link to="/super-admin">Super Admin</Link>
+              <Link to="/super-admin">Super Admin (CCTV)</Link>
             </li>
           </ul>
         </nav>

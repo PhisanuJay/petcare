@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { CatMark } from '../components/Marks';
+import { cctvPath } from '../paths';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export default function Login() {
   useEffect(() => {
     api('/api/auth/brand').then((data) => setHotelName(data.hotelName)).catch(() => {});
     api('/api/auth/me')
-      .then((data) => navigate(data.user.role === 'customer' ? '/watch' : '/admin', { replace: true }))
+      .then((data) => navigate(cctvPath(data.user.role === 'customer' ? '/watch' : '/admin'), { replace: true }))
       .catch(() => {});
   }, [navigate]);
 
@@ -24,7 +24,7 @@ export default function Login() {
     setError('');
     try {
       const data = await api('/api/auth/login', { method: 'POST', body: { username, password } });
-      navigate(data.user.role === 'customer' ? '/watch' : '/admin', { replace: true });
+      navigate(cctvPath(data.user.role === 'customer' ? '/watch' : '/admin'), { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -36,7 +36,9 @@ export default function Login() {
     <main className="login-page">
       <form className="login-card" onSubmit={submit}>
         <div className="brand login-brand">
-          <span className="brand-mark"><CatMark /></span>
+          <span className="brand-mark">
+            <img className="brand-mark-art" src="/brand-mark.jpg" alt="" draggable="false" />
+          </span>
           <div>
             <strong>Pet Hotel</strong>
             <small>{hotelName}</small>

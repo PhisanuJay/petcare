@@ -36,7 +36,7 @@ export default function HomePage() {
           <Link to="/admin">Admin (เจ)</Link>
         </li>
         <li>
-          <Link to="/super-admin">Super Admin (ฟ่าง)</Link>
+          <Link to="/super-admin">Super Admin — Pet Hotel CCTV (ฟ่าง)</Link>
         </li>
       </ul>
     </section>

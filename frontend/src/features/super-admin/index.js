@@ -1,5 +1,6 @@
-/** Super Admin module — Owner: ฟ่าง */
+/** Super Admin module — Owner: ฟ่าง / Xsup404 (Pet Hotel CCTV) */
 export { default as DashboardPage } from './pages/Dashboard.jsx';
+export { default as HotelCctvMount } from './HotelCctvMount.jsx';
 export { default as UsersPage } from './pages/Users.jsx';
 export { default as RolesPermissionsPage } from './pages/RolesPermissions.jsx';
 export { default as ProvidersPage } from './pages/Providers.jsx';

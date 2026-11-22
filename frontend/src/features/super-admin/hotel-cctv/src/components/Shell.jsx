@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
+import { cctvPath } from '../paths';
 import {
-  CatMark,
-  IconCamera,
   IconDoor,
   IconGear,
   IconHome,
   IconList,
   IconLive,
   IconMonitor,
-  IconShield,
   IconUser,
 } from './Marks';
 
@@ -21,14 +19,15 @@ function initial(name) {
 
 const ADMIN_NAV = [
   { id: 'dashboard', label: 'ภาพรวม', Icon: IconHome, permission: 'view_cameras' },
-  { id: 'cameras', label: 'จัดการกล้อง', Icon: IconCamera, permission: 'manage_cameras' },
   { id: 'live', label: 'ดูภาพสด', Icon: IconMonitor, permission: 'view_cameras' },
-  { id: 'rooms', label: 'จัดการห้อง', Icon: IconDoor, permission: 'manage_rooms' },
+  { id: 'rooms', label: 'จัดการกล้อง', Icon: IconDoor, permission: 'manage_rooms' },
   { id: 'users', label: 'จัดการผู้ใช้', Icon: IconUser, permission: 'manage_customers' },
-  { id: 'roles', label: 'สิทธิ์การเข้าถึง', Icon: IconShield, permission: 'manage_grants' },
   { id: 'logs', label: 'บันทึกกิจกรรม', Icon: IconList, permission: 'view_logs' },
   { id: 'settings', label: 'ตั้งค่า', Icon: IconGear, permission: 'view_settings' },
 ];
+
+// tab เก่า — redirect ไปจัดการกล้องแท็บสิทธิ์
+const LEGACY_ADMIN_TABS = new Set(['roles']);
 
 const CUSTOMER_NAV = [
   { id: 'live', label: 'กล้องสด', Icon: IconLive },
@@ -37,6 +36,22 @@ const CUSTOMER_NAV = [
   { id: 'profile', label: 'ข้อมูลส่วนตัว', Icon: IconUser },
   { id: 'contact', label: 'ติดต่อเรา', Icon: IconGear },
 ];
+
+const ADMIN_TABS = new Set(ADMIN_NAV.map((item) => item.id));
+const CUSTOMER_TABS = new Set(CUSTOMER_NAV.map((item) => item.id));
+
+function defaultTab(role) {
+  return role === 'admin' ? 'dashboard' : 'live';
+}
+
+function tabFromSearch(role, searchParams) {
+  const tab = searchParams.get('tab');
+  if (role === 'admin' && tab === 'roles') return 'rooms';
+  const allowed = role === 'admin' ? ADMIN_TABS : CUSTOMER_TABS;
+  if (tab && allowed.has(tab)) return tab;
+  if (role === 'admin' && tab && LEGACY_ADMIN_TABS.has(tab)) return 'rooms';
+  return defaultTab(role);
+}
 
 function canAccess(user, permission) {
   if (!user) return false;
@@ -47,7 +62,7 @@ function canAccess(user, permission) {
 }
 
 function roleHome(userRole) {
-  return userRole === 'customer' ? '/watch' : '/admin';
+  return cctvPath(userRole === 'customer' ? '/watch' : '/admin');
 }
 
 function roleLabelOf(userRole) {
@@ -58,9 +73,22 @@ function roleLabelOf(userRole) {
 
 export default function Shell({ role, children }) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [session, setSession] = useState(null);
-  const [section, setSection] = useState(role === 'admin' ? 'dashboard' : 'live');
+  const [section, setSectionState] = useState(() => tabFromSearch(role, searchParams));
   const [profileOpen, setProfileOpen] = useState(false);
+
+  function setSection(next) {
+    setSectionState(next);
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.set('tab', next);
+      params.delete('camera');
+      params.delete('view');
+      params.delete('grantCamera');
+      return params;
+    }, { replace: true });
+  }
 
   useEffect(() => {
     api('/api/auth/me')
@@ -74,13 +102,34 @@ export default function Shell({ role, children }) {
         }
         setSession(data);
       })
-      .catch(() => navigate('/login', { replace: true }));
+      .catch(() => navigate(cctvPath('/login'), { replace: true }));
   }, [navigate, role]);
+
+  useEffect(() => {
+    if (role !== 'admin') return;
+    if (searchParams.get('tab') !== 'roles') return;
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.set('tab', 'rooms');
+      params.set('view', 'access');
+      return params;
+    }, { replace: true });
+  }, [searchParams, role, setSearchParams]);
+
+  useEffect(() => {
+    const fromUrl = tabFromSearch(role, searchParams);
+    if (fromUrl !== section) setSectionState(fromUrl);
+  }, [searchParams, role, section]);
 
   useEffect(() => {
     if (!session || role !== 'admin') return;
     const allowed = ADMIN_NAV.filter((item) => {
       if (item.id === 'users' && session.user.role === 'admin') return true;
+      if (item.id === 'rooms') {
+        return canAccess(session.user, 'manage_rooms')
+          || canAccess(session.user, 'manage_grants')
+          || canAccess(session.user, 'manage_cameras');
+      }
       return canAccess(session.user, item.permission);
     });
     if (!allowed.some((item) => item.id === section) && allowed[0]) {
@@ -88,9 +137,19 @@ export default function Shell({ role, children }) {
     }
   }, [session, section, role]);
 
+  useEffect(() => {
+    if (!searchParams.get('tab')) {
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        params.set('tab', section);
+        return params;
+      }, { replace: true });
+    }
+  }, [searchParams, section, setSearchParams]);
+
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    navigate('/login', { replace: true });
+    navigate(cctvPath('/login'), { replace: true });
   }
 
   if (!session) return <main className="center-page">กำลังโหลด</main>;
@@ -98,6 +157,11 @@ export default function Shell({ role, children }) {
   const nav = role === 'admin'
     ? ADMIN_NAV.filter((item) => {
       if (item.id === 'users' && session.user.role === 'admin') return true;
+      if (item.id === 'rooms') {
+        return canAccess(session.user, 'manage_rooms')
+          || canAccess(session.user, 'manage_grants')
+          || canAccess(session.user, 'manage_cameras');
+      }
       return canAccess(session.user, item.permission);
     })
     : CUSTOMER_NAV;
@@ -109,7 +173,9 @@ export default function Shell({ role, children }) {
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="brand">
-            <span className="brand-mark"><CatMark /></span>
+            <span className="brand-mark">
+              <img className="brand-mark-art" src="/brand-mark.jpg" alt="" draggable="false" />
+            </span>
             <div>
               <strong>Pet Hotel</strong>
               <small>{role === 'admin' ? (session.user.role === 'staff' ? 'Staff Panel' : 'Admin Panel') : session.hotelName}</small>
@@ -134,12 +200,11 @@ export default function Shell({ role, children }) {
         </div>
 
         <div className="sidebar-foot">
-          <div className="sidebar-mascot">
-            <p>Happy Pets,<br />Happy Stay</p>
+          <div className="sidebar-mascot" aria-hidden="true">
             <img
-              className="peek-pets-photo"
-              src="/sidebar-pets.jpg?v=3"
-              alt="หมาซามอยด์และแมวขาวเกาะขอบ"
+              className="mascot-art"
+              src="/sidebar-mascot.jpg"
+              alt=""
               draggable="false"
             />
           </div>

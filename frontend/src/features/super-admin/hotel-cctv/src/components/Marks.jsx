@@ -1,13 +1,110 @@
+import { useId } from 'react';
+
+/** Pet Hotel mark — premium painted-illustration cat (app-icon grade). */
 export function CatMark() {
+  const uid = useId().replace(/:/g, '');
+  const g = (name) => `${uid}-${name}`;
+
   return (
     <svg viewBox="0 0 64 64" aria-hidden="true">
-      <path d="M18 30 22 14l8 12 8-12 4 16" fill="#ffe7c2" />
-      <circle cx="32" cy="36" r="16" fill="#fff7ec" />
-      <circle cx="26" cy="35" r="2.2" fill="#2c3d55" />
-      <circle cx="38" cy="35" r="2.2" fill="#2c3d55" />
-      <path d="M32 38.5c1.2 1.1 2.2 1.1 3.2 0" fill="none" stroke="#e39a7a" strokeWidth="1.6" strokeLinecap="round" />
-      <path d="M24 40c1.4 1.2 2 1.2 3.2 0M37 40c1.2 1.2 1.8 1.2 3.2 0" fill="none" stroke="#f3b7b0" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M22 48c3 5 17 5 20 0" fill="none" stroke="#7eb0ff" strokeWidth="3" strokeLinecap="round" />
+      <defs>
+        <radialGradient id={g('face')} cx="38%" cy="32%" r="68%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="55%" stopColor="#FFF4E4" />
+          <stop offset="100%" stopColor="#F0D0A4" />
+        </radialGradient>
+        <linearGradient id={g('ear')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFF8EF" />
+          <stop offset="100%" stopColor="#E8C49A" />
+        </linearGradient>
+        <linearGradient id={g('inner')} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFD0C6" />
+          <stop offset="100%" stopColor="#F08A78" />
+        </linearGradient>
+        <radialGradient id={g('eye')} cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#3D4F68" />
+          <stop offset="100%" stopColor="#1A2433" />
+        </radialGradient>
+        <linearGradient id={g('nose')} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#F2A08A" />
+          <stop offset="100%" stopColor="#D45F4A" />
+        </linearGradient>
+        <linearGradient id={g('collar')} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor="#9EC4FF" />
+          <stop offset="45%" stopColor="#FFFFFF" />
+          <stop offset="100%" stopColor="#6EA8F5" />
+        </linearGradient>
+        <radialGradient id={g('gem')} cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="45%" stopColor="#C9E0FF" />
+          <stop offset="100%" stopColor="#4A8FF0" />
+        </radialGradient>
+        <radialGradient id={g('blush')} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#FFB4A8" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#FFB4A8" stopOpacity="0" />
+        </radialGradient>
+        <filter id={g('soft')} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="0.35" />
+        </filter>
+      </defs>
+
+      {/* soft ground shadow */}
+      <ellipse cx="32" cy="56.5" rx="14" ry="2.2" fill="#2A3B52" opacity="0.12" />
+
+      {/* ears — outer */}
+      <path d="M18.5 30C15.2 18 14 8.5 20.8 7.2c3.2-.6 7.4 5.2 10.2 12.8Z" fill={`url(#${g('ear')})`} />
+      <path d="M45.5 30C48.8 18 50 8.5 43.2 7.2c-3.2-.6-7.4 5.2-10.2 12.8Z" fill={`url(#${g('ear')})`} />
+      {/* ears — inner */}
+      <path d="M19.6 26.5C17.6 19.2 17.4 12.8 21.2 12.2c2.2-.4 5.4 3.8 7.4 9.2Z" fill={`url(#${g('inner')})`} opacity="0.92" />
+      <path d="M44.4 26.5C46.4 19.2 46.6 12.8 42.8 12.2c-2.2-.4-5.4 3.8-7.4 9.2Z" fill={`url(#${g('inner')})`} opacity="0.92" />
+
+      {/* head base */}
+      <circle cx="32" cy="34.5" r="17.8" fill={`url(#${g('face')})`} />
+      {/* face shade */}
+      <ellipse cx="32" cy="40" rx="17" ry="12" fill="#E6B888" opacity="0.16" filter={`url(#${g('soft')})`} />
+      {/* forehead highlight */}
+      <ellipse cx="27" cy="26" rx="7" ry="4.5" fill="#FFFFFF" opacity="0.55" filter={`url(#${g('soft')})`} />
+
+      {/* fur suggestion strokes */}
+      <path d="M15.8 34c1.2-2.4 2-3.2 3.4-3.6" fill="none" stroke="#E2C09A" strokeWidth="1.1" strokeLinecap="round" opacity="0.7" />
+      <path d="M48.2 34c-1.2-2.4-2-3.2-3.4-3.6" fill="none" stroke="#E2C09A" strokeWidth="1.1" strokeLinecap="round" opacity="0.7" />
+
+      {/* muzzle plate */}
+      <ellipse cx="32" cy="41" rx="9.2" ry="6.8" fill="#FFF9F1" opacity="0.95" />
+
+      {/* eyes */}
+      <ellipse cx="24.8" cy="32.2" rx="3.15" ry="3.7" fill={`url(#${g('eye')})`} />
+      <ellipse cx="39.2" cy="32.2" rx="3.15" ry="3.7" fill={`url(#${g('eye')})`} />
+      <ellipse cx="24.8" cy="32.5" rx="1.15" ry="1.35" fill="#5B7A9A" opacity="0.45" />
+      <ellipse cx="39.2" cy="32.5" rx="1.15" ry="1.35" fill="#5B7A9A" opacity="0.45" />
+      <circle cx="25.85" cy="30.85" r="1.15" fill="#FFFFFF" />
+      <circle cx="40.25" cy="30.85" r="1.15" fill="#FFFFFF" />
+      <circle cx="23.9" cy="33.4" r="0.45" fill="#FFFFFF" opacity="0.7" />
+      <circle cx="38.3" cy="33.4" r="0.45" fill="#FFFFFF" opacity="0.7" />
+
+      {/* soft lids */}
+      <path d="M21.4 29.4c2.1-1.7 5.2-1.8 7.2-.1" fill="none" stroke="#D4B08A" strokeWidth="1.15" strokeLinecap="round" opacity="0.85" />
+      <path d="M35.4 29.3c2.1-1.7 5.2-1.8 7.2-.1" fill="none" stroke="#D4B08A" strokeWidth="1.15" strokeLinecap="round" opacity="0.85" />
+
+      {/* nose */}
+      <path d="M32 36.1c-1.7.15-3.2 1.7-3.15 2.85 0 1.35 1.55 2.2 3.15 2.2s3.15-.85 3.15-2.2c.05-1.15-1.45-2.7-3.15-2.85Z" fill={`url(#${g('nose')})`} />
+      <ellipse cx="31.2" cy="37.5" rx="0.7" ry="0.45" fill="#FFFFFF" opacity="0.55" />
+      <path d="M32 41v3.1" fill="none" stroke="#D45F4A" strokeWidth="1.25" strokeLinecap="round" />
+      <path d="M25.6 43.4c2.9 2.5 7.9 2.5 10.8 0" fill="none" stroke="#E8A090" strokeWidth="1.45" strokeLinecap="round" />
+
+      {/* whiskers */}
+      <path d="M20 39.5H12.5M20.5 42H13.2M44 39.5h7.5M43.5 42h7.3" fill="none" stroke="#C9A87E" strokeWidth="1.05" strokeLinecap="round" opacity="0.75" />
+
+      {/* blush */}
+      <circle cx="20.6" cy="38.6" r="3.2" fill={`url(#${g('blush')})`} />
+      <circle cx="43.4" cy="38.6" r="3.2" fill={`url(#${g('blush')})`} />
+
+      {/* premium collar + pearl gem */}
+      <path d="M17.2 49.2c4.8 6.2 24.8 6.2 29.6 0" fill="none" stroke={`url(#${g('collar')})`} strokeWidth="3.8" strokeLinecap="round" />
+      <path d="M17.2 49.2c4.8 6.2 24.8 6.2 29.6 0" fill="none" stroke="#FFFFFF" strokeWidth="1.1" strokeLinecap="round" opacity="0.45" />
+      <circle cx="32" cy="50.2" r="3.35" fill={`url(#${g('gem')})`} />
+      <circle cx="32" cy="50.2" r="3.35" fill="none" stroke="#FFFFFF" strokeWidth="0.7" opacity="0.8" />
+      <circle cx="30.9" cy="49.2" r="0.85" fill="#FFFFFF" opacity="0.9" />
     </svg>
   );
 }
@@ -117,14 +214,6 @@ export function IconUser() {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="8" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
       <path d="M5 19c1.5-3.2 3.8-4.8 7-4.8s5.5 1.6 7 4.8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-export function IconShield() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3 5 6v5c0 4.5 3 7.8 7 9 4-1.2 7-4.5 7-9V6l-7-3Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
     </svg>
   );
 }

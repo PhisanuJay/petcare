@@ -539,14 +539,20 @@ function adminRoutes(config, mtx) {
     }
     res.json({
       hotelName: config.hotelName,
+      adminEmail: config.adminEmail,
       mediamtx,
       mediamtxApi: config.mediamtxApi,
       mediamtxWhep: config.mediamtxWhep,
       allowlist: config.allowlist,
       streamSessionSeconds: config.streamSessionSeconds,
+      webrtcHost: config.webrtcHost,
       webrtcUdpPort: config.webrtcUdpPort,
       playbackAddresses: listPlaybackAddresses(),
+      cookieSecure: config.cookieSecure,
+      nodeEnv: config.nodeEnv,
+      apiPort: config.port,
       summary: await cameraSummary(),
+      checkedAt: new Date().toISOString(),
     });
   }));
 

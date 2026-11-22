@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { IconSearch } from '../components/Marks';
 import { api, bangkokInput, formatWhen, statusLabel } from '../api';
 
@@ -6,15 +7,83 @@ const CARE_LABEL = {
   feed: 'อาหาร',
   water: 'น้ำ',
   play: 'เล่น',
+  walk: 'เดินเล่น',
+  clean: 'ทำความสะอาด',
   health: 'สุขภาพ',
+  custom: 'กิจกรรมอื่น',
 };
 
-export function RoomsPanel() {
+const emptyCameraForm = {
+  rtspUrl: '',
+  roomLabel: '',
+  catName: '',
+  isEnabled: true,
+};
+
+export function RoomsHub({ canManage = true, canGrant = false } = {}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = searchParams.get('view') === 'access' ? 'access' : 'cameras';
+  const grantCamera = searchParams.get('grantCamera') || '';
+
+  function setView(next, cameraId = '') {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.set('tab', 'rooms');
+      if (next === 'access') params.set('view', 'access');
+      else params.delete('view');
+      if (cameraId) params.set('grantCamera', String(cameraId));
+      else params.delete('grantCamera');
+      return params;
+    }, { replace: true });
+  }
+
+  return (
+    <div className="rooms-hub">
+      <div className="rooms-hub-tabs" role="tablist" aria-label="จัดการกล้อง">
+        <button
+          type="button"
+          role="tab"
+          className={view === 'cameras' ? 'active' : ''}
+          aria-selected={view === 'cameras'}
+          onClick={() => setView('cameras')}
+        >
+          กล้อง
+        </button>
+        {canGrant ? (
+          <button
+            type="button"
+            role="tab"
+            className={view === 'access' ? 'active' : ''}
+            aria-selected={view === 'access'}
+            onClick={() => setView('access')}
+          >
+            สิทธิ์ลูกค้า
+          </button>
+        ) : null}
+      </div>
+      {view === 'access' && canGrant ? (
+        <RolesPanel embedded initialCameraId={grantCamera} />
+      ) : (
+        <RoomsPanel
+          canManage={canManage}
+          canGrant={canGrant}
+          onOpenAccess={(cameraId) => setView('access', cameraId)}
+        />
+      )}
+    </div>
+  );
+}
+
+export function RoomsPanel({ canManage = true, canGrant = false, onOpenAccess } = {}) {
   const [rooms, setRooms] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [formMsg, setFormMsg] = useState('');
   const [editing, setEditing] = useState(null);
-  const [rename, setRename] = useState({ fromLabel: '', toLabel: '' });
+  const [adding, setAdding] = useState(null);
+  const [renaming, setRenaming] = useState(null);
+  const [removeTarget, setRemoveTarget] = useState(null);
+  const [filter, setFilter] = useState({ q: '', status: '' });
 
   async function load() {
     const data = await api('/api/admin/rooms');
@@ -25,18 +94,32 @@ export function RoomsPanel() {
     load().catch((err) => setError(err.message));
   }, []);
 
+  function openAdd(roomLabel = '') {
+    setError('');
+    setFormMsg('');
+    setAdding({
+      ...emptyCameraForm,
+      roomLabel: roomLabel === 'ไม่ได้ระบุห้อง' ? '' : roomLabel,
+    });
+  }
+
   async function saveCamera(event) {
     event.preventDefault();
     setBusy(true);
     setError('');
     try {
+      const room = editing.roomLabel?.trim() || '';
+      const cat = editing.catName?.trim() || '';
+      const body = {
+        roomLabel: room,
+        catName: cat,
+        name: room && cat ? `${room} · ${cat}` : room || cat || 'กล้อง',
+      };
+      const rtspUrl = editing.rtspUrl?.trim();
+      if (rtspUrl) body.rtspUrl = rtspUrl;
       await api(`/api/admin/cameras/${editing.id}`, {
         method: 'PATCH',
-        body: {
-          roomLabel: editing.roomLabel,
-          catName: editing.catName,
-          name: editing.name,
-        },
+        body,
       });
       setEditing(null);
       await load();
@@ -47,13 +130,50 @@ export function RoomsPanel() {
     }
   }
 
-  async function renameRoom(event) {
+  async function addCamera(event) {
     event.preventDefault();
     setBusy(true);
     setError('');
+    setFormMsg('กำลังเชื่อมต่อกล้อง');
+    const room = adding.roomLabel?.trim() || '';
+    const cat = adding.catName?.trim() || '';
+    const name = room && cat ? `${room} · ${cat}` : room || cat || 'กล้อง';
+    const rtspUrl = adding.rtspUrl?.trim() || '';
     try {
-      await api('/api/admin/rooms/rename', { method: 'PATCH', body: rename });
-      setRename({ fromLabel: '', toLabel: '' });
+      if (!rtspUrl) throw new Error('ใส่ที่อยู่กล้องก่อน');
+      await api('/api/admin/cameras', {
+        method: 'POST',
+        body: {
+          name,
+          description: '',
+          roomLabel: room,
+          catName: cat,
+          rtspUrl,
+          isEnabled: true,
+        },
+      });
+      setAdding(null);
+      setFormMsg('');
+      await load();
+    } catch (err) {
+      setError(err.message);
+      setFormMsg('');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function renameRoom(event) {
+    event.preventDefault();
+    if (!renaming?.fromLabel || !renaming?.toLabel?.trim()) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api('/api/admin/rooms/rename', {
+        method: 'PATCH',
+        body: { fromLabel: renaming.fromLabel, toLabel: renaming.toLabel.trim() },
+      });
+      setRenaming(null);
       await load();
     } catch (err) {
       setError(err.message);
@@ -62,78 +182,367 @@ export function RoomsPanel() {
     }
   }
 
+  async function toggleEnabled(camera) {
+    if (busy) return;
+    const next = !camera.isEnabled;
+    setRooms((prev) => prev.map((room) => ({
+      ...room,
+      cameras: room.cameras.map((cam) => (
+        cam.id === camera.id ? { ...cam, isEnabled: next } : cam
+      )),
+    })));
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/api/admin/cameras/${camera.id}/toggle`, { method: 'PATCH' });
+      await load();
+    } catch (err) {
+      setError(err.message);
+      await load().catch(() => {});
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recheck(camera) {
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/api/admin/cameras/${camera.id}/recheck`, { method: 'POST' });
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function confirmDelete() {
+    if (!removeTarget) return;
+    setBusy(true);
+    setError('');
+    try {
+      await api(`/api/admin/cameras/${removeTarget.id}`, { method: 'DELETE' });
+      setRemoveTarget(null);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const namedRooms = rooms.filter((room) => room.roomLabel !== 'ไม่ได้ระบุห้อง');
+  const allCameras = rooms.flatMap((room) => room.cameras);
+  const summary = {
+    total: allCameras.length,
+    online: allCameras.filter((cam) => cam.streamStatus === 'online').length,
+    connecting: allCameras.filter((cam) => cam.streamStatus === 'connecting').length,
+    offline: allCameras.filter((cam) => cam.streamStatus === 'offline').length,
+  };
+  const q = filter.q.trim().toLowerCase();
+  const filteredRooms = rooms
+    .map((room) => {
+      const cameras = room.cameras.filter((camera) => {
+        if (filter.status && camera.streamStatus !== filter.status) return false;
+        if (!q) return true;
+        const hay = [camera.name, camera.catName, camera.roomLabel, room.roomLabel]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return hay.includes(q);
+      });
+      if (cameras.length === 0) {
+        if (!q && !filter.status) return room;
+        if (q && String(room.roomLabel || '').toLowerCase().includes(q) && !filter.status) {
+          return { ...room, cameras: room.cameras };
+        }
+        return null;
+      }
+      return {
+        ...room,
+        cameras,
+        cameraCount: cameras.length,
+        online: cameras.filter((cam) => cam.streamStatus === 'online').length,
+      };
+    })
+    .filter(Boolean);
+  const filteredCamCount = filteredRooms.reduce((sum, room) => sum + room.cameras.length, 0);
+
   return (
-    <div className="page">
+    <div className="page rooms-page">
       <div className="page-head">
         <div>
-          <h1>จัดการห้อง</h1>
-          <p className="muted">จัดกลุ่มกล้องตามชื่อห้อง และแก้ชื่อห้องหรือชื่อแมวได้</p>
+          <h1>จัดการกล้อง</h1>
+          <p className="muted">เพิ่ม แก้ ลบ และตรวจสถานะกล้องตามห้อง</p>
         </div>
-        <button className="button ghost" type="button" onClick={() => load().catch((err) => setError(err.message))}>รีเฟรช</button>
+        <div className="page-tools">
+          <span className="rooms-stat-pill">{namedRooms.length} ห้อง</span>
+          <span className="rooms-stat-pill soft">{summary.online}/{summary.total} ออนไลน์</span>
+          <button className="button ghost" type="button" onClick={() => load().catch((err) => setError(err.message))}>รีเฟรช</button>
+          {canManage ? (
+            <button className="button" type="button" onClick={() => openAdd()}>+ เพิ่มกล้อง</button>
+          ) : null}
+        </div>
       </div>
-      {error ? <p className="banner error">{error}</p> : null}
+      {error && !adding && !editing && !removeTarget ? <p className="banner error">{error}</p> : null}
 
-      <section className="panel">
-        <form className="toolbar compact" onSubmit={renameRoom}>
-          <label>ชื่อห้องเดิม
-            <select value={rename.fromLabel} onChange={(event) => setRename({ ...rename, fromLabel: event.target.value })} required>
-              <option value="">เลือกห้อง</option>
-              {rooms.filter((room) => room.roomLabel !== 'ไม่ได้ระบุห้อง').map((room) => (
-                <option key={room.roomLabel} value={room.roomLabel}>{room.roomLabel} ({room.cameraCount})</option>
+      {rooms.length === 0 ? (
+        <div className="empty rooms-empty">
+          ยังไม่มีกล้อง
+          {canManage ? (
+            <button className="button" type="button" onClick={() => openAdd()} style={{ marginTop: 12 }}>
+              + เพิ่มกล้อง
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <>
+          <section className="panel rooms-filter-panel">
+            <label className="search rooms-filter-search">
+              <IconSearch />
+              <input
+                value={filter.q}
+                onChange={(event) => setFilter({ ...filter, q: event.target.value })}
+                placeholder="ค้นหาห้อง หรือชื่อแมว"
+                aria-label="ค้นหากล้อง"
+              />
+            </label>
+            <div className="chip-row camera-status-chips" role="group" aria-label="กรองสถานะ">
+              {[
+                ['', 'ทั้งหมด', summary.total],
+                ['online', 'ออนไลน์', summary.online],
+                ['connecting', 'กำลังเชื่อม', summary.connecting],
+                ['offline', 'ออฟไลน์', summary.offline],
+              ].map(([value, label, count]) => (
+                <button
+                  key={value || 'all'}
+                  type="button"
+                  className={`chip-btn ${filter.status === value ? 'active' : ''} ${value || 'all'}`}
+                  onClick={() => setFilter({ ...filter, status: value })}
+                >
+                  <span>{label}</span>
+                  <em>{count}</em>
+                </button>
               ))}
-            </select>
-          </label>
-          <label>ชื่อห้องใหม่
-            <input value={rename.toLabel} onChange={(event) => setRename({ ...rename, toLabel: event.target.value })} required maxLength={120} />
-          </label>
-          <button className="button" type="submit" disabled={busy}>เปลี่ยนชื่อห้อง</button>
-        </form>
-      </section>
-
-      {rooms.length === 0 ? <div className="empty">ยังไม่มีกล้องให้จัดห้อง</div> : null}
-      <div className="room-grid">
-        {rooms.map((room) => (
-          <section className="panel" key={room.roomLabel}>
-            <div className="section-head">
-              <div>
-                <h2>{room.roomLabel}</h2>
-                <p className="muted tiny">กล้อง {room.cameraCount} · ออนไลน์ {room.online} · ออฟไลน์ {room.offline}</p>
-              </div>
             </div>
-            <ul className="grant-list">
-              {room.cameras.map((camera) => (
-                <li key={camera.id}>
-                  <div>
-                    <strong>{camera.name}</strong>
-                    <p className="muted">{camera.catName || 'ยังไม่ระบุชื่อแมว'}</p>
-                    <span className={`status-dot ${camera.streamStatus}`}>{statusLabel(camera.streamStatus)}</span>
-                  </div>
-                  <button
-                    className="button ghost tiny"
-                    type="button"
-                    onClick={() => setEditing({
-                      id: camera.id,
-                      name: camera.name,
-                      roomLabel: camera.roomLabel || '',
-                      catName: camera.catName || '',
-                    })}
-                  >
-                    แก้ไข
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {(q || filter.status) && filteredCamCount === 0 ? (
+              <p className="muted tiny rooms-filter-empty">ไม่พบกล้องตามเงื่อนไข</p>
+            ) : null}
           </section>
-        ))}
-      </div>
+
+          {filteredRooms.length === 0 ? (
+            <div className="empty rooms-empty">ไม่พบกล้องตามเงื่อนไข</div>
+          ) : (
+            <div className="room-grid">
+              {filteredRooms.map((room) => {
+                const canRename = room.roomLabel !== 'ไม่ได้ระบุห้อง';
+                const isRenaming = renaming?.fromLabel === room.roomLabel;
+                return (
+                  <section className="panel room-card" key={room.roomLabel}>
+                    <div className="room-card-head">
+                      <div className="room-card-title">
+                        <span className="room-card-mark">{String(room.roomLabel || '?').slice(0, 1)}</span>
+                        <div>
+                          <h2>{room.roomLabel}</h2>
+                          <p className="muted tiny">
+                            {room.cameras.length} กล้อง · {room.online} ออนไลน์
+                          </p>
+                        </div>
+                      </div>
+                      {canRename && !isRenaming ? (
+                        <button
+                          className="button ghost tiny"
+                          type="button"
+                          onClick={() => setRenaming({ fromLabel: room.roomLabel, toLabel: room.roomLabel })}
+                        >
+                          เปลี่ยนชื่อ
+                        </button>
+                      ) : null}
+                    </div>
+
+                    {isRenaming ? (
+                      <form className="room-rename-inline" onSubmit={renameRoom}>
+                        <input
+                          value={renaming.toLabel}
+                          onChange={(event) => setRenaming({ ...renaming, toLabel: event.target.value })}
+                          required
+                          maxLength={120}
+                          placeholder="ชื่อห้องใหม่"
+                          autoFocus
+                        />
+                        <button className="button tiny" type="submit" disabled={busy || !renaming.toLabel.trim() || renaming.toLabel.trim() === renaming.fromLabel}>
+                          บันทึก
+                        </button>
+                        <button className="button ghost tiny" type="button" onClick={() => setRenaming(null)}>ยกเลิก</button>
+                      </form>
+                    ) : null}
+
+                    <ul className="room-cam-list">
+                      {room.cameras.map((camera) => (
+                        <li key={camera.id} className={!camera.isEnabled ? 'disabled' : ''}>
+                          <div className="room-cam-top">
+                            <div className="room-cam-main">
+                              <strong>{camera.name}</strong>
+                              <span className="muted">{camera.catName || 'ยังไม่ระบุชื่อแมว'}</span>
+                            </div>
+                            <span className={`status-dot ${camera.streamStatus}`}>{statusLabel(camera.streamStatus)}</span>
+                          </div>
+                          {canManage ? (
+                            <div className="room-cam-actions">
+                              <button
+                                className={`room-cam-power ${camera.isEnabled ? 'on' : ''}`}
+                                type="button"
+                                disabled={busy}
+                                onClick={() => toggleEnabled(camera)}
+                                aria-pressed={camera.isEnabled}
+                                aria-label={camera.isEnabled ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
+                              >
+                                <span className={`toggle ${camera.isEnabled ? 'on' : ''}`} aria-hidden="true" />
+                                <span>{camera.isEnabled ? 'เปิดใช้' : 'ปิดอยู่'}</span>
+                              </button>
+                              <div className="room-cam-tools">
+                                <button
+                                  className="room-tool"
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => recheck(camera)}
+                                  title="ตรวจใหม่"
+                                >
+                                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 0 1 12.8-5.3L19 8.5V4h-1.5v3.2L15.7 5.4A9 9 0 1 0 21 12h-1.5A7.5 7.5 0 0 1 4.5 12Z" fill="currentColor"/></svg>
+                                  ตรวจใหม่
+                                </button>
+                                <button
+                                  className="room-tool"
+                                  type="button"
+                                  onClick={() => {
+                                    setError('');
+                                    setEditing({
+                                      id: camera.id,
+                                      roomLabel: camera.roomLabel || '',
+                                      catName: camera.catName || '',
+                                      rtspUrl: '',
+                                    });
+                                  }}
+                                  title="แก้ไข"
+                                >
+                                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5L4 17.5Zm15.7-9.2a.7.7 0 0 0 0-1l-1.5-1.5a.7.7 0 0 0-1 0l-1.2 1.2 2.5 2.5 1.2-1.2Z" fill="currentColor"/></svg>
+                                  แก้ไข
+                                </button>
+                                {canGrant && onOpenAccess ? (
+                                  <button
+                                    className="room-tool"
+                                    type="button"
+                                    onClick={() => onOpenAccess(camera.id)}
+                                    title="ให้สิทธิ์ลูกค้า"
+                                  >
+                                    สิทธิ์
+                                  </button>
+                                ) : null}
+                                <button
+                                  className="room-tool danger"
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() => {
+                                    setError('');
+                                    setRemoveTarget(camera);
+                                  }}
+                                  title="ลบกล้อง"
+                                >
+                                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1h4v1.5h-1.2l-1 12.2A2 2 0 0 1 15.8 23H8.2a2 2 0 0 1-2-1.8L5.2 7.5H4V6h4Zm1.5 0h5V5h-5v1Zm-1.1 1.5 1 11.8h6.2l1-11.8H8.4Z" fill="currentColor"/></svg>
+                                  ลบ
+                                </button>
+                              </div>
+                            </div>
+                          ) : canGrant && onOpenAccess ? (
+                            <div className="room-cam-actions">
+                              <div className="room-cam-tools">
+                                <button
+                                  className="room-tool"
+                                  type="button"
+                                  onClick={() => onOpenAccess(camera.id)}
+                                  title="ให้สิทธิ์ลูกค้า"
+                                >
+                                  สิทธิ์
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {adding ? (
+        <div className="overlay"><div className="modal rooms-edit-modal">
+          <form onSubmit={addCamera}>
+            <h2>เพิ่มกล้อง</h2>
+            <p className="muted tiny">ใส่ที่อยู่ RTSP แล้วกดเชื่อมต่อ ระบบจะตรวจให้ทันที</p>
+            {error ? <p className="banner error">{error}</p> : null}
+            {formMsg ? <p className="banner ok">{formMsg}</p> : null}
+            <label>ที่อยู่กล้อง (RTSP)
+              <input
+                value={adding.rtspUrl}
+                autoComplete="off"
+                placeholder="rtsp://user:pass@192.168.1.45:554/stream1"
+                onChange={(event) => setAdding({ ...adding, rtspUrl: event.target.value })}
+                required
+                autoFocus
+              />
+            </label>
+            <div className="form-row">
+              <label>ห้อง
+                <input
+                  value={adding.roomLabel}
+                  onChange={(event) => setAdding({ ...adding, roomLabel: event.target.value })}
+                  placeholder="เช่น A"
+                  list="rooms-add-labels"
+                />
+              </label>
+              <label>ชื่อแมว
+                <input
+                  value={adding.catName}
+                  onChange={(event) => setAdding({ ...adding, catName: event.target.value })}
+                  placeholder="เช่น มะลิ"
+                />
+              </label>
+            </div>
+            <datalist id="rooms-add-labels">
+              {namedRooms.map((room) => (
+                <option key={room.roomLabel} value={room.roomLabel} />
+              ))}
+            </datalist>
+            <div className="card-actions">
+              <button className="button ghost" type="button" onClick={() => { setAdding(null); setFormMsg(''); }}>ยกเลิก</button>
+              <button className="button" type="submit" disabled={busy}>{busy ? 'กำลังเชื่อมต่อ…' : 'เชื่อมต่อ'}</button>
+            </div>
+          </form>
+        </div></div>
+      ) : null}
 
       {editing ? (
-        <div className="overlay"><div className="modal">
+        <div className="overlay"><div className="modal rooms-edit-modal">
           <form onSubmit={saveCamera}>
-            <h2>แก้ไขห้อง / แมว</h2>
-            <label>ชื่อกล้อง<input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} required /></label>
-            <label>ห้อง<input value={editing.roomLabel} onChange={(event) => setEditing({ ...editing, roomLabel: event.target.value })} placeholder="เช่น A" /></label>
-            <label>ชื่อแมว<input value={editing.catName} onChange={(event) => setEditing({ ...editing, catName: event.target.value })} placeholder="เช่น มะลิ" /></label>
+            <h2>แก้ไขกล้อง</h2>
+            {error ? <p className="banner error">{error}</p> : null}
+            <div className="form-row">
+              <label>ห้อง<input value={editing.roomLabel} onChange={(event) => setEditing({ ...editing, roomLabel: event.target.value })} placeholder="เช่น A" /></label>
+              <label>ชื่อแมว<input value={editing.catName} onChange={(event) => setEditing({ ...editing, catName: event.target.value })} placeholder="เช่น มะลิ" /></label>
+            </div>
+            <label>ที่อยู่กล้อง (RTSP)
+              <input
+                value={editing.rtspUrl}
+                autoComplete="off"
+                placeholder="เว้นว่างถ้าไม่เปลี่ยน · rtsp://user:pass@ip:554/stream1"
+                onChange={(event) => setEditing({ ...editing, rtspUrl: event.target.value })}
+              />
+            </label>
             <div className="card-actions">
               <button className="button ghost" type="button" onClick={() => setEditing(null)}>ยกเลิก</button>
               <button className="button" type="submit" disabled={busy}>บันทึก</button>
@@ -141,17 +550,41 @@ export function RoomsPanel() {
           </form>
         </div></div>
       ) : null}
+
+      {removeTarget ? (
+        <div className="overlay"><div className="modal rooms-edit-modal">
+          <h2>ลบกล้อง {removeTarget.name}?</h2>
+          {error ? <p className="banner error">{error}</p> : null}
+          <p className="muted">สิทธิ์ดูภาพของลูกค้าสำหรับกล้องนี้จะถูกเพิกถอน</p>
+          <div className="card-actions">
+            <button className="button ghost" type="button" onClick={() => setRemoveTarget(null)}>ยกเลิก</button>
+            <button className="button danger" type="button" onClick={confirmDelete} disabled={busy}>
+              {busy ? 'กำลังลบ…' : 'ลบกล้อง'}
+            </button>
+          </div>
+        </div></div>
+      ) : null}
     </div>
   );
 }
 
-export function RolesPanel() {
+function grantStatus(item) {
+  if (item.revokedAt) return { key: 'revoked', label: 'เพิกถอนแล้ว', tone: 'offline' };
+  if (item.isActive) return { key: 'active', label: 'กำลังใช้ได้', tone: 'online' };
+  return { key: 'idle', label: 'หมดอายุ / ยังไม่ถึง', tone: 'connecting' };
+}
+
+export function RolesPanel({ embedded = false, initialCameraId = '' } = {}) {
   const [grants, setGrants] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [cameras, setCameras] = useState([]);
   const [filter, setFilter] = useState('active');
+  const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  const [okMsg, setOkMsg] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showExtra, setShowExtra] = useState(false);
+  const [duration, setDuration] = useState('7');
   const [form, setForm] = useState({
     cameraId: '',
     userId: '',
@@ -171,16 +604,41 @@ export function RolesPanel() {
     setGrants(access.items);
     setCustomers(people.items);
     setCameras(cams.items);
+    return cams.items;
   }
 
   useEffect(() => {
     load().catch((err) => setError(err.message));
   }, [filter]);
 
+  useEffect(() => {
+    if (!initialCameraId || !cameras.length) return;
+    const camera = cameras.find((item) => String(item.id) === String(initialCameraId));
+    if (!camera) return;
+    setForm((prev) => ({
+      ...prev,
+      cameraId: String(camera.id),
+      petName: camera.catName || prev.petName || '',
+      roomLabel: camera.roomLabel || prev.roomLabel || '',
+    }));
+  }, [initialCameraId, cameras]);
+
+  function applyDuration(days, baseStart = form.startsAt) {
+    const start = baseStart ? new Date(baseStart) : new Date();
+    const end = new Date(start.getTime() + Number(days) * 24 * 60 * 60 * 1000);
+    setDuration(String(days));
+    setForm((prev) => ({
+      ...prev,
+      startsAt: bangkokInput(start),
+      endsAt: bangkokInput(end),
+    }));
+  }
+
   async function createAccess(event) {
     event.preventDefault();
     setBusy(true);
     setError('');
+    setOkMsg('');
     try {
       await api(`/api/admin/cameras/${form.cameraId}/grants`, {
         method: 'POST',
@@ -192,13 +650,18 @@ export function RolesPanel() {
           endsAt: form.endsAt,
         },
       });
-      setForm({
-        ...form,
-        petName: '',
-        roomLabel: '',
+      const customer = customers.find((item) => String(item.id) === String(form.userId));
+      const camera = cameras.find((item) => String(item.id) === String(form.cameraId));
+      setOkMsg(`ให้สิทธิ์ ${customer?.displayName || 'ลูกค้า'} ดู ${camera?.name || 'กล้อง'} แล้ว`);
+      setForm((prev) => ({
+        ...prev,
+        userId: '',
+        petName: camera?.catName || '',
+        roomLabel: camera?.roomLabel || '',
         startsAt: bangkokInput(new Date()),
-        endsAt: bangkokInput(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
-      });
+        endsAt: bangkokInput(new Date(Date.now() + Number(duration === 'custom' ? 7 : duration) * 24 * 60 * 60 * 1000)),
+      }));
+      setFilter('active');
       await load();
     } catch (err) {
       setError(err.message);
@@ -210,8 +673,10 @@ export function RolesPanel() {
   async function revoke(id) {
     setBusy(true);
     setError('');
+    setOkMsg('');
     try {
       await api(`/api/admin/grants/${id}`, { method: 'DELETE' });
+      setOkMsg('เพิกถอนสิทธิ์แล้ว');
       await load();
     } catch (err) {
       setError(err.message);
@@ -222,105 +687,271 @@ export function RolesPanel() {
 
   function pickCamera(cameraId) {
     const camera = cameras.find((item) => String(item.id) === String(cameraId));
-    setForm({
-      ...form,
+    setForm((prev) => ({
+      ...prev,
       cameraId,
-      petName: camera?.catName || form.petName,
-      roomLabel: camera?.roomLabel || form.roomLabel,
-    });
+      petName: camera?.catName || '',
+      roomLabel: camera?.roomLabel || '',
+    }));
   }
 
+  const activeCustomers = customers.filter((item) => item.isActive);
+  const selectedCamera = cameras.find((item) => String(item.id) === String(form.cameraId));
+  const selectedCustomer = activeCustomers.find((item) => String(item.id) === String(form.userId));
+  const needle = query.trim().toLowerCase();
+  const visibleGrants = grants.filter((item) => {
+    if (!needle) return true;
+    const blob = [
+      item.displayName,
+      item.email,
+      item.cameraName,
+      item.petName,
+      item.cameraCat,
+      item.roomLabel,
+    ].join(' ').toLowerCase();
+    return blob.includes(needle);
+  });
+
   return (
-    <div className="page">
+    <div className={`page access-page ${embedded ? 'access-embedded' : ''}`}>
       <div className="page-head">
         <div>
-          <h1>สิทธิ์การเข้าถึง</h1>
-          <p className="muted">ให้หรือเพิกถอนสิทธิ์ลูกค้าในการดูกล้อง</p>
+          <h1>{embedded ? 'สิทธิ์ลูกค้า' : 'สิทธิ์การเข้าถึง'}</h1>
+          <p className="muted">เปิดให้ลูกค้าดูกล้องได้ในช่วงที่กำหนด เพิกถอนได้ทันที</p>
         </div>
-        <div className="page-tools">
-          <select value={filter} onChange={(event) => setFilter(event.target.value)} aria-label="กรองสิทธิ์">
-            <option value="active">กำลังใช้ได้</option>
-            <option value="all">ทั้งหมด</option>
-          </select>
-          <button className="button ghost" type="button" onClick={() => load().catch((err) => setError(err.message))}>รีเฟรช</button>
-        </div>
+        <button
+          className="button ghost"
+          type="button"
+          onClick={() => load().catch((err) => setError(err.message))}
+        >
+          รีเฟรช
+        </button>
       </div>
+
       {error ? <p className="banner error">{error}</p> : null}
+      {okMsg ? <p className="banner ok">{okMsg}</p> : null}
 
-      <div className="dash-bottom">
-        <section className="panel grow">
-          <h2>รายการสิทธิ์</h2>
-          {grants.length === 0 ? <div className="empty">ยังไม่มีสิทธิ์ตามตัวกรองนี้</div> : null}
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>ลูกค้า</th>
-                  <th>กล้อง</th>
-                  <th>ช่วงเวลา</th>
-                  <th>สถานะ</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {grants.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <strong>{item.displayName}</strong>
-                      <span className="cell-sub">{item.email}</span>
-                    </td>
-                    <td>
-                      <strong>{item.cameraName}</strong>
-                      <span className="cell-sub">{item.petName || item.cameraCat || '—'} · {item.roomLabel || '—'}</span>
-                    </td>
-                    <td>
-                      <span className="cell-sub">{formatWhen(item.startsAt)}</span>
-                      <span className="cell-sub">ถึง {formatWhen(item.endsAt)}</span>
-                    </td>
-                    <td>
-                      <span className={`pill ${item.isActive ? 'online' : 'offline'}`}>
-                        {item.revokedAt ? 'เพิกถอนแล้ว' : item.isActive ? 'ใช้ได้' : 'หมดอายุ/ยังไม่ถึง'}
-                      </span>
-                    </td>
-                    <td>
-                      {!item.revokedAt && item.isActive ? (
-                        <button className="button danger tiny" type="button" disabled={busy} onClick={() => revoke(item.id)}>เพิกถอน</button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="panel">
-          <form onSubmit={createAccess}>
+      <section className="panel access-create">
+        <div className="access-create-head">
+          <div>
+            <p className="access-step">ขั้นตอนเดียว</p>
             <h2>ให้สิทธิ์ใหม่</h2>
-            <label>กล้อง
+          </div>
+          {(selectedCamera || selectedCustomer) ? (
+            <div className="access-preview">
+              {selectedCustomer ? <span>{selectedCustomer.displayName}</span> : <span className="muted">เลือกลูกค้า</span>}
+              <span className="access-preview-sep">→</span>
+              {selectedCamera ? <span>{selectedCamera.name}</span> : <span className="muted">เลือกกล้อง</span>}
+            </div>
+          ) : null}
+        </div>
+
+        <form className="access-form" onSubmit={createAccess}>
+          <div className="access-form-grid">
+            <label className="access-field">
+              <span>1. เลือกกล้อง</span>
               <select value={form.cameraId} onChange={(event) => pickCamera(event.target.value)} required>
                 <option value="">เลือกกล้อง</option>
                 {cameras.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name} · {item.roomLabel || 'ไม่มีห้อง'}</option>
+                  <option key={item.id} value={item.id}>
+                    {item.name} · {item.roomLabel || 'ไม่มีห้อง'} · {item.catName || 'ไม่ระบุแมว'}
+                  </option>
                 ))}
               </select>
             </label>
-            <label>ลูกค้า
-              <select value={form.userId} onChange={(event) => setForm({ ...form, userId: event.target.value })} required>
+
+            <label className="access-field">
+              <span>2. เลือกลูกค้า</span>
+              <select
+                value={form.userId}
+                onChange={(event) => setForm({ ...form, userId: event.target.value })}
+                required
+              >
                 <option value="">เลือกลูกค้า</option>
-                {customers.filter((item) => item.isActive).map((item) => (
+                {activeCustomers.map((item) => (
                   <option key={item.id} value={item.id}>{item.displayName} · {item.email}</option>
                 ))}
               </select>
             </label>
-            <label>ชื่อแมวที่แสดง<input value={form.petName} onChange={(event) => setForm({ ...form, petName: event.target.value })} /></label>
-            <label>ชื่อห้องที่แสดง<input value={form.roomLabel} onChange={(event) => setForm({ ...form, roomLabel: event.target.value })} /></label>
-            <label>เริ่ม<input type="datetime-local" value={form.startsAt} onChange={(event) => setForm({ ...form, startsAt: event.target.value })} required /></label>
-            <label>สิ้นสุด<input type="datetime-local" value={form.endsAt} onChange={(event) => setForm({ ...form, endsAt: event.target.value })} required /></label>
-            <button className="button" type="submit" disabled={busy}>ให้สิทธิ์</button>
-          </form>
-        </section>
-      </div>
+          </div>
+
+          <div className="access-duration">
+            <span className="access-duration-label">3. ระยะเวลา</span>
+            <div className="chip-row" role="group" aria-label="เลือกระยะเวลา">
+              {[
+                ['1', '1 วัน'],
+                ['3', '3 วัน'],
+                ['7', '7 วัน'],
+                ['custom', 'กำหนดเอง'],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`chip-btn ${duration === value ? 'active' : ''}`}
+                  onClick={() => {
+                    if (value === 'custom') setDuration('custom');
+                    else applyDuration(value);
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {duration === 'custom' ? (
+            <div className="access-form-grid">
+              <label className="access-field">
+                <span>เริ่ม</span>
+                <input
+                  type="datetime-local"
+                  value={form.startsAt}
+                  onChange={(event) => setForm({ ...form, startsAt: event.target.value })}
+                  required
+                />
+              </label>
+              <label className="access-field">
+                <span>สิ้นสุด</span>
+                <input
+                  type="datetime-local"
+                  value={form.endsAt}
+                  onChange={(event) => setForm({ ...form, endsAt: event.target.value })}
+                  required
+                />
+              </label>
+            </div>
+          ) : (
+            <p className="access-range muted">
+              {formatWhen(form.startsAt)} → {formatWhen(form.endsAt)}
+            </p>
+          )}
+
+          <button
+            className="button ghost tiny access-extra-toggle"
+            type="button"
+            onClick={() => setShowExtra((value) => !value)}
+          >
+            {showExtra ? 'ซ่อนรายละเอียดเพิ่มเติม' : 'แก้ชื่อแมว / ห้องที่แสดง'}
+          </button>
+
+          {showExtra ? (
+            <div className="access-form-grid">
+              <label className="access-field">
+                <span>ชื่อแมวที่แสดง</span>
+                <input
+                  value={form.petName}
+                  onChange={(event) => setForm({ ...form, petName: event.target.value })}
+                  placeholder="เช่น มะลิ"
+                />
+              </label>
+              <label className="access-field">
+                <span>ชื่อห้องที่แสดง</span>
+                <input
+                  value={form.roomLabel}
+                  onChange={(event) => setForm({ ...form, roomLabel: event.target.value })}
+                  placeholder="เช่น ห้อง A"
+                />
+              </label>
+            </div>
+          ) : null}
+
+          <div className="access-actions">
+            <button className="button wide" type="submit" disabled={busy || !form.cameraId || !form.userId}>
+              {busy ? 'กำลังบันทึก…' : 'ให้สิทธิ์ดูกล้อง'}
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section className="panel access-list">
+        <div className="access-list-head">
+          <div>
+            <h2>สิทธิ์ที่มีอยู่</h2>
+            <p className="muted tiny">{visibleGrants.length} รายการ</p>
+          </div>
+          <div className="chip-row" role="tablist" aria-label="กรองสิทธิ์">
+            <button
+              type="button"
+              className={`chip-btn ${filter === 'active' ? 'active' : ''}`}
+              onClick={() => setFilter('active')}
+            >
+              กำลังใช้ได้
+            </button>
+            <button
+              type="button"
+              className={`chip-btn ${filter === 'all' ? 'active' : ''}`}
+              onClick={() => setFilter('all')}
+            >
+              ทั้งหมด
+            </button>
+          </div>
+        </div>
+
+        <label className="search access-search">
+          <IconSearch />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="ค้นหาลูกค้า กล้อง ห้อง หรือชื่อแมว"
+            aria-label="ค้นหาสิทธิ์"
+          />
+        </label>
+
+        {visibleGrants.length === 0 ? (
+          <div className="empty access-empty">
+            <strong>ยังไม่มีสิทธิ์ตามเงื่อนไขนี้</strong>
+            <p className="muted">เลือกกล้องกับลูกค้าด้านบน แล้วกดให้สิทธิ์ได้เลย</p>
+          </div>
+        ) : (
+          <div className="access-cards">
+            {visibleGrants.map((item) => {
+              const status = grantStatus(item);
+              return (
+                <article className="access-card" key={item.id}>
+                  <div className="access-card-top">
+                    <div className="access-who">
+                      <span className="avatar tiny-avatar">{initialOf(item.displayName)}</span>
+                      <div>
+                        <strong>{item.displayName}</strong>
+                        <span className="cell-sub">{item.email}</span>
+                      </div>
+                    </div>
+                    <span className={`pill ${status.tone}`}>{status.label}</span>
+                  </div>
+
+                  <div className="access-card-body">
+                    <div>
+                      <span className="access-meta-label">กล้อง</span>
+                      <strong>{item.cameraName}</strong>
+                      <span className="cell-sub">
+                        {item.petName || item.cameraCat || 'ไม่ระบุแมว'} · {item.roomLabel || 'ไม่ระบุห้อง'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="access-meta-label">ช่วงเวลา</span>
+                      <span className="cell-sub">{formatWhen(item.startsAt)}</span>
+                      <span className="cell-sub">ถึง {formatWhen(item.endsAt)}</span>
+                    </div>
+                  </div>
+
+                  {!item.revokedAt && item.isActive ? (
+                    <div className="access-card-actions">
+                      <button
+                        className="button danger tiny"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => revoke(item.id)}
+                      >
+                        เพิกถอนสิทธิ์
+                      </button>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -380,7 +1011,10 @@ export function LogsPanel() {
               <option value="feed">อาหาร</option>
               <option value="water">น้ำ</option>
               <option value="play">เล่น</option>
+              <option value="walk">เดินเล่น</option>
+              <option value="clean">ทำความสะอาด</option>
               <option value="health">สุขภาพ</option>
+              <option value="custom">กิจกรรมอื่น</option>
             </select>
           </label>
           <label>ช่วงวัน
@@ -426,11 +1060,12 @@ export function LogsPanel() {
   );
 }
 
-export function SettingsPanel() {
+export function SettingsPanel({ session }) {
   const [system, setSystem] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   async function load() {
     setSystem(await api('/api/admin/system'));
@@ -447,8 +1082,8 @@ export function SettingsPanel() {
     try {
       const result = await api('/api/admin/system/sync', { method: 'POST' });
       setMessage(result.ok
-        ? `ซิงก์สำเร็จ ${result.synced} กล้อง`
-        : `ซิงก์บางส่วน ${result.synced} กล้อง มีปัญหา ${result.errors.length} รายการ`);
+        ? `ซิงก์กล้องเข้าตัวกลางภาพแล้ว ${result.synced} ตัว`
+        : `ซิงก์ได้ ${result.synced} ตัว มีปัญหา ${result.errors.length} รายการ`);
       await load();
     } catch (err) {
       setError(err.message);
@@ -458,77 +1093,159 @@ export function SettingsPanel() {
   }
 
   const summary = system?.summary || { total: 0, online: 0, offline: 0, connecting: 0 };
+  const mediaUp = system?.mediamtx === 'up';
+  const statusTone = !system ? '' : (!mediaUp ? 'bad' : summary.online > 0 ? 'ok' : 'warn');
+  const statusTitle = !mediaUp
+    ? 'ยังดูภาพสดไม่ได้'
+    : summary.online > 0
+      ? 'พร้อมให้ลูกค้าดูภาพ'
+      : 'ระบบพร้อม แต่กล้องยังออฟไลน์';
+  const statusDetail = !mediaUp
+    ? 'ตัวกลางภาพปิดอยู่ เปิด MediaMTX แล้วกดรีเฟรช'
+    : summary.online > 0
+      ? `${summary.online} จาก ${summary.total} กล้องพร้อมใช้งาน`
+      : summary.total > 0
+        ? 'ลองกดซิงก์กล้อง หรือไปตรวจที่เมนูจัดการกล้อง'
+        : 'ยังไม่มีกล้องในระบบ ไปเพิ่มที่เมนูจัดการกล้อง';
 
   return (
-    <div className="page">
+    <div className="page settings-page">
       <div className="page-head">
         <div>
           <h1>ตั้งค่า</h1>
-          <p className="muted">สถานะระบบและตัวกลางภาพจริงของโรงแรม</p>
+          <p className="muted">ภาพรวมโรงแรมและการดูแลระบบภาพสด</p>
         </div>
-        <button className="button" type="button" disabled={busy} onClick={syncMedia}>ซิงก์ MediaMTX</button>
+        <button
+          className="button ghost"
+          type="button"
+          disabled={busy}
+          onClick={() => load().catch((err) => setError(err.message))}
+        >
+          รีเฟรช
+        </button>
       </div>
+
       {error ? <p className="banner error">{error}</p> : null}
       {message ? <p className="banner ok">{message}</p> : null}
-      {!system ? <p className="muted">กำลังโหลด</p> : null}
+      {!system ? <p className="muted">กำลังโหลด…</p> : null}
 
       {system ? (
-        <>
-          <section className="stat-row">
-            <article className="stat-card">
+        <div className="settings-admin">
+          <section className={`panel settings-status ${statusTone}`}>
+            <div className="settings-status-copy">
+              <p className="access-step">สถานะวันนี้</p>
+              <h2>{statusTitle}</h2>
+              <p className="muted">{statusDetail}</p>
+            </div>
+            <div className="settings-status-metrics">
               <div>
-                <span>ฐานข้อมูลกล้อง</span>
-                <strong>{summary.total}</strong>
-                <small>ตัว</small>
-              </div>
-            </article>
-            <article className="stat-card">
-              <div>
-                <span>ออนไลน์</span>
                 <strong>{summary.online}</strong>
-                <small>ตัว</small>
+                <span>ออนไลน์</span>
               </div>
-            </article>
-            <article className="stat-card">
               <div>
-                <span>MediaMTX</span>
-                <strong className={system.mediamtx === 'up' ? 'ok-text' : 'bad-text'}>{system.mediamtx === 'up' ? 'พร้อม' : 'ปิดอยู่'}</strong>
+                <strong>{summary.offline}</strong>
+                <span>ออฟไลน์</span>
               </div>
-            </article>
-            <article className="stat-card">
               <div>
-                <span>เซสชันดูภาพ</span>
-                <strong>{system.streamSessionSeconds}</strong>
-                <small>วินาที</small>
+                <strong>{summary.total}</strong>
+                <span>ทั้งหมด</span>
               </div>
-            </article>
+            </div>
           </section>
 
-          <div className="dash-bottom">
-            <section className="panel grow">
-              <h2>ข้อมูลโรงแรม</h2>
-              <dl className="kv-list">
-                <div><dt>ชื่อโรงแรม</dt><dd>{system.hotelName}</dd></div>
+          <section className="panel">
+            <div className="settings-card-head">
+              <div>
+                <h2>โรงแรม</h2>
+                <p className="muted tiny">ข้อมูลที่ลูกค้าเห็นตอนเข้าใช้งาน</p>
+              </div>
+            </div>
+            <div className="settings-profile">
+              <div className="settings-profile-mark">
+                <img className="brand-mark-art" src="/brand-mark.jpg" alt="" draggable="false" />
+              </div>
+              <div className="settings-profile-copy">
+                <strong>{system.hotelName}</strong>
+                <span className="muted">แอดมิน: {session?.user?.displayName || 'Admin'}</span>
+                <span className="muted">{system.adminEmail || session?.user?.email || '—'}</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="settings-card-head">
+              <div>
+                <h2>ระบบภาพสด</h2>
+                <p className="muted tiny">ซิงก์กล้องเข้าตัวกลางภาพเมื่อเพิ่มหรือแก้กล้องแล้วภาพไม่ออก</p>
+              </div>
+              <span className={`pill ${mediaUp ? 'online' : 'offline'}`}>
+                {mediaUp ? 'ตัวกลางพร้อม' : 'ตัวกลางปิด'}
+              </span>
+            </div>
+            <div className="settings-inline-facts">
+              <div>
+                <span>เวลาดูภาพต่อครั้ง</span>
+                <strong>{Math.round(system.streamSessionSeconds / 60)} นาที</strong>
+              </div>
+              <div>
+                <span>กล้องในระบบ</span>
+                <strong>{summary.total} ตัว</strong>
+              </div>
+            </div>
+            <button className="button wide" type="button" disabled={busy || !mediaUp} onClick={syncMedia}>
+              {busy ? 'กำลังซิงก์…' : 'ซิงก์กล้องเข้าตัวกลางภาพ'}
+            </button>
+            {!mediaUp ? (
+              <p className="muted tiny settings-note">เปิดโปรแกรม MediaMTX ก่อน แล้วค่อยกดซิงก์</p>
+            ) : null}
+          </section>
+
+          <section className="panel">
+            <div className="settings-card-head">
+              <div>
+                <h2>ความปลอดภัย</h2>
+                <p className="muted tiny">ช่วงเครือข่ายที่ระบบยอมรับกล้อง</p>
+              </div>
+            </div>
+            {(system.allowlist || []).length === 0 ? (
+              <div className="empty">ยังไม่ได้จำกัดเครือข่ายกล้อง</div>
+            ) : (
+              <ul className="settings-tags">
+                {system.allowlist.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            )}
+          </section>
+
+          <section className="panel settings-advanced">
+            <button
+              className="settings-advanced-toggle"
+              type="button"
+              onClick={() => setShowAdvanced((value) => !value)}
+              aria-expanded={showAdvanced}
+            >
+              <span>
+                <strong>รายละเอียดทางเทคนิค</strong>
+                <small className="muted">สำหรับช่าง/ผู้ติดตั้งระบบ</small>
+              </span>
+              <span className="muted">{showAdvanced ? 'ซ่อน' : 'แสดง'}</span>
+            </button>
+
+            {showAdvanced ? (
+              <dl className="settings-tech-list">
                 <div><dt>MediaMTX API</dt><dd>{system.mediamtxApi}</dd></div>
                 <div><dt>WHEP</dt><dd>{system.mediamtxWhep}</dd></div>
-                <div><dt>พอร์ต WebRTC UDP</dt><dd>{system.webrtcUdpPort}</dd></div>
+                <div><dt>WebRTC</dt><dd>{system.webrtcHost}:{system.webrtcUdpPort}</dd></div>
+                <div><dt>API Port</dt><dd>{system.apiPort}</dd></div>
+                <div><dt>โหมด</dt><dd>{system.nodeEnv}</dd></div>
+                <div><dt>คุกกี้ Secure</dt><dd>{system.cookieSecure ? 'เปิด' : 'ปิด'}</dd></div>
+                <div>
+                  <dt>ที่อยู่เล่นภาพ</dt>
+                  <dd>{(system.playbackAddresses || []).join(', ') || '—'}</dd>
+                </div>
               </dl>
-              <p className="muted tiny">ชื่อโรงแรมและรหัสแอดมินอ่านจากไฟล์ .env หากเปลี่ยนต้องแก้ที่ไฟล์แล้วรีสตาร์ทเซิร์ฟเวอร์</p>
-            </section>
-            <section className="panel">
-              <h2>เครือข่ายที่อนุญาต</h2>
-              {system.allowlist.length === 0 ? <div className="empty">ยังไม่ตั้ง allowlist</div> : (
-                <ul className="plain-list">
-                  {system.allowlist.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              )}
-              <h3>ที่อยู่เล่นภาพ</h3>
-              <ul className="plain-list">
-                {(system.playbackAddresses || []).map((item) => <li key={item}>{item}</li>)}
-              </ul>
-            </section>
-          </div>
-        </>
+            ) : null}
+          </section>
+        </div>
       ) : null}
     </div>
   );
@@ -600,8 +1317,6 @@ export function UsersPanel({ mode, session }) {
   useEffect(() => {
     load().catch((err) => setError(err.message));
   }, [isAdmin]);
-
-  if (mode === 'roles') return <RolesPanel />;
 
   const q = query.trim().toLowerCase();
   const visibleStaff = staff.filter((item) => {
