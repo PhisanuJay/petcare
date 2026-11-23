@@ -114,7 +114,7 @@ async function main() {
     syncMedia(config, mtx).catch((error) => {
       console.error(`MediaMTX sync failed: ${error.message}`);
     });
-    startCameraHealth({ config, mtx, everyMs: 60000 });
+    startCameraHealth({ config, mtx, everyMs: 20000 });
   });
 }
 

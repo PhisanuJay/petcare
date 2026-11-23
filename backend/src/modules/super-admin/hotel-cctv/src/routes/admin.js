@@ -2,6 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const { asyncHandler, HttpError } = require('../errors');
 const { validateRtspUrl } = require('../security/rtsp');
+const { listLocalCidrs } = require('../lan');
 const { probeRtsp } = require('../security/probe');
 const { publicCamera, publicUser, publicCare, publicGrant, sqlToIso } = require('../serialize');
 const { readViewerHost, filterOfferSdp, choosePlaybackAddress, rewriteAnswerCandidates, listPlaybackAddresses, listPlaybackInterfaces } = require('../webrtc');
@@ -225,7 +226,7 @@ function adminRoutes(config, mtx) {
   router.post('/cameras', asyncHandler(async (req, res) => {
     const body = cameraBody.parse(req.body);
     if (!body.rtspUrl) throw new HttpError(400, 'BAD_INPUT', 'ต้องใส่ RTSP URL');
-    const checked = await validateRtspUrl(body.rtspUrl, config.allowlist);
+    const checked = await validateRtspUrl(body.rtspUrl, config.allowlist, undefined, listLocalCidrs());
     if (!checked.ok) throw new HttpError(400, 'BAD_INPUT', checked.message);
 
     const fingerprint = rtspFingerprint(body.rtspUrl);
@@ -261,7 +262,7 @@ function adminRoutes(config, mtx) {
     if (body.isEnabled !== undefined) fields.is_enabled = body.isEnabled ? 1 : 0;
     let rtspUrl = null;
     if (body.rtspUrl) {
-      const checked = await validateRtspUrl(body.rtspUrl, config.allowlist);
+      const checked = await validateRtspUrl(body.rtspUrl, config.allowlist, undefined, listLocalCidrs());
       if (!checked.ok) throw new HttpError(400, 'BAD_INPUT', checked.message);
       const fingerprint = rtspFingerprint(body.rtspUrl);
       const duplicate = await findCameraByFingerprint(fingerprint);

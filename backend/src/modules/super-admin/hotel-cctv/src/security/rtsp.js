@@ -61,7 +61,7 @@ function fail(message) {
   return { ok: false, message };
 }
 
-async function validateRtspUrl(raw, allowlist, lookup = defaultLookup) {
+async function validateRtspUrl(raw, allowlist, lookup = defaultLookup, localCidrs = []) {
   if (!Array.isArray(allowlist) || allowlist.length === 0) {
     return fail('ยังไม่ได้ตั้งค่า CAMERA_RTSP_ALLOWLIST');
   }
@@ -95,9 +95,10 @@ async function validateRtspUrl(raw, allowlist, lookup = defaultLookup) {
   if (!ips.length) return fail('หาที่อยู่ของกล้องไม่เจอ');
   if (ips.some((ip) => isAlwaysBlocked(ip))) return fail('ที่อยู่ปลายทางถูกปิดกั้น');
 
+  const onLocalNetwork = (ip) => localCidrs.some((cidr) => inCidr(ip, cidr));
   const hostListed = allowlist.some((entry) => !entry.includes('/') && !net.isIP(entry) && entry.toLowerCase() === host.toLowerCase());
-  const ipsAllowed = ips.every((ip) => allowlistAllows(host, ip, allowlist) || (hostListed && !isAlwaysBlocked(ip)));
-  if (!hostListed && !ips.every((ip) => allowlistAllows(host, ip, allowlist))) {
+  const ipsAllowed = ips.every((ip) => allowlistAllows(host, ip, allowlist) || onLocalNetwork(ip) || (hostListed && !isAlwaysBlocked(ip)));
+  if (!hostListed && !ips.every((ip) => allowlistAllows(host, ip, allowlist) || onLocalNetwork(ip))) {
     return fail('โฮสต์ของกล้องไม่อยู่ในรายการที่อนุญาต');
   }
   if (!ipsAllowed) return fail('ที่อยู่ปลายทางของกล้องไม่ปลอดภัย');

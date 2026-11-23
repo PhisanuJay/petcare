@@ -308,7 +308,7 @@ async function deleteCamera(id) {
 }
 
 async function listEnabledSecrets() {
-  const [rows] = await query('SELECT id, rtsp_url_enc FROM cameras WHERE is_enabled = 1');
+  const [rows] = await query('SELECT id, rtsp_url_enc, updated_at FROM cameras WHERE is_enabled = 1');
   return rows;
 }
 
