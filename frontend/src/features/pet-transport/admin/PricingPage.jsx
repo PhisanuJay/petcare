@@ -32,7 +32,7 @@ export default function PricingPage() {
     <>
       <h1>Pricing (Zone แขวงจตุจักร)</h1>
       <p className="tp-lead">
-        กำหนดราคาฐาน Zone 1 / Zone 2 — ระบบคิดค่ารถตามตารางจุดรับ–ส่ง และไป–กลับลด 10%
+        กำหนดราคาฐาน Zone 1 / Zone 2 — ไปส่ง/รับกลับคิดเที่ยวเดียว · ไป–กลับคิดรวม 2 เที่ยว ไม่มีส่วนลด
       </p>
       {msg && <div className="tp-alert tp-alert--ok">{msg}</div>}
 
@@ -58,7 +58,7 @@ export default function PricingPage() {
           </div>
         ))}
         <div className="tp-actions">
-          <button type="button" className="tp-btn" onClick={save}>บันทึก</button>
+          <button type="button" className="btn btn-sky" onClick={save}>บันทึก</button>
         </div>
       </div>
 
@@ -83,7 +83,7 @@ export default function PricingPage() {
           </tbody>
         </table>
         <p className="tp-muted" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
-          กฎ: Zone 1→1 ใช้ราคา Zone 1 · เส้นทางที่มี Zone 2 ใช้ราคา Zone 2
+          กฎ: Zone 1→1 ใช้ราคา Zone 1 · เส้นทางที่มี Zone 2 ใช้ราคา Zone 2 · ไป–กลับ = รวม 2 เที่ยว
         </p>
       </div>
     </>

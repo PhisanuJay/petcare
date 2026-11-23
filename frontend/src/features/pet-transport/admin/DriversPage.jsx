@@ -78,7 +78,7 @@ export default function DriversPage() {
             <input id="dveh" value={form.vehicle} onChange={set('vehicle')} placeholder="เช่น รถตู้ขาว กข 1234" />
           </div>
         </div>
-        <button type="submit" className="tp-btn" disabled={saving}>
+        <button type="submit" className="btn btn-sky" disabled={saving}>
           {saving ? 'กำลังสร้าง...' : 'สร้างบัญชีคนขับ'}
         </button>
       </form>
@@ -108,7 +108,7 @@ export default function DriversPage() {
               />
               <button
                 type="button"
-                className={`tp-btn ${d.active === false ? 'tp-btn--ok' : 'tp-btn--ghost'}`}
+                className={`btn ${d.active === false ? 'btn-sky' : 'btn-soft'}`}
                 onClick={() => setDriverActive(d.id, d.active === false)}
               >
                 {d.active === false ? 'เปิดใช้' : 'ระงับ'}

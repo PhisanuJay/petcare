@@ -36,7 +36,7 @@ export default function PetTransportDashboardPage() {
         <div className="tp-stat"><strong>{done.length}</strong><span>เสร็จแล้ว</span></div>
       </div>
       <div className="tp-actions">
-        <Link className="tp-btn" to="/pet-transport/assigned-jobs">ดู Assigned Jobs</Link>
+        <Link className="btn btn-sky" to="/pet-transport/assigned-jobs">ดู Assigned Jobs</Link>
       </div>
     </section>
   );

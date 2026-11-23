@@ -5,12 +5,14 @@ import {
   ZONES,
   bookingStatusMeta,
   canOwnerRequestCancel,
+  isRoundTrip,
   nextTripStatus,
 } from './constants.js';
-import { districtLabel, quotePrice, subdistrictById } from './pricing.js';
+import { districtLabel, quotePrice, subdistrictById, zoneIdFromSubdistrict } from './pricing.js';
 
 const listeners = new Set();
 let cache = null;
+const PRICING_VERSION = 4;
 
 function defaultState() {
   return {
@@ -21,7 +23,7 @@ function defaultState() {
     trips: [],
     issues: [],
     seeded: true,
-    pricingVersion: 2,
+    pricingVersion: PRICING_VERSION,
   };
 }
 
@@ -31,17 +33,36 @@ function zonesNeedMigration(zones) {
   return ids.includes('A') || ids.includes('OUT') || !ids.includes('1') || !ids.includes('2');
 }
 
+function mergeCatalog(list, demos) {
+  return demos.map((demo) => {
+    const existing = (list || []).find((x) => x.id === demo.id);
+    return existing ? { ...existing, ...demo, ...pickZoneFields(demo) } : { ...demo };
+  });
+}
+
+function pickZoneFields(demo) {
+  return {
+    districtId: demo.districtId,
+    subdistrictId: demo.subdistrictId,
+    zoneId: demo.zoneId || zoneIdFromSubdistrict(demo.subdistrictId),
+    address: demo.address,
+    name: demo.name,
+  };
+}
+
 function getState() {
   if (cache === null) {
     const raw = readJSON(STORAGE_KEYS.transport, null);
     cache = raw?.seeded ? raw : defaultState();
     if (!raw?.seeded) {
       persist(cache);
-    } else if (zonesNeedMigration(cache.zones) || cache.pricingVersion !== 2) {
+    } else if (zonesNeedMigration(cache.zones) || cache.pricingVersion !== PRICING_VERSION) {
       cache = {
         ...cache,
         zones: ZONES.map((z) => ({ ...z })),
-        pricingVersion: 2,
+        clinics: mergeCatalog(cache.clinics, DEMO_CLINICS),
+        hotels: mergeCatalog(cache.hotels, DEMO_HOTELS),
+        pricingVersion: PRICING_VERSION,
       };
       persist(cache);
     }
@@ -101,23 +122,15 @@ function makeTrip({ bookingId, type, from, to, pickupTime, dropoffTime }) {
 
 function placeLabel(place) {
   if (!place) return '';
-  if (place.subdistrictId) {
-    const sub = subdistrictById(place.subdistrictId);
-    const parts = [
-      districtLabel(place.districtId),
-      sub?.label,
-      place.zoneId ? `Zone ${place.zoneId}` : null,
-      place.address,
-    ].filter(Boolean);
-    return parts.join(' · ');
-  }
-  if (place.kind === 'clinic') {
-    return place.address || place.name || '';
-  }
-  if (place.kind === 'hotel') {
-    return place.address || place.name || '';
-  }
-  return [place.name, place.address].filter(Boolean).join(' — ');
+  const sub = place.subdistrictId ? subdistrictById(place.subdistrictId) : null;
+  const parts = [
+    place.name || null,
+    districtLabel(place.districtId) || null,
+    sub?.label || null,
+    place.zoneId ? `Zone ${place.zoneId}` : null,
+    place.address || null,
+  ].filter(Boolean);
+  return parts.join(' · ') || place.address || '';
 }
 
 /** Owner creates booking */
@@ -125,13 +138,21 @@ export function createBooking(input) {
   const state = getState();
   const from = { ...input.from };
   const to = { ...input.to };
+  const returnFrom = input.returnFrom ? { ...input.returnFrom } : { ...to };
+  const returnTo = input.returnTo ? { ...input.returnTo } : { ...from };
+
   if (!from.zoneId || !to.zoneId) {
-    throw new Error('กรุณาเลือกแขวงจุดรับและจุดส่ง');
+    throw new Error('กรุณาเลือกจุดรับและจุดส่งให้ครบ (แขวงหรือสถานที่ในระบบ)');
+  }
+  if (isRoundTrip(input.serviceType) && (!returnFrom.zoneId || !returnTo.zoneId)) {
+    throw new Error('กรุณาเลือกจุดรับ–ส่งเที่ยวกลับให้ครบ');
   }
 
   const estimate = quotePrice({
     fromZoneId: from.zoneId,
     toZoneId: to.zoneId,
+    returnFromZoneId: returnFrom.zoneId,
+    returnToZoneId: returnTo.zoneId,
     serviceType: input.serviceType,
     zones: state.zones,
   });
@@ -152,13 +173,13 @@ export function createBooking(input) {
     }),
   ];
 
-  if (input.serviceType === 'round_trip') {
+  if (isRoundTrip(input.serviceType)) {
     trips.push(
       makeTrip({
         bookingId,
         type: 'dropoff',
-        from: to,
-        to: from,
+        from: returnFrom,
+        to: returnTo,
         pickupTime: input.returnPickupTime,
         dropoffTime: input.returnDropoffTime,
       }),
@@ -176,6 +197,8 @@ export function createBooking(input) {
     serviceType: input.serviceType,
     fromZoneId: from.zoneId,
     toZoneId: to.zoneId,
+    returnFromZoneId: isRoundTrip(input.serviceType) ? returnFrom.zoneId : null,
+    returnToZoneId: isRoundTrip(input.serviceType) ? returnTo.zoneId : null,
     fareZoneId: estimate.fareZoneId,
     zoneId: estimate.fareZoneId,
     estimatedQuote: estimate,
@@ -206,6 +229,8 @@ export function confirmPrice(bookingId, { fareZoneId, customPerTrip }) {
     const quote = quotePrice({
       fromZoneId,
       toZoneId,
+      returnFromZoneId: b.returnFromZoneId || b.estimatedQuote?.returnFromZoneId,
+      returnToZoneId: b.returnToZoneId || b.estimatedQuote?.returnToZoneId,
       serviceType: b.serviceType,
       zones: draft.zones,
       fareZoneOverride: override,

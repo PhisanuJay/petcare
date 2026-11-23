@@ -1,12 +1,16 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { usePets } from '../usePets.js';
-import PlaceFields, { emptyZonePlace } from '../../pet-transport/components/PlaceFields.jsx';
-import PriceQuote from '../../pet-transport/components/PriceQuote.jsx';
+import PlaceFields, {
+  emptyZonePlace,
+  mergeFacilities,
+  placeFromCatalog,
+} from '../../pet-transport/components/PlaceFields.jsx';
+import PriceQuote, { ServiceZonesMap } from '../../pet-transport/components/PriceQuote.jsx';
 import ThaiDateTimeInput, { parseThaiDateTime } from '../../pet-transport/components/ThaiDateTimeInput.jsx';
 import TransportSubnav from '../../pet-transport/components/TransportSubnav.jsx';
-import { SERVICE_TYPES } from '../../pet-transport/constants.js';
+import { SERVICE_TYPES, isRoundTrip } from '../../pet-transport/constants.js';
 import { quotePrice } from '../../pet-transport/pricing.js';
 import { useTransport } from '../../pet-transport/useTransport.js';
 import '../../pet-transport/transport.css';
@@ -16,33 +20,76 @@ const OWNER_NAV = [
   { to: '/pet-owner/transport/history', label: 'ประวัติการจอง', icon: 'bi-clock-history' },
 ];
 
+function clonePlace(place) {
+  return place ? { ...place } : emptyZonePlace('');
+}
+
+function placesReady(place) {
+  return Boolean(place?.zoneId && String(place.address || '').trim());
+}
+
 export default function TransportPage() {
   const { currentUser } = useAuth();
   const { pets } = usePets();
-  const { zones, createBooking } = useTransport();
+  const { zones, clinics, hotels, createBooking } = useTransport();
   const navigate = useNavigate();
 
-  const [serviceType, setServiceType] = useState('one_way');
+  const homeSeed = useMemo(
+    () => emptyZonePlace(currentUser?.address || '', 'home'),
+    [currentUser?.address],
+  );
+  const facilitySeed = useMemo(() => {
+    const list = mergeFacilities(clinics, hotels);
+    return placeFromCatalog(list[0], 'facility');
+  }, [clinics, hotels]);
+
+  const [serviceType, setServiceType] = useState('outbound');
   const [petId, setPetId] = useState(pets[0]?.id || '');
   const [petName, setPetName] = useState(pets[0]?.name || '');
   const [petNotes, setPetNotes] = useState('');
-  const [from, setFrom] = useState(() => emptyZonePlace(currentUser?.address || ''));
-  const [to, setTo] = useState(() => emptyZonePlace(''));
+  const [from, setFrom] = useState(() => homeSeed);
+  const [to, setTo] = useState(() => facilitySeed);
+  const [returnFrom, setReturnFrom] = useState(() => facilitySeed);
+  const [returnTo, setReturnTo] = useState(() => homeSeed);
+  const [returnEdited, setReturnEdited] = useState(false);
   const [outboundDate, setOutboundDate] = useState('');
   const [outboundTime, setOutboundTime] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-  const [returnTime, setReturnTime] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (serviceType === 'outbound') {
+      setFrom(homeSeed);
+      setTo(facilitySeed);
+    } else if (serviceType === 'inbound') {
+      setFrom(facilitySeed);
+      setTo(homeSeed);
+    } else {
+      setFrom(homeSeed);
+      setTo(facilitySeed);
+      setReturnFrom(facilitySeed);
+      setReturnTo(homeSeed);
+      setReturnEdited(false);
+    }
+  }, [serviceType, homeSeed, facilitySeed]);
+
+  useEffect(() => {
+    if (!isRoundTrip(serviceType) || returnEdited) return;
+    setReturnFrom(clonePlace(to));
+    setReturnTo(clonePlace(from));
+  }, [from, to, serviceType, returnEdited]);
 
   const estimate = useMemo(() => {
     if (!from.zoneId || !to.zoneId) return null;
+    if (isRoundTrip(serviceType) && (!returnFrom.zoneId || !returnTo.zoneId)) return null;
     return quotePrice({
       fromZoneId: from.zoneId,
       toZoneId: to.zoneId,
+      returnFromZoneId: returnFrom.zoneId,
+      returnToZoneId: returnTo.zoneId,
       serviceType,
       zones,
     });
-  }, [from.zoneId, to.zoneId, serviceType, zones]);
+  }, [from.zoneId, to.zoneId, returnFrom.zoneId, returnTo.zoneId, serviceType, zones]);
 
   function onPetChange(id) {
     setPetId(id);
@@ -50,29 +97,38 @@ export default function TransportPage() {
     setPetName(pet?.name || '');
   }
 
+  function onReturnFromChange(next) {
+    setReturnEdited(true);
+    setReturnFrom(next);
+  }
+
+  function onReturnToChange(next) {
+    setReturnEdited(true);
+    setReturnTo(next);
+  }
+
+  function resetReturnSwap() {
+    setReturnEdited(false);
+    setReturnFrom(clonePlace(to));
+    setReturnTo(clonePlace(from));
+  }
+
   function handleSubmit(e) {
     e.preventDefault();
     setError('');
     if (!petName.trim()) return setError('กรุณาระบุชื่อสัตว์เลี้ยง');
-    if (!from.subdistrictId || !to.subdistrictId) {
-      return setError('กรุณาเลือกแขวงจุดรับและจุดส่ง');
+    if (!placesReady(from) || !placesReady(to)) {
+      return setError('กรุณากรอกจุดรับและจุดส่งให้ครบ (แขวงหรือสถานที่ในระบบ + ที่อยู่)');
     }
-    if (!from.address.trim() || !to.address.trim()) {
-      return setError('กรุณากรอกรายละเอียดที่อยู่จุดรับและจุดส่ง');
+    if (isRoundTrip(serviceType) && (!placesReady(returnFrom) || !placesReady(returnTo))) {
+      return setError('กรุณากรอกจุดรับ–ส่งเที่ยวกลับให้ครบ');
     }
     if (!estimate || estimate.total == null) {
       return setError('คำนวณราคาไม่สำเร็จ');
     }
     const outboundPickupTime = parseThaiDateTime(outboundDate, outboundTime);
     if (!outboundPickupTime) {
-      return setError('กรุณาระบุวันรับสัตว์เที่ยวไปเป็น วว/ดด/ปปปป และเวลาให้ถูกต้อง');
-    }
-    let returnPickupTime = null;
-    if (serviceType === 'round_trip') {
-      returnPickupTime = parseThaiDateTime(returnDate, returnTime);
-      if (!returnPickupTime) {
-        return setError('กรุณาระบุวันรับสัตว์เที่ยวกลับเป็น วว/ดด/ปปปป และเวลาให้ถูกต้อง');
-      }
+      return setError('กรุณาระบุวันและเวลารับให้ถูกต้อง (วว/ดด/ปปปป) และเวลาในช่วง 09:00–21:00 น.');
     }
 
     try {
@@ -86,9 +142,11 @@ export default function TransportPage() {
         serviceType,
         from,
         to,
+        returnFrom: isRoundTrip(serviceType) ? returnFrom : null,
+        returnTo: isRoundTrip(serviceType) ? returnTo : null,
         outboundPickupTime,
         outboundDropoffTime: null,
-        returnPickupTime,
+        returnPickupTime: null,
         returnDropoffTime: null,
       });
       navigate(`/pet-owner/transport/${booking.id}`);
@@ -98,6 +156,12 @@ export default function TransportPage() {
     return undefined;
   }
 
+  const fromLabel = serviceType === 'inbound' ? 'จุดรับ (คลินิก)' : 'จุดรับ (บ้าน / ต้นทาง)';
+  const toLabel = serviceType === 'inbound' ? 'จุดส่งกลับบ้าน' : 'จุดส่ง (คลินิก)';
+  const lockOutboundTo = serviceType === 'outbound' || isRoundTrip(serviceType);
+  const lockInboundFrom = serviceType === 'inbound';
+  const lockReturnFrom = isRoundTrip(serviceType);
+
   return (
     <div className="page-wrap">
       <div className="container">
@@ -105,8 +169,7 @@ export default function TransportPage() {
           <div className="tp-page-head">
             <h1>บริการรับ–ส่งสัตว์เลี้ยง</h1>
             <p className="tp-lead">
-              พื้นที่บริการ MVP: เขตจตุจักร 4 แขวง — เลือกแขวงจุดรับ–ส่ง ระบบคำนวณค่ารถตาม Zone อัตโนมัติ
-              (Admin จะตรวจและยืนยันราคาสุดท้าย)
+              เลือกประเภทบริการ แล้วกรอกจุดรับ–ส่งในเขตจตุจักร 4 แขวง ระบบคำนวณค่ารถตาม Zone อัตโนมัติ
             </p>
           </div>
           <TransportSubnav items={OWNER_NAV} />
@@ -114,17 +177,32 @@ export default function TransportPage() {
           <form className="tp-form" onSubmit={handleSubmit}>
             {error && <div className="tp-alert tp-alert--danger">{error}</div>}
 
-            <div className="tp-grid tp-grid--2">
+            <div className="tp-card">
+              <h3>ประเภทบริการ</h3>
+              <div className="tp-service-cards" role="radiogroup" aria-label="ประเภทบริการ">
+                {SERVICE_TYPES.map((s) => {
+                  const active = serviceType === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      className={`tp-service-card ${active ? 'is-active' : ''}`}
+                      onClick={() => setServiceType(s.id)}
+                    >
+                      <span className="tp-service-card__icon"><i className={`bi ${s.icon}`} /></span>
+                      <span className="tp-service-card__label">{s.label}</span>
+                      <span className="tp-service-card__hint">{s.hint}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="tp-grid tp-grid--2" style={{ marginTop: '1rem' }}>
               <div className="tp-card">
                 <h3>รายละเอียดการจอง</h3>
-                <div className="field">
-                  <label htmlFor="svc">ประเภทบริการ</label>
-                  <select id="svc" value={serviceType} onChange={(e) => setServiceType(e.target.value)}>
-                    {SERVICE_TYPES.map((s) => (
-                      <option key={s.id} value={s.id}>{s.label}</option>
-                    ))}
-                  </select>
-                </div>
                 <div className="field">
                   <label htmlFor="pet">สัตว์เลี้ยง</label>
                   {pets.length ? (
@@ -151,29 +229,63 @@ export default function TransportPage() {
                   <label htmlFor="notes">หมายเหตุสัตว์เลี้ยง</label>
                   <textarea id="notes" rows={2} value={petNotes} onChange={(e) => setPetNotes(e.target.value)} />
                 </div>
-                <p className="tp-muted" style={{ marginBottom: 0 }}>
-                  Zone 1 (จตุจักร, จอมพล) ฿100 · Zone 2 (ลาดยาว, จันทรเกษม) ฿150 — คิดตามตารางจุดรับ–ส่ง
-                </p>
               </div>
 
-              <PriceQuote quote={estimate} title="สรุปค่าบริการ (ก่อนยืนยัน)" />
+              <ServiceZonesMap />
             </div>
 
             <div className="tp-grid tp-grid--2" style={{ marginTop: '1rem' }}>
               <PlaceFields
-                prefix="จุดรับสัตว์เลี้ยง (Pickup)"
+                prefix={isRoundTrip(serviceType) ? 'เที่ยวไป · จุดรับ' : fromLabel}
                 value={from}
                 onChange={setFrom}
+                clinics={clinics}
+                hotels={hotels}
+                allowedKinds={lockInboundFrom ? ['facility'] : null}
+                locked={lockInboundFrom}
               />
               <PlaceFields
-                prefix="จุดส่งสัตว์เลี้ยง (Drop-off)"
+                prefix={isRoundTrip(serviceType) ? 'เที่ยวไป · จุดส่ง (คลินิก)' : toLabel}
                 value={to}
                 onChange={setTo}
+                clinics={clinics}
+                hotels={hotels}
+                allowedKinds={lockOutboundTo ? ['facility'] : null}
+                locked={lockOutboundTo}
               />
             </div>
 
+            {isRoundTrip(serviceType) && (
+              <div style={{ marginTop: '1rem' }}>
+                <div className="tp-round-toolbar">
+                  <h3 style={{ margin: 0 }}>เที่ยวกลับ (สลับจากเที่ยวไปเป็นค่าเริ่มต้น)</h3>
+                  <button type="button" className="btn btn-soft btn-sm" onClick={resetReturnSwap}>
+                    รีเซ็ตเป็นสลับอัตโนมัติ
+                  </button>
+                </div>
+                <div className="tp-grid tp-grid--2" style={{ marginTop: '0.75rem' }}>
+                  <PlaceFields
+                    prefix="เที่ยวกลับ · จุดรับ (คลินิก)"
+                    value={returnFrom}
+                    onChange={onReturnFromChange}
+                    clinics={clinics}
+                    hotels={hotels}
+                    allowedKinds={['facility']}
+                    locked={lockReturnFrom}
+                  />
+                  <PlaceFields
+                    prefix="เที่ยวกลับ · จุดส่ง"
+                    value={returnTo}
+                    onChange={onReturnToChange}
+                    clinics={clinics}
+                    hotels={hotels}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="tp-card" style={{ marginTop: '1rem' }}>
-              <h3>เวลารับสัตว์เที่ยวไป</h3>
+              <h3>{isRoundTrip(serviceType) ? 'วันและเวลารับ · เที่ยวไป' : 'วันและเวลารับ'}</h3>
               <ThaiDateTimeInput
                 id="out-pick"
                 date={outboundDate}
@@ -181,28 +293,23 @@ export default function TransportPage() {
                 onDateChange={setOutboundDate}
                 onTimeChange={setOutboundTime}
               />
-
-              {serviceType === 'round_trip' && (
-                <>
-                  <h3 style={{ marginTop: '1rem' }}>เวลารับสัตว์เที่ยวกลับ</h3>
-                  <ThaiDateTimeInput
-                    id="ret-pick"
-                    date={returnDate}
-                    time={returnTime}
-                    onDateChange={setReturnDate}
-                    onTimeChange={setReturnTime}
-                  />
-                  <p className="tp-muted">ระบุวันและเวลาที่ต้องการให้มารับกลับเท่านั้น</p>
-                </>
+              {isRoundTrip(serviceType) && (
+                <p className="tp-muted" style={{ marginTop: '0.75rem', marginBottom: 0 }}>
+                  เที่ยวกลับยังไม่ระบุวันเวลา เพราะเวลากลับยังไม่แน่นอน — นัดหมายภายหลังได้
+                </p>
               )}
             </div>
 
+            <div style={{ marginTop: '1rem' }}>
+              <PriceQuote quote={estimate} title="สรุปค่าบริการ (ก่อนยืนยัน)" />
+            </div>
+
             <div className="tp-actions">
-              <button type="submit" className="tp-btn">
+              <button type="submit" className="btn btn-sky">
                 <i className="bi bi-check2" />
                 ยืนยันการจอง
               </button>
-              <Link className="tp-btn tp-btn--ghost" to="/pet-owner/transport/history">
+              <Link className="btn btn-soft" to="/pet-owner/transport/history">
                 ดูประวัติ
               </Link>
             </div>

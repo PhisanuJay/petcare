@@ -38,7 +38,7 @@ export default function JobDetailPage() {
       <section className="tp-page">
         <TransportSubnav title="Driver" items={NAV} />
         <p>เลือกงานจาก Assigned Jobs</p>
-        <Link className="tp-btn" to="/pet-transport/assigned-jobs">ไป Assigned Jobs</Link>
+        <Link className="btn btn-sky" to="/pet-transport/assigned-jobs">ไป Assigned Jobs</Link>
       </section>
     );
   }
@@ -118,10 +118,10 @@ export default function JobDetailPage() {
           <p className="tp-muted">หมายเหตุสัตว์: {booking?.petNotes || '-'}</p>
           <TripStatusTimeline status={trip.status} />
           <div className="tp-actions">
-            <button type="button" className="tp-btn" disabled={!next || !paid} onClick={advance}>
+            <button type="button" className="btn btn-sky" disabled={!next || !paid} onClick={advance}>
               {next ? `ถัดไป: ${next.label}` : 'เสร็จสิ้นแล้ว'}
             </button>
-            <Link className="tp-btn tp-btn--ghost" to={`/pet-transport/jobs/${trip.id}/status`}>
+            <Link className="btn btn-soft" to={`/pet-transport/jobs/${trip.id}/status`}>
               หน้า Tracking
             </Link>
           </div>
@@ -161,7 +161,7 @@ export default function JobDetailPage() {
               <textarea id="imsg" rows={2} value={issueMsg} onChange={(e) => setIssueMsg(e.target.value)} />
             </div>
           </div>
-          <button type="button" className="tp-btn tp-btn--ghost" onClick={sendIssue}>ส่งรายงาน</button>
+          <button type="button" className="btn btn-soft" onClick={sendIssue}>ส่งรายงาน</button>
         </div>
       </div>
     </section>

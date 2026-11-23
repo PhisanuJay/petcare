@@ -34,7 +34,7 @@ export default function HotelsPage() {
             <input id="haddr" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
         </div>
-        <button type="submit" className="tp-btn">เพิ่ม</button>
+        <button type="submit" className="btn btn-sky">เพิ่ม</button>
       </form>
 
       <div className="tp-list" style={{ marginTop: '1rem' }}>
@@ -44,7 +44,7 @@ export default function HotelsPage() {
               <strong>{h.name}</strong>
               <div className="tp-list-item__meta">{h.address}</div>
             </div>
-            <button type="button" className="tp-btn tp-btn--ghost" onClick={() => removeHotel(h.id)}>ลบ</button>
+            <button type="button" className="btn btn-soft" onClick={() => removeHotel(h.id)}>ลบ</button>
           </div>
         ))}
       </div>

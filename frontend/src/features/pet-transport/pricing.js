@@ -1,7 +1,7 @@
 import {
-  ROUND_TRIP_DISCOUNT,
   SERVICE_SUBDISTRICTS,
   ZONES,
+  isRoundTrip,
 } from './constants.js';
 
 export function zoneIdFromSubdistrict(subdistrictId) {
@@ -44,37 +44,54 @@ export function priceForZone(zoneId, zones = ZONES) {
 
 /**
  * Quote from pickup/dropoff zones.
- * Round trip = 2 legs, 10% off total fare.
+ * Round trip = sum of both legs, no discount.
+ * outbound / inbound / one_way = single leg.
  */
 export function quotePrice({
   fromZoneId,
   toZoneId,
+  returnFromZoneId = null,
+  returnToZoneId = null,
   serviceType,
   zones = ZONES,
   customPerTrip = null,
   fareZoneOverride = null,
 }) {
-  const resolvedFareZone = fareZoneOverride || fareZoneId(fromZoneId, toZoneId);
-  let perTrip = null;
+  const outboundFareZone = fareZoneOverride || fareZoneId(fromZoneId, toZoneId);
+  let outboundPerTrip = null;
   if (customPerTrip != null && customPerTrip !== '') {
-    perTrip = Number(customPerTrip);
+    outboundPerTrip = Number(customPerTrip);
   } else if (fareZoneOverride) {
-    perTrip = priceForZone(fareZoneOverride, zones);
+    outboundPerTrip = priceForZone(fareZoneOverride, zones);
   } else {
-    perTrip = fareForZones(fromZoneId, toZoneId, zones);
+    outboundPerTrip = fareForZones(fromZoneId, toZoneId, zones);
   }
 
-  const trips = serviceType === 'round_trip' ? 2 : 1;
+  const round = isRoundTrip(serviceType);
+  const retFrom = returnFromZoneId || toZoneId;
+  const retTo = returnToZoneId || fromZoneId;
+  const returnFareZone = round ? fareZoneId(retFrom, retTo) : null;
+  const returnPerTrip = round ? fareForZones(retFrom, retTo, zones) : null;
 
-  if (perTrip == null || !Number.isFinite(perTrip)) {
+  if (
+    outboundPerTrip == null
+    || !Number.isFinite(outboundPerTrip)
+    || (round && (returnPerTrip == null || !Number.isFinite(returnPerTrip)))
+  ) {
     return {
       fromZoneId,
       toZoneId,
-      zoneId: resolvedFareZone,
-      fareZoneId: resolvedFareZone,
+      returnFromZoneId: round ? retFrom : null,
+      returnToZoneId: round ? retTo : null,
+      zoneId: outboundFareZone,
+      fareZoneId: outboundFareZone,
       serviceType,
-      trips,
-      perTrip: null,
+      trips: round ? 2 : 1,
+      perTrip: outboundPerTrip,
+      outboundPerTrip,
+      returnPerTrip: round ? returnPerTrip : null,
+      outboundFareZone,
+      returnFareZone,
       subtotal: null,
       discount: 0,
       total: null,
@@ -82,19 +99,25 @@ export function quotePrice({
     };
   }
 
-  const subtotal = perTrip * trips;
-  const discount = serviceType === 'round_trip' ? Math.round(subtotal * ROUND_TRIP_DISCOUNT) : 0;
+  const trips = round ? 2 : 1;
+  const subtotal = round ? outboundPerTrip + returnPerTrip : outboundPerTrip;
   return {
     fromZoneId,
     toZoneId,
-    zoneId: resolvedFareZone,
-    fareZoneId: resolvedFareZone,
+    returnFromZoneId: round ? retFrom : null,
+    returnToZoneId: round ? retTo : null,
+    zoneId: outboundFareZone,
+    fareZoneId: outboundFareZone,
     serviceType,
     trips,
-    perTrip,
+    perTrip: outboundPerTrip,
+    outboundPerTrip,
+    returnPerTrip: round ? returnPerTrip : null,
+    outboundFareZone,
+    returnFareZone,
     subtotal,
-    discount,
-    total: subtotal - discount,
+    discount: 0,
+    total: subtotal,
     needsAdminReview: false,
   };
 }

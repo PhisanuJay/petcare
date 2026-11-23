@@ -112,9 +112,9 @@ export default function BookingAdminDetail() {
             </div>
           </div>
           <div className="tp-actions">
-            <button type="button" className="tp-btn" onClick={doConfirmPrice}>ยืนยันราคา</button>
+            <button type="button" className="btn btn-sky" onClick={doConfirmPrice}>ยืนยันราคา</button>
             {booking.paymentStatus === 'owner_confirmed' && (
-              <button type="button" className="tp-btn tp-btn--ok" onClick={doMarkPaid}>Mark as Paid</button>
+              <button type="button" className="btn btn-sky" onClick={doMarkPaid}>Mark as Paid</button>
             )}
           </div>
         </div>

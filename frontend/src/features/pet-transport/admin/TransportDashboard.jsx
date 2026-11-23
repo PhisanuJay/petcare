@@ -20,8 +20,8 @@ export default function TransportDashboard() {
         <div className="tp-stat"><strong>{issues.filter((i) => i.status === 'open').length}</strong><span>ปัญหาจากคนขับ</span></div>
       </div>
       <div className="tp-actions">
-        <Link className="tp-btn" to="/admin/transport/bookings">จัดการ Booking</Link>
-        <Link className="tp-btn tp-btn--ghost" to="/admin/transport/payments">ตรวจชำระเงิน</Link>
+        <Link className="btn btn-sky" to="/admin/transport/bookings">จัดการ Booking</Link>
+        <Link className="btn btn-soft" to="/admin/transport/payments">ตรวจชำระเงิน</Link>
       </div>
     </>
   );

@@ -16,7 +16,12 @@ export default function BookingManagement() {
             <div>
               <strong>{b.petName}</strong> · {b.ownerName}
               <div className="tp-list-item__meta">
-                {b.serviceType === 'round_trip' ? 'ไป–กลับ' : 'เที่ยวเดียว'}
+                {{
+                  outbound: 'ไปส่ง',
+                  inbound: 'รับกลับ',
+                  round_trip: 'ไป–กลับ',
+                  one_way: 'ไปส่ง',
+                }[b.serviceType] || b.serviceType}
                 {' · '}
                 Zone {b.fromZoneId || '?'}→{b.toZoneId || '?'}
                 {' · คิด Zone '}

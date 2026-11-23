@@ -22,10 +22,10 @@ export default function PaymentVerification() {
               <div className="tp-list-item__meta">{formatBaht(b.quote?.total)} · {b.paymentNote || 'ไม่มีหมายเหตุ'}</div>
             </div>
             <div className="tp-actions" style={{ marginTop: 0 }}>
-              <button type="button" className="tp-btn tp-btn--ok" onClick={() => adminMarkPaid(b.id)}>
+              <button type="button" className="btn btn-sky" onClick={() => adminMarkPaid(b.id)}>
                 Mark as Paid
               </button>
-              <Link className="tp-btn tp-btn--ghost" to={`/admin/transport/bookings/${b.id}`}>รายละเอียด</Link>
+              <Link className="btn btn-soft" to={`/admin/transport/bookings/${b.id}`}>รายละเอียด</Link>
             </div>
           </div>
         ))}
