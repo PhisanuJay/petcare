@@ -1,10 +1,21 @@
-/** Domain constants for Pet Transportation MVP */
+/** Domain constants for Pet Transportation MVP — Chatuchak zone pricing */
 
 export const ZONES = [
-  { id: 'A', label: 'Zone A', minKm: 0, maxKm: 5, price: 100 },
-  { id: 'B', label: 'Zone B', minKm: 5, maxKm: 10, price: 180 },
-  { id: 'C', label: 'Zone C', minKm: 10, maxKm: 20, price: 300 },
-  { id: 'OUT', label: 'นอกพื้นที่', minKm: 20, maxKm: Infinity, price: null },
+  { id: '1', label: 'Zone 1', price: 100 },
+  { id: '2', label: 'Zone 2', price: 150 },
+];
+
+/** Service area: Chatuchak district only (MVP) */
+export const SERVICE_DISTRICTS = [
+  { id: 'chatuchak', label: 'เขตจตุจักร' },
+];
+
+/** 4 subdistricts in Chatuchak — Zone mapped for fare matrix */
+export const SERVICE_SUBDISTRICTS = [
+  { id: 'chatuchak', districtId: 'chatuchak', label: 'แขวงจตุจักร', zoneId: '1' },
+  { id: 'chomphon', districtId: 'chatuchak', label: 'แขวงจอมพล', zoneId: '1' },
+  { id: 'latyao', districtId: 'chatuchak', label: 'แขวงลาดยาว', zoneId: '2' },
+  { id: 'chantharakasem', districtId: 'chatuchak', label: 'แขวงจันทรเกษม', zoneId: '2' },
 ];
 
 export const ROUND_TRIP_DISCOUNT = 0.1;
@@ -65,13 +76,37 @@ export const ISSUE_REASONS = [
 ];
 
 export const DEMO_CLINICS = [
-  { id: 'clinic-1', name: 'คลินิกมะแอ่ว สาขาหลัก', address: '123 ถ.สุขุมวิท กรุงเทพฯ' },
-  { id: 'clinic-2', name: 'คลินิกมะแอ่ว สาขาลาดพร้าว', address: '88 ถ.ลาดพร้าว กรุงเทพฯ' },
+  {
+    id: 'clinic-1',
+    name: 'คลินิกมะแอ่ว สาขาหลัก',
+    address: '123 ถ.สุขุมวิท กรุงเทพฯ',
+    lat: 13.7367,
+    lng: 100.5612,
+  },
+  {
+    id: 'clinic-2',
+    name: 'คลินิกมะแอ่ว สาขาลาดพร้าว',
+    address: '88 ถ.ลาดพร้าว กรุงเทพฯ',
+    lat: 13.8166,
+    lng: 100.5917,
+  },
 ];
 
 export const DEMO_HOTELS = [
-  { id: 'hotel-1', name: 'PetCare Hotel Ari', address: '45 อารีย์ กรุงเทพฯ' },
-  { id: 'hotel-2', name: 'Cat Nest Thonglor', address: '12 ทองหล่อ กรุงเทพฯ' },
+  {
+    id: 'hotel-1',
+    name: 'PetCare Hotel Ari',
+    address: '45 อารีย์ กรุงเทพฯ',
+    lat: 13.7797,
+    lng: 100.5446,
+  },
+  {
+    id: 'hotel-2',
+    name: 'Cat Nest Thonglor',
+    address: '12 ทองหล่อ กรุงเทพฯ',
+    lat: 13.7308,
+    lng: 100.5782,
+  },
 ];
 
 export function tripStatusMeta(id) {

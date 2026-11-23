@@ -7,7 +7,7 @@ import {
   canOwnerRequestCancel,
   nextTripStatus,
 } from './constants.js';
-import { quotePrice, zoneFromDistance } from './pricing.js';
+import { districtLabel, quotePrice, subdistrictById } from './pricing.js';
 
 const listeners = new Set();
 let cache = null;
@@ -21,14 +21,30 @@ function defaultState() {
     trips: [],
     issues: [],
     seeded: true,
+    pricingVersion: 2,
   };
+}
+
+function zonesNeedMigration(zones) {
+  if (!Array.isArray(zones) || zones.length === 0) return true;
+  const ids = zones.map((z) => z.id);
+  return ids.includes('A') || ids.includes('OUT') || !ids.includes('1') || !ids.includes('2');
 }
 
 function getState() {
   if (cache === null) {
     const raw = readJSON(STORAGE_KEYS.transport, null);
     cache = raw?.seeded ? raw : defaultState();
-    if (!raw?.seeded) persist(cache);
+    if (!raw?.seeded) {
+      persist(cache);
+    } else if (zonesNeedMigration(cache.zones) || cache.pricingVersion !== 2) {
+      cache = {
+        ...cache,
+        zones: ZONES.map((z) => ({ ...z })),
+        pricingVersion: 2,
+      };
+      persist(cache);
+    }
   }
   return cache;
 }
@@ -83,15 +99,23 @@ function makeTrip({ bookingId, type, from, to, pickupTime, dropoffTime }) {
   };
 }
 
-function placeLabel(place, state) {
+function placeLabel(place) {
   if (!place) return '';
+  if (place.subdistrictId) {
+    const sub = subdistrictById(place.subdistrictId);
+    const parts = [
+      districtLabel(place.districtId),
+      sub?.label,
+      place.zoneId ? `Zone ${place.zoneId}` : null,
+      place.address,
+    ].filter(Boolean);
+    return parts.join(' · ');
+  }
   if (place.kind === 'clinic') {
-    const c = state.clinics.find((x) => x.id === place.refId);
-    return c ? `${c.name} — ${c.address}` : place.address || place.name || '';
+    return place.address || place.name || '';
   }
   if (place.kind === 'hotel') {
-    const h = state.hotels.find((x) => x.id === place.refId);
-    return h ? `${h.name} — ${h.address}` : place.address || place.name || '';
+    return place.address || place.name || '';
   }
   return [place.name, place.address].filter(Boolean).join(' — ');
 }
@@ -99,16 +123,23 @@ function placeLabel(place, state) {
 /** Owner creates booking */
 export function createBooking(input) {
   const state = getState();
-  const zone = zoneFromDistance(input.distanceKm) ?? state.zones[0];
+  const from = { ...input.from };
+  const to = { ...input.to };
+  if (!from.zoneId || !to.zoneId) {
+    throw new Error('กรุณาเลือกแขวงจุดรับและจุดส่ง');
+  }
+
   const estimate = quotePrice({
-    zoneId: zone.id,
+    fromZoneId: from.zoneId,
+    toZoneId: to.zoneId,
     serviceType: input.serviceType,
     zones: state.zones,
   });
+  if (estimate.total == null) {
+    throw new Error('คำนวณราคาไม่สำเร็จ');
+  }
 
   const bookingId = newId();
-  const from = { ...input.from };
-  const to = { ...input.to };
 
   const trips = [
     makeTrip({
@@ -143,8 +174,10 @@ export function createBooking(input) {
     petName: input.petName,
     petNotes: input.petNotes || '',
     serviceType: input.serviceType,
-    distanceKm: Number(input.distanceKm),
-    zoneId: zone.id,
+    fromZoneId: from.zoneId,
+    toZoneId: to.zoneId,
+    fareZoneId: estimate.fareZoneId,
+    zoneId: estimate.fareZoneId,
     estimatedQuote: estimate,
     finalQuote: null,
     status: 'submitted',
@@ -163,18 +196,24 @@ export function createBooking(input) {
   return { booking, trips };
 }
 
-export function confirmPrice(bookingId, { zoneId, customPerTrip }) {
+export function confirmPrice(bookingId, { fareZoneId, customPerTrip }) {
   update((draft) => {
     const b = draft.bookings.find((x) => x.id === bookingId);
     if (!b) throw new Error('ไม่พบการจอง');
+    const fromZoneId = b.fromZoneId || b.estimatedQuote?.fromZoneId;
+    const toZoneId = b.toZoneId || b.estimatedQuote?.toZoneId;
+    const override = fareZoneId || b.fareZoneId || b.zoneId;
     const quote = quotePrice({
-      zoneId: zoneId || b.zoneId,
+      fromZoneId,
+      toZoneId,
       serviceType: b.serviceType,
       zones: draft.zones,
+      fareZoneOverride: override,
       customPerTrip: customPerTrip === '' || customPerTrip == null ? null : Number(customPerTrip),
     });
-    if (quote.total == null) throw new Error('นอกพื้นที่ต้องใส่ราคาก่อนยืนยัน');
-    b.zoneId = quote.zoneId;
+    if (quote.total == null) throw new Error('ต้องใส่ราคาก่อนยืนยัน');
+    b.fareZoneId = quote.fareZoneId;
+    b.zoneId = quote.fareZoneId;
     b.finalQuote = quote;
     b.status = 'price_confirmed';
     b.updatedAt = new Date().toISOString();
@@ -333,8 +372,8 @@ export function enrichBooking(booking, state = getState(), drivers = []) {
     .map((t) => ({
       ...t,
       driver: drivers.find((d) => d.id === t.driverId) || null,
-      fromLabel: placeLabel(t.from, state),
-      toLabel: placeLabel(t.to, state),
+      fromLabel: placeLabel(t.from),
+      toLabel: placeLabel(t.to),
     }))
     .sort((a, b) => (a.type === 'pickup' ? -1 : 1));
   return {

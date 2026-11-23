@@ -410,3 +410,48 @@
 .react-datepicker__time-container .react-datepicker__time .react-datepicker__time-box ul.react-datepicker__time-list li.react-datepicker__time-list-item--selected {
   background: #2563eb !important;
 }
+
+.tp-distance-readout {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  font: inherit;
+}
+
+.tp-geo-ok {
+  color: #047857;
+}
+
+.tp-geo-err {
+  margin: 0.35rem 0 0;
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+.tp-zone-badge {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  font: inherit;
+}
+
+.tp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: inherit;
+}
+
+.tp-table th,
+.tp-table td {
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tp-table th {
+  color: #334155;
+  font-weight: 600;
+  background: #f8fafc;
+}

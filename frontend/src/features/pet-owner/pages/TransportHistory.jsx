@@ -41,7 +41,10 @@ export default function TransportHistoryPage() {
                 <div>
                   <strong>{b.petName}</strong>
                   <div className="tp-list-item__meta">
-                    {b.serviceType === 'round_trip' ? 'ไป–กลับ' : 'เที่ยวเดียว'} · Zone {b.zoneId} ·{' '}
+                    {b.serviceType === 'round_trip' ? 'ไป–กลับ' : 'เที่ยวเดียว'}
+                    {' · '}
+                    Zone {b.fromZoneId || '?'}→{b.toZoneId || '?'}
+                    {' · '}
                     {formatBaht(b.quote?.total)}
                   </div>
                   <div className="tp-list-item__meta">

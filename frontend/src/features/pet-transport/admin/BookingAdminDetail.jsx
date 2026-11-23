@@ -4,13 +4,14 @@ import PriceQuote from '../components/PriceQuote.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import TripStatusTimeline from '../components/TripStatusTimeline.jsx';
 import { TRIP_TYPES, ZONES } from '../constants.js';
+import { subdistrictById } from '../pricing.js';
 import { useTransport } from '../useTransport.js';
 
 export default function BookingAdminDetail() {
   const { bookingId } = useParams();
   const { getBooking, zones, activeDrivers, confirmPrice, assignDriver, adminMarkPaid } = useTransport();
   const booking = getBooking(bookingId);
-  const [zoneId, setZoneId] = useState(booking?.zoneId || 'A');
+  const [fareZoneId, setFareZoneId] = useState(booking?.fareZoneId || booking?.zoneId || '1');
   const [customPrice, setCustomPrice] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
@@ -24,12 +25,15 @@ export default function BookingAdminDetail() {
     );
   }
 
+  const pickup = booking.trips[0]?.from;
+  const dropoff = booking.trips[0]?.to;
+
   function doConfirmPrice() {
     setErr('');
     try {
       confirmPrice(booking.id, {
-        zoneId,
-        customPerTrip: zoneId === 'OUT' || customPrice !== '' ? customPrice : null,
+        fareZoneId,
+        customPerTrip: customPrice !== '' ? customPrice : null,
       });
       setMsg('ยืนยันราคาแล้ว');
     } catch (e) {
@@ -68,17 +72,29 @@ export default function BookingAdminDetail() {
       <div className="tp-grid tp-grid--2">
         <div className="tp-card">
           <StatusBadge label={booking.statusMeta.label} tone={booking.statusMeta.tone} />
-          <p className="tp-muted">ระยะทางที่ Owner กรอก: {booking.distanceKm} กม.</p>
+          <p className="tp-muted">
+            จุดรับ: {subdistrictById(pickup?.subdistrictId)?.label || '-'}
+            {pickup?.zoneId ? ` (Zone ${pickup.zoneId})` : ''}
+          </p>
+          <p className="tp-muted">
+            จุดส่ง: {subdistrictById(dropoff?.subdistrictId)?.label || '-'}
+            {dropoff?.zoneId ? ` (Zone ${dropoff.zoneId})` : ''}
+          </p>
+          <p className="tp-muted">
+            คิดตาม Zone {booking.fareZoneId || booking.zoneId}
+            {' · '}
+            Zone รับ {booking.fromZoneId || pickup?.zoneId || '-'} → ส่ง {booking.toZoneId || dropoff?.zoneId || '-'}
+          </p>
           <p className="tp-muted">การชำระ: {booking.paymentStatus} {booking.paymentNote && `— ${booking.paymentNote}`}</p>
 
           <h3 style={{ marginTop: '1rem' }}>ยืนยันราคา (Zone)</h3>
           <div className="tp-form">
             <div className="field">
-              <label htmlFor="zone">Zone</label>
-              <select id="zone" value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
+              <label htmlFor="zone">คิดตาม Zone</label>
+              <select id="zone" value={fareZoneId} onChange={(e) => setFareZoneId(e.target.value)}>
                 {(zones.length ? zones : ZONES).map((z) => (
                   <option key={z.id} value={z.id}>
-                    {z.label} {z.price != null ? `(฿${z.price}/เที่ยว)` : '(กำหนดเอง)'}
+                    {z.label} {z.price != null ? `(฿${z.price}/เที่ยว)` : ''}
                   </option>
                 ))}
               </select>
@@ -91,7 +107,7 @@ export default function BookingAdminDetail() {
                 min="0"
                 value={customPrice}
                 onChange={(e) => setCustomPrice(e.target.value)}
-                placeholder="จำเป็นสำหรับนอกพื้นที่"
+                placeholder="เว้นว่างเพื่อใช้ราคา Zone"
               />
             </div>
           </div>

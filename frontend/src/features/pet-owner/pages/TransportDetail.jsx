@@ -92,7 +92,10 @@ export default function TransportDetailPage() {
             />
           </div>
           <p className="tp-muted">ประเภท: {booking.serviceType === 'round_trip' ? 'ไป–กลับ' : 'เที่ยวเดียว'}</p>
-          <p className="tp-muted">ระยะทาง: {booking.distanceKm} กม. · Zone {booking.zoneId}</p>
+          <p className="tp-muted">
+            Zone รับ {booking.fromZoneId || '-'} → ส่ง {booking.toZoneId || '-'}
+            {' · '}คิดตาม Zone {booking.fareZoneId || booking.zoneId}
+          </p>
           {booking.petNotes && <p className="tp-muted">หมายเหตุ: {booking.petNotes}</p>}
           {booking.cancelRequest && (
             <div className="tp-alert tp-alert--info" style={{ marginTop: '0.75rem' }}>
