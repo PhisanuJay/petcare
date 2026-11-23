@@ -4,7 +4,7 @@ import { Router } from 'express';
  * Super Admin API module
  * Owner: ฟ่าง (Xsup404)
  * Placeholder routes for monorepo shell.
- * Full Pet Hotel CCTV API lives in ./hotel-cctv (standalone).
+ * Pet Hotel CCTV API runs from D:\CCTV\backend (port 3000).
  */
 const router = Router();
 

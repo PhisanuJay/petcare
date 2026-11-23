@@ -55,7 +55,9 @@ function tabFromSearch(role, searchParams) {
 
 function canAccess(user, permission) {
   if (!user) return false;
-  if (user.role === 'admin') return true;
+  if (user.isSuper) return true;
+  if (user.role === 'admin') return !permission || Boolean(user.permissions && user.permissions[permission]);
+  if (user.role === 'driver') return permission === 'view_cameras';
   if (user.role !== 'staff') return false;
   if (!permission) return true;
   return Boolean(user.permissions && user.permissions[permission]);
@@ -67,6 +69,7 @@ function roleHome(userRole) {
 
 function roleLabelOf(userRole) {
   if (userRole === 'admin') return 'ผู้ดูแลระบบ';
+  if (userRole === 'driver') return 'คนขับ';
   if (userRole === 'staff') return 'พนักงาน';
   return 'ลูกค้า';
 }
@@ -94,7 +97,7 @@ export default function Shell({ role, children }) {
     api('/api/auth/me')
       .then((data) => {
         const ok = role === 'admin'
-          ? data.user.role === 'admin' || data.user.role === 'staff'
+          ? data.user.role === 'admin' || data.user.role === 'staff' || data.user.role === 'driver'
           : data.user.role === role;
         if (!ok) {
           navigate(roleHome(data.user.role), { replace: true });
@@ -124,7 +127,7 @@ export default function Shell({ role, children }) {
   useEffect(() => {
     if (!session || role !== 'admin') return;
     const allowed = ADMIN_NAV.filter((item) => {
-      if (item.id === 'users' && session.user.role === 'admin') return true;
+      if (item.id === 'users') return Boolean(session.user.isSuper);
       if (item.id === 'rooms') {
         return canAccess(session.user, 'manage_rooms')
           || canAccess(session.user, 'manage_grants')
@@ -156,7 +159,7 @@ export default function Shell({ role, children }) {
 
   const nav = role === 'admin'
     ? ADMIN_NAV.filter((item) => {
-      if (item.id === 'users' && session.user.role === 'admin') return true;
+      if (item.id === 'users') return Boolean(session.user.isSuper);
       if (item.id === 'rooms') {
         return canAccess(session.user, 'manage_rooms')
           || canAccess(session.user, 'manage_grants')
@@ -178,7 +181,7 @@ export default function Shell({ role, children }) {
             </span>
             <div>
               <strong>Pet Hotel</strong>
-              <small>{role === 'admin' ? (session.user.role === 'staff' ? 'Staff Panel' : 'Admin Panel') : session.hotelName}</small>
+              <small>{role === 'admin' ? (session.user.role === 'driver' ? 'คนขับ' : session.user.role === 'staff' ? 'Staff Panel' : 'Admin Panel') : session.hotelName}</small>
             </div>
           </div>
           <nav>
