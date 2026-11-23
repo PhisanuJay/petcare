@@ -46,6 +46,9 @@ import AnimalsPage from '../features/adoption/pages/Animals.jsx';
 import AddAnimalPage from '../features/adoption/pages/AddAnimal.jsx';
 import AdoptionRequestsPage from '../features/adoption/pages/AdoptionRequests.jsx';
 import RequestDetailPage from '../features/adoption/pages/RequestDetail.jsx';
+import AdoptionStaffGate from '../features/adoption/AdoptionStaffGate.jsx';
+import AdoptionStaffLayout from '../features/adoption/AdoptionStaffLayout.jsx';
+import AdoptionStaffLoginPage from '../features/adoption/pages/StaffLogin.jsx';
 
 import AdminDashboardPage from '../features/admin/pages/Dashboard.jsx';
 import AdminUsersPage from '../features/admin/pages/Users.jsx';
@@ -83,6 +86,22 @@ export const petOwnerRoutes = (
     <Route path="adoption" element={<PetOwnerAdoptionPage />} />
     <Route path="cctv" element={<PetOwnerCctvPage />} />
   </Route>
+);
+
+/** Adoption staff — uses the main PetCare site layout and its existing navbar. */
+export const adoptionStaffRoutes = (
+  <>
+    <Route path="adoption/login" element={<AdoptionStaffLoginPage />} />
+    <Route element={<AdoptionStaffGate />}>
+      <Route path="adoption" element={<AdoptionStaffLayout />}>
+        <Route index element={<AdoptionDashboardPage />} />
+        <Route path="animals" element={<AnimalsPage />} />
+        <Route path="add-animal" element={<AddAnimalPage />} />
+        <Route path="requests" element={<AdoptionRequestsPage />} />
+        <Route path="requests/:requestId" element={<RequestDetailPage />} />
+      </Route>
+    </Route>
+  </>
 );
 
 /** Staff role modules — rendered inside the legacy AppShell. */
@@ -128,15 +147,6 @@ export const roleRoutes = (
       <Route path="job-detail" element={<JobDetailPage />} />
       <Route path="tracking" element={<TrackingPage />} />
       <Route path="history" element={<HistoryPage />} />
-    </Route>
-
-    {/* Adoption — ปร่ย */}
-    <Route path="adoption">
-      <Route index element={<AdoptionDashboardPage />} />
-      <Route path="animals" element={<AnimalsPage />} />
-      <Route path="add-animal" element={<AddAnimalPage />} />
-      <Route path="requests" element={<AdoptionRequestsPage />} />
-      <Route path="requests/:requestId" element={<RequestDetailPage />} />
     </Route>
 
     {/* Admin — เจ */}

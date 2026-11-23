@@ -1,0 +1,96 @@
+[
+  {
+    "id": "2795379e-f408-4fa1-a719-d811638bdcdb",
+    "bookingId": "87d4b219-89a1-41c2-a70f-4750e6428d66",
+    "slipImage": "/uploads/1783581157672-969105180.jpg",
+    "status": "pending",
+    "submittedAt": "2026-07-09T07:12:57.337Z",
+    "verifiedAt": null,
+    "verifiedBy": null,
+    "updatedAt": "2026-07-09T07:12:57.337Z"
+  },
+  {
+    "id": "140d205a-4b0f-41b0-806f-c98fbd0cefef",
+    "bookingId": "95bb40a1-747c-4fa0-bb1b-9022a1eb4407",
+    "slipImage": "/uploads/1784058269584-818228932.png",
+    "status": "pending",
+    "submittedAt": "2026-07-14T19:44:30.513Z",
+    "verifiedAt": null,
+    "verifiedBy": null
+  },
+  {
+    "id": "edfbbb16-ba1f-4519-b7dc-82b52b0a8ea7",
+    "bookingId": "d04bc91a-39ec-4ba8-80c3-bf846b8d04df",
+    "slipImage": "/uploads/1784063810560-732807097.png",
+    "status": "pending",
+    "submittedAt": "2026-07-14T21:17:18.412Z",
+    "verifiedAt": null,
+    "verifiedBy": null,
+    "updatedAt": "2026-07-14T21:17:18.413Z"
+  },
+  {
+    "id": "6604b91a-7754-457f-851d-d5691ded60be",
+    "bookingId": "264ea998-8b14-4dd7-941a-e1f0c7a4269a",
+    "slipImage": "/uploads/1784058603046-739915504.png",
+    "status": "pending",
+    "submittedAt": "2026-07-14T19:50:03.833Z",
+    "verifiedAt": null,
+    "verifiedBy": null
+  },
+  {
+    "id": "b2af0166-62c2-4177-a148-a3cb375dc6b9",
+    "bookingId": "ff6982ea-4cac-4862-b478-363d1e9cd5e1",
+    "slipImage": "/uploads/1784064194233-421901670.png",
+    "status": "pending",
+    "submittedAt": "2026-07-14T21:23:14.864Z",
+    "verifiedAt": null,
+    "verifiedBy": null
+  },
+  {
+    "id": "a62c4d6c-af78-407c-b68a-e7c5bb34977f",
+    "bookingId": "e3cad131-8025-4853-9de7-4c1ac5a4e27a",
+    "slipImage": "/uploads/1784064268991-793249426.png",
+    "status": "pending",
+    "submittedAt": "2026-07-14T21:24:30.090Z",
+    "verifiedAt": null,
+    "verifiedBy": null
+  },
+  {
+    "id": "f48a7ea0-d538-42ce-8627-9d1c864afaa4",
+    "bookingId": "83007640-ded6-4215-99cf-9adb51c93882",
+    "slipImage": "/uploads/1784064485654-285015119.png",
+    "status": "pending",
+    "submittedAt": "2026-07-14T21:28:06.494Z",
+    "verifiedAt": null,
+    "verifiedBy": null
+  },
+  {
+    "id": "bba546f5-f13b-4e62-819d-868a104adb14",
+    "bookingId": "627c5a87-8c9e-46b9-8a48-b7f5709c1fb3",
+    "slipImage": "/uploads/1784065002921-676297587.png",
+    "status": "verified",
+    "submittedAt": "2026-07-14T21:36:43.485Z",
+    "verifiedAt": "2026-07-15T07:44:51.182Z",
+    "verifiedBy": "e15277ce-7d1c-4cf2-82ea-7bc65057dece",
+    "updatedAt": "2026-07-15T07:44:51.183Z"
+  },
+  {
+    "id": "1a113d4e-3e0f-456d-8fb7-c6a5cb6119a1",
+    "bookingId": "153ffbec-752e-453c-8209-4f4a9e50c9d3",
+    "slipImage": "/uploads/1784065350804-649746336.png",
+    "status": "pending",
+    "submittedAt": "2026-07-14T21:42:31.531Z",
+    "verifiedAt": null,
+    "verifiedBy": null
+  },
+  {
+    "id": "e75f8622-147e-4553-8901-fae176adeabe",
+    "bookingId": "ae727182-cb8a-4c21-b7bc-94a3855054c9",
+    "slipImage": "/uploads/1784093931246-599123526.webp",
+    "status": "verified",
+    "submittedAt": "2026-07-15T05:38:54.067Z",
+    "verifiedAt": "2026-07-15T07:44:11.376Z",
+    "verifiedBy": "e15277ce-7d1c-4cf2-82ea-7bc65057dece",
+    "updatedAt": "2026-07-15T07:44:11.376Z"
+  }
+]

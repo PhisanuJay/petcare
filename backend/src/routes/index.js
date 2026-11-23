@@ -9,6 +9,7 @@ import petTransportRouter from '../modules/pet-transport/routes.js';
 import adoptionRouter from '../modules/adoption/routes.js';
 import adminRouter from '../modules/admin/routes.js';
 import superAdminRouter from '../modules/super-admin/routes.js';
+import authRouter from '../modules/auth/routes.js';
 
 /**
  * Mount each role module under its own API prefix.
@@ -17,6 +18,7 @@ import superAdminRouter from '../modules/super-admin/routes.js';
 export function registerRoutes(app) {
   const api = Router();
 
+  api.use('/auth', authRouter);
   api.use('/pet-owner', petOwnerRouter);
   api.use('/veterinarian', veterinarianRouter);
   api.use('/medical-assistant', medicalAssistantRouter);

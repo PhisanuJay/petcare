@@ -1,6 +1,7 @@
+import { Link } from 'react-router-dom';
 import { ADOPT_ANIMALS, ADOPT_STEPS } from '../../data/homeContent.js';
 
-export default function AdoptionSection({ go }) {
+export default function AdoptionSection() {
   return (
     <section id="adopt" className="pc-section">
       <div className="container">
@@ -40,14 +41,10 @@ export default function AdoptionSection({ go }) {
                       </span>
                     ))}
                   </div>
-                  <a
-                    href="/pet-owner/adoption"
-                    className="btn btn-soft btn-sm mt-auto"
-                    onClick={go('/pet-owner/adoption')}
-                  >
+                  <Link to="/find-home" className="btn btn-soft btn-sm mt-auto">
                     <i className="bi bi-heart me-1" />
                     ขอรับเลี้ยง
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -73,9 +70,9 @@ export default function AdoptionSection({ go }) {
               </div>
             ))}
             <div className="col-lg-2 text-lg-end">
-              <a href="/pet-owner/adoption" className="btn btn-sky btn-sm text-nowrap" onClick={go('/pet-owner/adoption')}>
+              <Link to="/find-home" className="btn btn-sky btn-sm text-nowrap">
                 ดูน้องทั้งหมด
-              </a>
+              </Link>
             </div>
           </div>
         </div>
