@@ -1,4 +1,4 @@
-import { Route } from 'react-router-dom';
+import { Navigate, Route } from 'react-router-dom';
 
 import PetOwnerDashboardPage from '../features/pet-owner/pages/Dashboard.jsx';
 import MyPetsPage from '../features/pet-owner/pages/MyPets.jsx';
@@ -50,6 +50,7 @@ import PaymentVerification from '../features/pet-transport/admin/PaymentVerifica
 import CancellationPage from '../features/pet-transport/admin/CancellationPage.jsx';
 import TransportPricingPage from '../features/pet-transport/admin/PricingPage.jsx';
 import HotelsPage from '../features/pet-transport/admin/HotelsPage.jsx';
+import DriversPage from '../features/pet-transport/admin/DriversPage.jsx';
 
 import AdoptionDashboardPage from '../features/adoption/pages/Dashboard.jsx';
 import AnimalsPage from '../features/adoption/pages/Animals.jsx';
@@ -97,10 +98,44 @@ export const petOwnerRoutes = (
   </Route>
 );
 
-/** Staff role modules — rendered inside the legacy AppShell. */
+/** Admin routes — nested under `/admin` + StaffShell + RequireRole(admin). */
+export const adminTransportRoutes = (
+  <>
+    <Route index element={<Navigate to="transport" replace />} />
+    <Route path="transport" element={<AdminTransportLayout />}>
+      <Route index element={<TransportDashboard />} />
+      <Route path="bookings" element={<BookingManagement />} />
+      <Route path="bookings/:bookingId" element={<BookingAdminDetail />} />
+      <Route path="payments" element={<PaymentVerification />} />
+      <Route path="cancellations" element={<CancellationPage />} />
+      <Route path="pricing" element={<TransportPricingPage />} />
+      <Route path="hotels" element={<HotelsPage />} />
+      <Route path="drivers" element={<DriversPage />} />
+    </Route>
+    <Route path="users" element={<AdminUsersPage />} />
+    <Route path="providers" element={<AdminProvidersPage />} />
+    <Route path="bookings" element={<AdminBookingsPage />} />
+    <Route path="reports" element={<AdminReportsPage />} />
+    <Route path="dashboard" element={<AdminDashboardPage />} />
+  </>
+);
+
+/** Driver routes — nested under `/pet-transport` + StaffShell + RequireRole(driver). */
+export const driverTransportRoutes = (
+  <>
+    <Route index element={<PetTransportDashboardPage />} />
+    <Route path="assigned-jobs" element={<AssignedJobsPage />} />
+    <Route path="job-detail" element={<JobDetailPage />} />
+    <Route path="jobs/:tripId" element={<JobDetailPage />} />
+    <Route path="jobs/:tripId/status" element={<TrackingPage />} />
+    <Route path="tracking" element={<TrackingPage />} />
+    <Route path="history" element={<HistoryPage />} />
+  </>
+);
+
+/** Legacy skeleton modules (other teams) — not mounted in App until they add auth. */
 export const roleRoutes = (
   <>
-    {/* Veterinarian — มะแอ่ว */}
     <Route path="veterinarian">
       <Route index element={<VeterinarianDashboardPage />} />
       <Route path="appointments" element={<VetAppointmentsPage />} />
@@ -109,8 +144,6 @@ export const roleRoutes = (
       <Route path="vaccination" element={<VaccinationPage />} />
       <Route path="reports" element={<VetReportsPage />} />
     </Route>
-
-    {/* Medical Assistant — เอิร์ท */}
     <Route path="medical-assistant">
       <Route index element={<MedicalAssistantDashboardPage />} />
       <Route path="appointments" element={<MaAppointmentsPage />} />
@@ -118,11 +151,7 @@ export const roleRoutes = (
       <Route path="booking-management" element={<BookingManagementPage />} />
       <Route path="medical-support" element={<MedicalSupportPage />} />
     </Route>
-
-    {/* Pet Profile (shared) — เอิร์ท, ปร่ย */}
     <Route path="pet-profile" element={<PetProfile />} />
-
-    {/* Pet Hotel — ฟ่าง, เจ */}
     <Route path="pet-hotel">
       <Route index element={<PetHotelDashboardPage />} />
       <Route path="rooms" element={<RoomsPage />} />
@@ -132,19 +161,6 @@ export const roleRoutes = (
       <Route path="care-records" element={<CareRecordsPage />} />
       <Route path="cctv" element={<HotelCctvPage />} />
     </Route>
-
-    {/* Pet Transport (Driver) — โมเดล */}
-    <Route path="pet-transport">
-      <Route index element={<PetTransportDashboardPage />} />
-      <Route path="assigned-jobs" element={<AssignedJobsPage />} />
-      <Route path="job-detail" element={<JobDetailPage />} />
-      <Route path="jobs/:tripId" element={<JobDetailPage />} />
-      <Route path="jobs/:tripId/status" element={<TrackingPage />} />
-      <Route path="tracking" element={<TrackingPage />} />
-      <Route path="history" element={<HistoryPage />} />
-    </Route>
-
-    {/* Adoption — ปร่ย */}
     <Route path="adoption">
       <Route index element={<AdoptionDashboardPage />} />
       <Route path="animals" element={<AnimalsPage />} />
@@ -152,26 +168,6 @@ export const roleRoutes = (
       <Route path="requests" element={<AdoptionRequestsPage />} />
       <Route path="requests/:requestId" element={<RequestDetailPage />} />
     </Route>
-
-    {/* Admin — เจ */}
-    <Route path="admin">
-      <Route index element={<AdminDashboardPage />} />
-      <Route path="users" element={<AdminUsersPage />} />
-      <Route path="providers" element={<AdminProvidersPage />} />
-      <Route path="bookings" element={<AdminBookingsPage />} />
-      <Route path="reports" element={<AdminReportsPage />} />
-      <Route path="transport" element={<AdminTransportLayout />}>
-        <Route index element={<TransportDashboard />} />
-        <Route path="bookings" element={<BookingManagement />} />
-        <Route path="bookings/:bookingId" element={<BookingAdminDetail />} />
-        <Route path="payments" element={<PaymentVerification />} />
-        <Route path="cancellations" element={<CancellationPage />} />
-        <Route path="pricing" element={<TransportPricingPage />} />
-        <Route path="hotels" element={<HotelsPage />} />
-      </Route>
-    </Route>
-
-    {/* Super Admin — ฟ่าง */}
     <Route path="super-admin">
       <Route index element={<SuperAdminDashboardPage />} />
       <Route path="users" element={<SuperAdminUsersPage />} />

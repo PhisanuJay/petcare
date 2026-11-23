@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import DriverActorBar, { getSelectedDriverId } from '../components/DriverActorBar.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import TransportSubnav from '../components/TransportSubnav.jsx';
 import { TRIP_TYPES, tripStatusMeta } from '../constants.js';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import { useTransport } from '../useTransport.js';
 import { placeLabel } from '../store.js';
 import '../transport.css';
@@ -15,17 +14,15 @@ const NAV = [
 ];
 
 export default function AssignedJobsPage() {
+  const { currentUser } = useAuth();
   const transport = useTransport();
-  const { drivers, tripsForDriver } = transport;
-  const [driverId, setDriverId] = useState(() => getSelectedDriverId(drivers));
-  const jobs = tripsForDriver(driverId).filter((j) => j.status !== 'completed');
+  const jobs = transport.tripsForDriver(currentUser?.id).filter((j) => j.status !== 'completed');
 
   return (
     <section className="tp-page">
-      <TransportSubnav title="Driver · Pet Transport" items={NAV} />
-      <DriverActorBar driverId={driverId} onChange={setDriverId} />
+      <TransportSubnav title="Driver · Assigned Jobs" items={NAV} />
       <h1>Assigned Jobs</h1>
-      <p className="tp-lead">ทริปที่ยังไม่เสร็จ</p>
+      <p className="tp-lead">ทริปที่ Admin มอบหมายให้คุณและยังไม่เสร็จ</p>
       <div className="tp-list">
         {jobs.map((job) => {
           const meta = tripStatusMeta(job.status);

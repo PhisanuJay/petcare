@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { fileToResizedDataUrl } from '../../../shared/utils/storage.js';
-import DriverActorBar, { getSelectedDriverId } from '../components/DriverActorBar.jsx';
 import TransportSubnav from '../components/TransportSubnav.jsx';
 import TripStatusTimeline from '../components/TripStatusTimeline.jsx';
 import { ISSUE_REASONS, TRIP_TYPES, nextTripStatus } from '../constants.js';
 import { placeLabel } from '../store.js';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import { useTransport } from '../useTransport.js';
 import '../transport.css';
 
@@ -17,22 +17,31 @@ const NAV = [
 
 export default function JobDetailPage() {
   const { tripId } = useParams();
+  const { currentUser } = useAuth();
   const transport = useTransport();
   const {
-    drivers,
     trips,
     bookings,
     advanceTripStatus,
     attachEvidence,
     reportIssue,
   } = transport;
-  const [driverId, setDriverId] = useState(() => getSelectedDriverId(drivers));
   const trip = trips.find((t) => t.id === tripId);
   const booking = bookings.find((b) => b.id === trip?.bookingId);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [issueReason, setIssueReason] = useState(ISSUE_REASONS[0].id);
   const [issueMsg, setIssueMsg] = useState('');
+
+  if (!tripId) {
+    return (
+      <section className="tp-page">
+        <TransportSubnav title="Driver" items={NAV} />
+        <p>เลือกงานจาก Assigned Jobs</p>
+        <Link className="tp-btn" to="/pet-transport/assigned-jobs">ไป Assigned Jobs</Link>
+      </section>
+    );
+  }
 
   if (!trip) {
     return (
@@ -41,6 +50,10 @@ export default function JobDetailPage() {
         <Link to="/pet-transport/assigned-jobs">กลับ</Link>
       </section>
     );
+  }
+
+  if (trip.driverId !== currentUser?.id) {
+    return <Navigate to="/pet-transport/assigned-jobs" replace />;
   }
 
   const next = nextTripStatus(trip.status);
@@ -70,7 +83,12 @@ export default function JobDetailPage() {
   function sendIssue() {
     setErr('');
     if (!issueMsg.trim()) return setErr('กรอกรายละเอียดปัญหา');
-    reportIssue({ tripId: trip.id, driverId, reasonId: issueReason, message: issueMsg.trim() });
+    reportIssue({
+      tripId: trip.id,
+      driverId: currentUser.id,
+      reasonId: issueReason,
+      message: issueMsg.trim(),
+    });
     setIssueMsg('');
     setMsg('ส่งปัญหาให้ Admin แล้ว');
     return undefined;
@@ -78,8 +96,7 @@ export default function JobDetailPage() {
 
   return (
     <section className="tp-page">
-      <TransportSubnav title="Driver · Pet Transport" items={NAV} />
-      <DriverActorBar driverId={driverId} onChange={setDriverId} />
+      <TransportSubnav title="Driver · Job Detail" items={NAV} />
       <h1>Job Detail</h1>
       <p className="tp-lead">
         {TRIP_TYPES[trip.type]?.label} · {booking?.petName}

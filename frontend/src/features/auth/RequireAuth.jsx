@@ -9,5 +9,8 @@ export default function RequireAuth() {
     const next = encodeURIComponent(location.pathname + location.search);
     return <Navigate to={`/login?next=${next}`} replace />;
   }
+  if (currentUser.active === false) {
+    return <Navigate to="/login" replace />;
+  }
   return <Outlet />;
 }

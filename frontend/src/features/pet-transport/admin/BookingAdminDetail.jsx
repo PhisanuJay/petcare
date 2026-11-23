@@ -8,7 +8,7 @@ import { useTransport } from '../useTransport.js';
 
 export default function BookingAdminDetail() {
   const { bookingId } = useParams();
-  const { getBooking, zones, drivers, confirmPrice, assignDriver, adminMarkPaid } = useTransport();
+  const { getBooking, zones, activeDrivers, confirmPrice, assignDriver, adminMarkPaid } = useTransport();
   const booking = getBooking(bookingId);
   const [zoneId, setZoneId] = useState(booking?.zoneId || 'A');
   const [customPrice, setCustomPrice] = useState('');
@@ -125,8 +125,10 @@ export default function BookingAdminDetail() {
                   onChange={(e) => doAssign(trip.id, e.target.value)}
                 >
                   <option value="">— เลือกคนขับ —</option>
-                  {drivers.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name} · {d.vehicle}</option>
+                  {activeDrivers.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} · {d.vehicle || 'ไม่ระบุรถ'}
+                    </option>
                   ))}
                 </select>
               </div>

@@ -64,12 +64,6 @@ export const ISSUE_REASONS = [
   { id: 'other', label: 'อื่น ๆ' },
 ];
 
-export const DEMO_DRIVERS = [
-  { id: 'drv-1', name: 'สมชาย ใจดี', phone: '081-111-1111', vehicle: 'รถตู้ขาว กข 1234' },
-  { id: 'drv-2', name: 'วิภา ขับดี', phone: '082-222-2222', vehicle: 'รถเก๋งเทา คค 5678' },
-  { id: 'drv-3', name: 'อนุชา ตรงเวลา', phone: '083-333-3333', vehicle: 'รถตู้เงิน งง 9012' },
-];
-
 export const DEMO_CLINICS = [
   { id: 'clinic-1', name: 'คลินิกมะแอ่ว สาขาหลัก', address: '123 ถ.สุขุมวิท กรุงเทพฯ' },
   { id: 'clinic-2', name: 'คลินิกมะแอ่ว สาขาลาดพร้าว', address: '88 ถ.ลาดพร้าว กรุงเทพฯ' },

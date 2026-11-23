@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import DriverActorBar, { getSelectedDriverId } from '../components/DriverActorBar.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import TransportSubnav from '../components/TransportSubnav.jsx';
 import { TRIP_TYPES, tripStatusMeta } from '../constants.js';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import { useTransport } from '../useTransport.js';
 import '../transport.css';
 
@@ -14,14 +13,13 @@ const NAV = [
 ];
 
 export default function HistoryPage() {
-  const { drivers, tripsForDriver } = useTransport();
-  const [driverId, setDriverId] = useState(() => getSelectedDriverId(drivers));
-  const jobs = tripsForDriver(driverId).filter((j) => j.status === 'completed');
+  const { currentUser } = useAuth();
+  const { tripsForDriver } = useTransport();
+  const jobs = tripsForDriver(currentUser?.id).filter((j) => j.status === 'completed');
 
   return (
     <section className="tp-page">
-      <TransportSubnav title="Driver · Pet Transport" items={NAV} />
-      <DriverActorBar driverId={driverId} onChange={setDriverId} />
+      <TransportSubnav title="Driver · History" items={NAV} />
       <h1>History</h1>
       <p className="tp-lead">งานที่ส่งสำเร็จแล้ว</p>
       <div className="tp-list">

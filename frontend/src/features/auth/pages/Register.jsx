@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
+import { canAccessPath, homePathForRole, normalizeRole, ROLES } from '../roles.js';
 
 const EMPTY = {
   firstName: '',
@@ -36,7 +37,11 @@ export default function RegisterPage() {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (currentUser && !submitting) return <Navigate to={next} replace />;
+  if (currentUser && !submitting) {
+    const role = normalizeRole(currentUser.role);
+    const dest = role === ROLES.owner && canAccessPath(role, next) ? next : homePathForRole(role);
+    return <Navigate to={dest} replace />;
+  }
 
   const set = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
@@ -50,7 +55,9 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register({ ...form, phone: form.phone.replace(/[-\s]/g, '') });
-      navigate(next, { replace: true });
+      // Self-register is always Owner
+      const dest = canAccessPath(ROLES.owner, next) ? next : homePathForRole(ROLES.owner);
+      navigate(dest, { replace: true });
     } catch (err) {
       setFormError(err.message);
       setSubmitting(false);

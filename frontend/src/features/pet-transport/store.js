@@ -1,7 +1,6 @@
 import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
 import {
   DEMO_CLINICS,
-  DEMO_DRIVERS,
   DEMO_HOTELS,
   ZONES,
   bookingStatusMeta,
@@ -16,7 +15,6 @@ let cache = null;
 function defaultState() {
   return {
     zones: ZONES.map((z) => ({ ...z })),
-    drivers: DEMO_DRIVERS.map((d) => ({ ...d })),
     clinics: DEMO_CLINICS.map((c) => ({ ...c })),
     hotels: DEMO_HOTELS.map((h) => ({ ...h })),
     bookings: [],
@@ -183,7 +181,7 @@ export function confirmPrice(bookingId, { zoneId, customPerTrip }) {
   });
 }
 
-export function assignDriver(tripId, driverId) {
+export function assignDriver(tripId, driverId, driverLabel = '') {
   update((draft) => {
     const trip = draft.trips.find((t) => t.id === tripId);
     if (!trip) throw new Error('ไม่พบทริป');
@@ -193,7 +191,7 @@ export function assignDriver(tripId, driverId) {
     trip.statusHistory.push({
       status: 'assigned',
       at: new Date().toISOString(),
-      note: `มอบหมายคนขับ ${draft.drivers.find((d) => d.id === driverId)?.name || driverId}`,
+      note: `มอบหมายคนขับ ${driverLabel || driverId}`,
     });
     if (booking) {
       const related = draft.trips.filter((t) => t.bookingId === booking.id);
@@ -328,13 +326,13 @@ export function resetTransportDemo() {
   persist(defaultState());
 }
 
-export function enrichBooking(booking, state = getState()) {
+export function enrichBooking(booking, state = getState(), drivers = []) {
   if (!booking) return null;
   const trips = state.trips
     .filter((t) => t.bookingId === booking.id)
     .map((t) => ({
       ...t,
-      driver: state.drivers.find((d) => d.id === t.driverId) || null,
+      driver: drivers.find((d) => d.id === t.driverId) || null,
       fromLabel: placeLabel(t.from, state),
       toLabel: placeLabel(t.to, state),
     }))
@@ -344,6 +342,19 @@ export function enrichBooking(booking, state = getState()) {
     statusMeta: bookingStatusMeta(booking.status),
     trips,
     quote: booking.finalQuote || booking.estimatedQuote,
+  };
+}
+
+/** Map auth driver user → assign list shape */
+export function toAssignDriver(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+    phone: user.phone || '',
+    vehicle: user.vehicle || '',
+    email: user.email,
+    active: user.active !== false,
   };
 }
 

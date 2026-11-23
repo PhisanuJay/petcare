@@ -45,7 +45,11 @@ export default function CancellationPage() {
         {issues.map((issue) => (
           <div key={issue.id} className="tp-list-item">
             <div>
-              <strong>{drivers.find((d) => d.id === issue.driverId)?.name || issue.driverId}</strong>
+              <strong>
+                {drivers.find((d) => d.id === issue.driverId)?.name
+                  || drivers.find((d) => d.id === issue.driverId)?.email
+                  || issue.driverId}
+              </strong>
               <div className="tp-list-item__meta">เหตุผล: {issue.reasonId}</div>
               <div className="tp-list-item__meta">{issue.message}</div>
             </div>
