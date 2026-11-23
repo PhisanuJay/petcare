@@ -15,7 +15,9 @@ import { ageText, daysUntil, formatDate, reminderText, speciesOf } from '../../p
  * (Parasite treatment is recorded on the Medical Records page, not here.)
  */
 
-// Common vaccines as suggestions only; the vet can type any name.
+const OTHER = '__other__';
+
+// Common vaccines offered in the dropdown; "อื่นๆ (ระบุเอง)" lets the vet type any other name.
 const VACCINE_SUGGESTIONS = {
   dog: ['พิษสุนัขบ้า', 'วัคซีนรวมสุนัข (DHPP)', 'ไอกรนสุนัข', 'เลปโตสไปโรซิส'],
   cat: ['พิษสุนัขบ้า', 'วัคซีนรวมแมว (FVRCP)', 'ลิวคีเมียในแมว (FeLV)'],
@@ -90,6 +92,21 @@ function VaccineForm({ patient, editing, presetName, onSaved, onCancel }) {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
+  // The dropdown lists the usual vaccines for the species; a name outside the list (typed earlier,
+  // or chosen via "อื่นๆ") shows the free-text box.
+  const [customName, setCustomName] = useState(() => form.name !== '' && !suggestions.includes(form.name));
+  const selectValue = customName ? OTHER : form.name;
+  const pickVaccine = (e) => {
+    const v = e.target.value;
+    if (v === OTHER) {
+      setCustomName(true);
+      setForm((f) => ({ ...f, name: suggestions.includes(f.name) ? '' : f.name }));
+    } else {
+      setCustomName(false);
+      setForm((f) => ({ ...f, name: v }));
+    }
+  };
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.name.trim()) return setError('กรุณากรอกชื่อวัคซีน');
@@ -128,12 +145,24 @@ function VaccineForm({ patient, editing, presetName, onSaved, onCancel }) {
       <div className="row g-3">
         <div className="col-md-6">
           <label className="form-label" htmlFor="vx-name">ชื่อวัคซีน</label>
-          <input id="vx-name" className="form-control" list="vx-suggestions" maxLength={100} value={form.name} onChange={set('name')} />
-          <datalist id="vx-suggestions">
+          <select id="vx-name" className="form-select" value={selectValue} onChange={pickVaccine}>
+            <option value="">เลือกชนิดวัคซีน</option>
             {suggestions.map((n) => (
-              <option key={n} value={n} />
+              <option key={n} value={n}>{n}</option>
             ))}
-          </datalist>
+            <option value={OTHER}>อื่นๆ (ระบุเอง)</option>
+          </select>
+          {selectValue === OTHER && (
+            <input
+              className="form-control mt-2"
+              aria-label="ชื่อวัคซีน"
+              placeholder="ระบุชื่อวัคซีน"
+              maxLength={100}
+              value={form.name}
+              onChange={set('name')}
+              autoFocus
+            />
+          )}
         </div>
         <div className="col-md-6">
           <label className="form-label" htmlFor="vx-vet">สัตวแพทย์</label>
