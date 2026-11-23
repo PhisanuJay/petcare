@@ -6,18 +6,22 @@ import LoginPage from './features/auth/pages/Login.jsx';
 import RegisterPage from './features/auth/pages/Register.jsx';
 import RequireAuth from './features/auth/RequireAuth.jsx';
 import RequireRole from './features/auth/RequireRole.jsx';
+import RoleHomeRedirect from './features/auth/RoleHomeRedirect.jsx';
 import ProfilePage from './features/profile/pages/Profile.jsx';
 import { ROLES } from './features/auth/roles.js';
 import { petOwnerRoutes, adminTransportRoutes, driverTransportRoutes } from './routes/roleRoutes.jsx';
-import RoleHomeRedirect from './features/auth/RoleHomeRedirect.jsx';
+import HotelCctvMount from './features/super-admin/HotelCctvMount.jsx';
 
 /**
  * Customer site for owners; Admin/Driver use StaffShell with role guards.
- * Other Page-17 skeleton modules are omitted from public entry until their teams wire auth.
+ * Super Admin Pet Hotel CCTV mounts at /super-admin/* (from Super-Admin branch).
  */
 export default function App() {
   return (
     <Routes>
+      {/* Super Admin — Pet Hotel CCTV (ฟ่าง) */}
+      <Route path="/super-admin/*" element={<HotelCctvMount />} />
+
       <Route element={<CustomerLayout />}>
         <Route index element={<RoleHomeRedirect />} />
         <Route path="login" element={<LoginPage />} />
@@ -28,7 +32,6 @@ export default function App() {
             {petOwnerRoutes}
           </Route>
         </Route>
-        {/* Keep HomePage available at /home for owners/guests if redirected */}
         <Route path="home" element={<HomePage />} />
       </Route>
 
