@@ -4,6 +4,7 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import { usePets } from '../usePets.js';
 import PlaceFields from '../../pet-transport/components/PlaceFields.jsx';
 import PriceQuote from '../../pet-transport/components/PriceQuote.jsx';
+import ThaiDateTimeInput, { parseThaiDateTime } from '../../pet-transport/components/ThaiDateTimeInput.jsx';
 import TransportSubnav from '../../pet-transport/components/TransportSubnav.jsx';
 import { SERVICE_TYPES } from '../../pet-transport/constants.js';
 import { quotePrice, zoneFromDistance } from '../../pet-transport/pricing.js';
@@ -38,8 +39,10 @@ export default function TransportPage() {
     name: clinics[0]?.name || '',
     address: clinics[0]?.address || '',
   }));
-  const [outboundPickupTime, setOutboundPickupTime] = useState('');
-  const [returnPickupTime, setReturnPickupTime] = useState('');
+  const [outboundDate, setOutboundDate] = useState('');
+  const [outboundTime, setOutboundTime] = useState('');
+  const [returnDate, setReturnDate] = useState('');
+  const [returnTime, setReturnTime] = useState('');
   const [error, setError] = useState('');
 
   const estimate = useMemo(() => {
@@ -59,9 +62,16 @@ export default function TransportPage() {
     setError('');
     if (!petName.trim()) return setError('กรุณาระบุชื่อสัตว์เลี้ยง');
     if (!from.address.trim() || !to.address.trim()) return setError('กรุณากรอกที่อยู่จุดรับและจุดส่ง');
-    if (!outboundPickupTime) return setError('กรุณาระบุเวลารับสัตว์เที่ยวไป');
-    if (serviceType === 'round_trip' && !returnPickupTime) {
-      return setError('กรุณาระบุเวลารับสัตว์เที่ยวกลับ');
+    const outboundPickupTime = parseThaiDateTime(outboundDate, outboundTime);
+    if (!outboundPickupTime) {
+      return setError('กรุณาระบุวันรับสัตว์เที่ยวไปเป็น วว/ดด/ปปปป และเวลาให้ถูกต้อง');
+    }
+    let returnPickupTime = null;
+    if (serviceType === 'round_trip') {
+      returnPickupTime = parseThaiDateTime(returnDate, returnTime);
+      if (!returnPickupTime) {
+        return setError('กรุณาระบุวันรับสัตว์เที่ยวกลับเป็น วว/ดด/ปปปป และเวลาให้ถูกต้อง');
+      }
     }
     if (!Number.isFinite(Number(distanceKm)) || Number(distanceKm) < 0) {
       return setError('ระยะทางไม่ถูกต้อง');
@@ -180,31 +190,27 @@ export default function TransportPage() {
         </div>
 
         <div className="tp-card" style={{ marginTop: '1rem' }}>
-          <h3>เวลาเที่ยวไป</h3>
-          <div className="field" style={{ maxWidth: 360 }}>
-            <label htmlFor="out-pick">เวลารับสัตว์</label>
-            <input
-              id="out-pick"
-              type="datetime-local"
-              value={outboundPickupTime}
-              onChange={(e) => setOutboundPickupTime(e.target.value)}
-            />
-            <p className="tp-muted">ไม่ต้องใส่เวลาถึงปลายทาง — ขึ้นกับระยะทางและสภาพการจราจร</p>
-          </div>
+          <h3>เวลารับสัตว์เที่ยวไป</h3>
+          <ThaiDateTimeInput
+            id="out-pick"
+            date={outboundDate}
+            time={outboundTime}
+            onDateChange={setOutboundDate}
+            onTimeChange={setOutboundTime}
+          />
+          
 
           {serviceType === 'round_trip' && (
             <>
-              <h3 style={{ marginTop: '1rem' }}>เวลาเที่ยวกลับ</h3>
-              <div className="field" style={{ maxWidth: 360 }}>
-                <label htmlFor="ret-pick">เวลารับสัตว์</label>
-                <input
-                  id="ret-pick"
-                  type="datetime-local"
-                  value={returnPickupTime}
-                  onChange={(e) => setReturnPickupTime(e.target.value)}
-                />
-                <p className="tp-muted">ระบุเวลาที่ต้องการให้มารับกลับเท่านั้น</p>
-              </div>
+              <h3 style={{ marginTop: '1rem' }}>เวลารับสัตว์เที่ยวกลับ</h3>
+              <ThaiDateTimeInput
+                id="ret-pick"
+                date={returnDate}
+                time={returnTime}
+                onDateChange={setReturnDate}
+                onTimeChange={setReturnTime}
+              />
+              <p className="tp-muted">ระบุวันและเวลาที่ต้องการให้มารับกลับเท่านั้น</p>
             </>
           )}
         </div>
