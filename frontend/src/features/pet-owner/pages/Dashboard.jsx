@@ -210,18 +210,6 @@ export default function PetOwnerDashboardPage() {
           </>
         )}
 
-        {import.meta.env.DEV && (
-          <div className="card-soft small mt-4">
-            <div className="section-label mb-2">
-              <i className="bi bi-wrench-adjustable" />
-              สำหรับนักพัฒนา (แสดงเฉพาะตอนรัน npm run dev)
-            </div>
-            <div className="d-flex flex-wrap gap-2">
-              <Link to="/veterinarian/appointments" className="btn btn-soft btn-sm">ฝั่งสัตวแพทย์: นัดหมาย</Link>
-              <Link to="/veterinarian" className="btn btn-soft btn-sm">ฝั่งสัตวแพทย์: ภาพรวม</Link>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

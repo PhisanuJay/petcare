@@ -3,6 +3,11 @@
  * The legacy AppShell paints every <a> blue (.app-shell a), which would turn button-styled links
  * (btn-sky, btn-soft, ...) unreadable. These rules restore the customer-site button colours here only.
  */
+/* Hide the legacy AppShell role menu above the vet pages (the vet site has its own navbar).
+   Done here so the shared AppShell.jsx stays untouched; other roles' pages keep their menu. */
+.app-shell > header:has(~ main .vet-site) {
+  display: none;
+}
 .vet-site {
   min-height: 0;
   border-radius: 24px;

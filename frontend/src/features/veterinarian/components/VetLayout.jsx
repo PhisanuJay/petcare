@@ -50,13 +50,6 @@ function VetNavbar() {
                 </li>
               ))}
             </ul>
-
-            {import.meta.env.DEV && (
-              <Link to="/pet-owner" className="btn btn-soft btn-sm" title="แสดงเฉพาะตอนรัน npm run dev">
-                <i className="bi bi-arrow-left me-1" />
-                หน้าเจ้าของ (dev)
-              </Link>
-            )}
           </div>
         </nav>
       </div>
