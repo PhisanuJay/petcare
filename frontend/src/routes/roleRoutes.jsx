@@ -9,6 +9,8 @@ import BookingPage from '../features/pet-owner/pages/Booking.jsx';
 import MedicalPage from '../features/pet-owner/pages/Medical.jsx';
 import CatHotelPage from '../features/pet-owner/pages/CatHotel.jsx';
 import TransportPage from '../features/pet-owner/pages/Transport.jsx';
+import TransportHistoryPage from '../features/pet-owner/pages/TransportHistory.jsx';
+import TransportDetailPage from '../features/pet-owner/pages/TransportDetail.jsx';
 import PetOwnerAdoptionPage from '../features/pet-owner/pages/Adoption.jsx';
 import PetOwnerCctvPage from '../features/pet-owner/pages/Cctv.jsx';
 
@@ -40,6 +42,14 @@ import AssignedJobsPage from '../features/pet-transport/pages/AssignedJobs.jsx';
 import JobDetailPage from '../features/pet-transport/pages/JobDetail.jsx';
 import TrackingPage from '../features/pet-transport/pages/Tracking.jsx';
 import HistoryPage from '../features/pet-transport/pages/History.jsx';
+import AdminTransportLayout from '../features/pet-transport/admin/AdminTransportLayout.jsx';
+import TransportDashboard from '../features/pet-transport/admin/TransportDashboard.jsx';
+import BookingManagement from '../features/pet-transport/admin/BookingManagement.jsx';
+import BookingAdminDetail from '../features/pet-transport/admin/BookingAdminDetail.jsx';
+import PaymentVerification from '../features/pet-transport/admin/PaymentVerification.jsx';
+import CancellationPage from '../features/pet-transport/admin/CancellationPage.jsx';
+import TransportPricingPage from '../features/pet-transport/admin/PricingPage.jsx';
+import HotelsPage from '../features/pet-transport/admin/HotelsPage.jsx';
 
 import AdoptionDashboardPage from '../features/adoption/pages/Dashboard.jsx';
 import AnimalsPage from '../features/adoption/pages/Animals.jsx';
@@ -80,6 +90,8 @@ export const petOwnerRoutes = (
     <Route path="medical" element={<MedicalPage />} />
     <Route path="cat-hotel" element={<CatHotelPage />} />
     <Route path="transport" element={<TransportPage />} />
+    <Route path="transport/history" element={<TransportHistoryPage />} />
+    <Route path="transport/:bookingId" element={<TransportDetailPage />} />
     <Route path="adoption" element={<PetOwnerAdoptionPage />} />
     <Route path="cctv" element={<PetOwnerCctvPage />} />
   </Route>
@@ -121,11 +133,13 @@ export const roleRoutes = (
       <Route path="cctv" element={<HotelCctvPage />} />
     </Route>
 
-    {/* Pet Transport — โมเดล */}
+    {/* Pet Transport (Driver) — โมเดล */}
     <Route path="pet-transport">
       <Route index element={<PetTransportDashboardPage />} />
       <Route path="assigned-jobs" element={<AssignedJobsPage />} />
       <Route path="job-detail" element={<JobDetailPage />} />
+      <Route path="jobs/:tripId" element={<JobDetailPage />} />
+      <Route path="jobs/:tripId/status" element={<TrackingPage />} />
       <Route path="tracking" element={<TrackingPage />} />
       <Route path="history" element={<HistoryPage />} />
     </Route>
@@ -146,6 +160,15 @@ export const roleRoutes = (
       <Route path="providers" element={<AdminProvidersPage />} />
       <Route path="bookings" element={<AdminBookingsPage />} />
       <Route path="reports" element={<AdminReportsPage />} />
+      <Route path="transport" element={<AdminTransportLayout />}>
+        <Route index element={<TransportDashboard />} />
+        <Route path="bookings" element={<BookingManagement />} />
+        <Route path="bookings/:bookingId" element={<BookingAdminDetail />} />
+        <Route path="payments" element={<PaymentVerification />} />
+        <Route path="cancellations" element={<CancellationPage />} />
+        <Route path="pricing" element={<TransportPricingPage />} />
+        <Route path="hotels" element={<HotelsPage />} />
+      </Route>
     </Route>
 
     {/* Super Admin — ฟ่าง */}

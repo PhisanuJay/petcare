@@ -1,18 +1,27 @@
+import { Link } from 'react-router-dom';
+
 /**
- * Placeholder — Admin Dashboard
- * Role: Admin
- * Owner: เจ
- * Source: Page 17 sitemap (Thanik Sapnonwai)
- *
- * TODO: implement UI and business logic later.
+ * Admin Dashboard — links into Pet Transport MVP and other modules.
  */
 export default function AdminDashboardPage() {
   return (
     <section>
       <h1>Admin Dashboard</h1>
       <p>Role: Admin</p>
-      <p>Owner: เจ</p>
-      <p>Placeholder page — not implemented yet.</p>
+      <ul>
+        <li>
+          <Link to="/admin/transport">Pet Transport — จัดการรับ–ส่งสัตว์เลี้ยง</Link>
+        </li>
+        <li>
+          <Link to="/admin/users">Users</Link>
+        </li>
+        <li>
+          <Link to="/admin/bookings">Bookings (ทั่วไป)</Link>
+        </li>
+        <li>
+          <Link to="/admin/reports">Reports</Link>
+        </li>
+      </ul>
     </section>
   );
 }
