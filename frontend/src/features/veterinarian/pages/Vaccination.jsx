@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VetLayout from '../components/VetLayout.jsx';
+import VetPageHeader from '../components/VetPageHeader.jsx';
 import { useOwners, usePatient } from '../usePatients.js';
 import { createVaccination, updateVaccination, useDueVaccines } from '../useVaccination.js';
 import { DEFAULT_CLINIC, readVetName, saveVetName } from '../vetName.js';
@@ -60,7 +61,7 @@ function DueList({ due, loading, error, reload, onPick }) {
           {due.map((d) => {
             const r = { days: daysUntil(d.nextDate) };
             return (
-              <div key={`${d.petId}-${d.name}-${d.nextDate}`} className="p-2 rounded-4 border">
+              <div key={`${d.petId}-${d.name}-${d.nextDate}`} className={`vet-due ${d.status === 'overdue' ? 'overdue' : ''}`}>
                 <div className="d-flex flex-wrap align-items-center gap-2">
                   <span className="fw-medium">{speciesOf(d.petSpecies).emoji} {d.petName}</span>
                   <span className={`tag ${d.status === 'overdue' ? 'danger' : 'warn'}`}>{reminderText(r)}</span>
@@ -283,12 +284,16 @@ function PatientPicker({ owners, loading, onSelect, startOwnerId = '' }) {
             {owner.pets.map((p) => {
               const species = speciesOf(p.species);
               return (
-                <button type="button" key={p.id} className="btn btn-soft text-start" style={{ borderRadius: 20 }} onClick={() => onSelect(p.id)}>
-                  <span className="fw-medium">{species.emoji} {p.name}</span>
-                  <span className="small text-muted ms-2">
-                    {species.label}
-                    {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+                <button type="button" key={p.id} className="vet-person" onClick={() => onSelect(p.id)}>
+                  <span className="person-avatar pet" aria-hidden="true">{species.emoji}</span>
+                  <span className="person-body">
+                    <span className="fw-medium d-block">{p.name}</span>
+                    <span className="small text-muted d-block">
+                      {species.label}
+                      {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+                    </span>
                   </span>
+                  <i className="bi bi-chevron-right person-go" />
                 </button>
               );
             })}
@@ -311,12 +316,15 @@ function PatientPicker({ owners, loading, onSelect, startOwnerId = '' }) {
           ) : (
             <div className="d-grid gap-2">
               {shown.map((o) => (
-                <button type="button" key={o.id} className="btn btn-soft text-start" style={{ borderRadius: 20 }} onClick={() => setOwnerId(o.id)}>
-                  <div className="fw-medium">
-                    <i className="bi bi-person-circle me-1" />
-                    {o.name || 'ไม่ทราบชื่อลูกค้า'}
-                  </div>
-                  <div>{[...new Set(o.pets.map((p) => speciesOf(p.species).emoji))].join(' ')}</div>
+                <button type="button" key={o.id} className="vet-person" onClick={() => setOwnerId(o.id)}>
+                  <span className="person-avatar" aria-hidden="true">
+                    {o.name ? Array.from(o.name.replace(/^(น\.สพ\.|สพ\.ญ\.|นางสาว|นาง|นาย|คุณ)\s*/, '') || o.name)[0] : <i className="bi bi-person" />}
+                  </span>
+                  <span className="person-body">
+                    <span className="fw-medium d-block text-truncate">{o.name || 'ไม่ทราบชื่อลูกค้า'}</span>
+                    <span className="d-block">{[...new Set(o.pets.map((p) => speciesOf(p.species).emoji))].join(' ')}</span>
+                  </span>
+                  <i className="bi bi-chevron-right person-go" />
                 </button>
               ))}
             </div>
@@ -356,13 +364,14 @@ export default function VaccinationPage() {
     <VetLayout>
       <div className="page-wrap">
         <div className="container">
-          <div className="page-head">
-            <div>
-              <h1>วัคซีน</h1>
-              <p>บันทึกการฉีดวัคซีน และติดตามวัคซีนที่ใกล้ถึงกำหนด</p>
-            </div>
+          <VetPageHeader
+            icon="bi-capsule"
+            title="วัคซีน"
+            subtitle="บันทึกการฉีดวัคซีน และติดตามวัคซีนที่ใกล้ถึงกำหนด"
+          stats={[{ icon: 'bi-bell', value: dueState.due.length, label: 'ถึงกำหนดฉีด' }]}
+          >
             {patient && (
-              <div className="d-flex gap-2">
+              <>
                 <Link to={`/veterinarian/patients?pet=${patient.id}`} className="btn btn-soft">
                   <i className="bi bi-person-vcard me-1" />
                   ข้อมูลสัตว์เลี้ยง
@@ -370,9 +379,9 @@ export default function VaccinationPage() {
                 <button type="button" className="btn btn-soft" onClick={() => setParams(patient.owner?.id ? { owner: patient.owner.id } : {})}>
                   เปลี่ยนสัตว์เลี้ยง
                 </button>
-              </div>
+              </>
             )}
-          </div>
+          </VetPageHeader>
 
           {listError && <div className="alert alert-danger">{listError}</div>}
 

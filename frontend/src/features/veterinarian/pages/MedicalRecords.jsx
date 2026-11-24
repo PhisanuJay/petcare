@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VetLayout from '../components/VetLayout.jsx';
+import VetPageHeader from '../components/VetPageHeader.jsx';
 import { useOwners, usePatient } from '../usePatients.js';
 import {
   createMedicalRecord,
@@ -319,12 +320,16 @@ function PatientPicker({ owners, loading, onSelect, onlyOwnerId = '', onShowAll 
                 {o.pets.map((p) => {
                   const species = speciesOf(p.species);
                   return (
-                    <button type="button" key={p.id} className="btn btn-soft text-start" style={{ borderRadius: 20 }} onClick={() => onSelect(p.id)}>
-                      <span className="fw-medium">{species.emoji} {p.name}</span>
-                      <span className="small text-muted ms-2">
-                        {species.label}
-                        {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+                    <button type="button" key={p.id} className="vet-person" onClick={() => onSelect(p.id)}>
+                      <span className="person-avatar pet" aria-hidden="true">{species.emoji}</span>
+                      <span className="person-body">
+                        <span className="fw-medium d-block">{p.name}</span>
+                        <span className="small text-muted d-block">
+                          {species.label}
+                          {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+                        </span>
                       </span>
+                      <i className="bi bi-chevron-right person-go" />
                     </button>
                   );
                 })}
@@ -369,13 +374,13 @@ export default function MedicalRecordsPage() {
     <VetLayout>
       <div className="page-wrap">
         <div className="container">
-          <div className="page-head">
-            <div>
-              <h1>ประวัติการรักษา</h1>
-              <p>บันทึกการตรวจ การรักษา และการให้ยาถ่ายพยาธิ เจ้าของจะเห็นในหน้าประวัติสุขภาพของน้อง</p>
-            </div>
+          <VetPageHeader
+            icon="bi-journal-medical"
+            title="ประวัติการรักษา"
+            subtitle="บันทึกการตรวจ การรักษา และการให้ยาถ่ายพยาธิ เจ้าของจะเห็นในหน้าประวัติสุขภาพของน้อง"
+          >
             {patient && (
-              <div className="d-flex gap-2">
+              <>
                 <Link to={`/veterinarian/patients?pet=${patient.id}`} className="btn btn-soft">
                   <i className="bi bi-person-vcard me-1" />
                   ข้อมูลสัตว์เลี้ยง
@@ -383,9 +388,9 @@ export default function MedicalRecordsPage() {
                 <button type="button" className="btn btn-soft" onClick={() => setParams(patient.owner?.id ? { owner: patient.owner.id } : {})}>
                   เปลี่ยนสัตว์เลี้ยง
                 </button>
-              </div>
+              </>
             )}
-          </div>
+          </VetPageHeader>
 
           {listError && <div className="alert alert-danger">{listError}</div>}
 
@@ -401,10 +406,12 @@ export default function MedicalRecordsPage() {
           ) : (
             patient && (
               <>
-                <div className="mb-3">
-                  <i className="bi bi-person-circle me-1" />
-                  <strong>เจ้าของ:</strong> {patient.owner?.name || 'ไม่ทราบชื่อลูกค้า'}
-                  {patient.owner?.phone && <span className="text-muted"> · {patient.owner.phone}</span>}
+                <div className="vet-ownerline mb-3">
+                  <i className="bi bi-person-circle" />
+                  <span>
+                    <strong>เจ้าของ:</strong> {patient.owner?.name || 'ไม่ทราบชื่อลูกค้า'}
+                    {patient.owner?.phone && <span className="text-muted"> · {patient.owner.phone}</span>}
+                  </span>
                 </div>
                 {patient.allergies && (
                   <div className="alert-soft danger mb-3">

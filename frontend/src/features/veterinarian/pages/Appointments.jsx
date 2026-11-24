@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppointments } from '../useAppointments.js';
 import VetLayout from '../components/VetLayout.jsx';
+import VetPageHeader from '../components/VetPageHeader.jsx';
 import { BOOKING_STATUS, todayString } from '../../pet-owner/bookingOptions.js';
 import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 
@@ -75,11 +76,11 @@ function PetInfo({ pet, fallbackName }) {
 function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
   const status = vetStatus(a.status);
   return (
-    <div className="card-soft mb-3">
+    <div className={`card-soft vet-appt st-${a.status} mb-3`}>
       <div className="d-flex flex-wrap align-items-start gap-3">
-        <div className="text-center" style={{ minWidth: 72 }}>
-          <div className="mitr fs-4">{a.time}</div>
-          {showDate && <div className="small text-muted">{formatDate(a.date)}</div>}
+        <div className="appt-time">
+          <div className="mitr fs-4 lh-sm">{a.time}</div>
+          {showDate && <div className="small">{formatDate(a.date)}</div>}
         </div>
 
         <div className="flex-grow-1">
@@ -143,12 +144,15 @@ export default function AppointmentsPage() {
     <VetLayout>
     <div className="page-wrap">
       <div className="container">
-        <div className="page-head">
-          <div>
-            <h1>นัดหมาย</h1>
-            <p>นัดที่ผู้ช่วยสัตวแพทย์ยืนยันแล้ว บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ</p>
-          </div>
-        </div>
+        <VetPageHeader
+          icon="bi-calendar2-check"
+          title="นัดหมาย"
+          subtitle="นัดที่ผู้ช่วยสัตวแพทย์ยืนยันแล้ว บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ"
+          stats={[
+            { icon: 'bi-hourglass-split', value: count('confirmed'), label: 'รอตรวจ' },
+            { icon: 'bi-check2-all', value: count('completed'), label: 'เสร็จสิ้น' },
+          ]}
+        />
 
         <div className="card-soft mb-3">
           <div className="d-flex flex-wrap align-items-center gap-2">
@@ -194,15 +198,16 @@ export default function AppointmentsPage() {
             </div>
           </div>
 
-          <div className="d-flex flex-wrap gap-2 mt-3">
+          <div className="vet-chips mt-3">
             {FILTERS.map((f) => (
               <button
                 type="button"
                 key={f.value}
-                className={`btn btn-sm ${filter === f.value ? 'btn-sky' : 'btn-soft'}`}
+                className={`btn btn-sm vet-chip ${filter === f.value ? 'btn-sky' : 'btn-soft'}`}
                 onClick={() => setFilter(f.value)}
               >
-                {f.label} ({count(f.value)})
+                {f.label}
+                <span className="chip-count">{count(f.value)}</span>
               </button>
             ))}
           </div>

@@ -2,6 +2,7 @@ import { startTransition, useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import '../vet.css';
+import '../vet-pages.css';
 
 /** Menu in the order of the Page 17 flow: Dashboard → Appointments → Patients → Medical Records → Vaccination → Reports. */
 const MENU = [
@@ -76,9 +77,9 @@ function VetNavbar() {
 }
 
 /** Page frame for every veterinarian page: navbar on top, page content below. */
-export default function VetLayout({ children }) {
+export default function VetLayout({ children, inner = true }) {
   return (
-    <div className="pc-site vet-site">
+    <div className={`pc-site vet-site${inner ? ' vet-inner' : ''}`}>
       <VetNavbar />
       <main>{children}</main>
     </div>

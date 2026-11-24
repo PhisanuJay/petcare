@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import VetLayout from '../components/VetLayout.jsx';
+import VetPageHeader from '../components/VetPageHeader.jsx';
 import DayChart from '../components/DayChart.jsx';
 import { useReport } from '../useReports.js';
 import { BOOKING_STATUS, todayString } from '../../pet-owner/bookingOptions.js';
@@ -60,12 +61,15 @@ function toColumns(byDay) {
   return weeks;
 }
 
-function Stat({ value, label, hint }) {
+function Stat({ icon, tone = 'blue', value, label, hint }) {
   return (
     <div className="col-6 col-lg-3">
-      <div className="stat h-100">
-        <div className="num">{value}</div>
-        <div className="small">{label}</div>
+      <div className="vet-stat h-100">
+        <span className={`stat-icon ${tone}`}>
+          <i className={`bi ${icon}`} />
+        </span>
+        <div className="stat-num">{value}</div>
+        <div className="fw-medium">{label}</div>
         {hint && <div className="small text-muted">{hint}</div>}
       </div>
     </div>
@@ -150,10 +154,10 @@ function ReportBody({ report }) {
   return (
     <>
       <div className="row g-3 mb-4">
-        <Stat value={a.total} label="นัดหมายทั้งหมด" />
-        <Stat value={percent(a.completionRate)} label="ตรวจเสร็จสิ้น" hint={`จากนัดที่ดำเนินการแล้ว (${a.byStatus.completed} นัด)`} />
-        <Stat value={percent(a.noShowRate)} label="ไม่มาตามนัด" hint={`${a.byStatus.no_show} นัด`} />
-        <Stat value={p.seen} label="สัตว์เลี้ยงที่ได้รับการตรวจ" hint={`ลงทะเบียนใหม่ ${p.newInRange} ตัว`} />
+        <Stat icon="bi-calendar2-check" value={a.total} label="นัดหมายทั้งหมด" />
+        <Stat icon="bi-check2-circle" tone="green" value={percent(a.completionRate)} label="ตรวจเสร็จสิ้น" hint={`จากนัดที่ดำเนินการแล้ว (${a.byStatus.completed} นัด)`} />
+        <Stat icon="bi-person-x" tone="red" value={percent(a.noShowRate)} label="ไม่มาตามนัด" hint={`${a.byStatus.no_show} นัด`} />
+        <Stat icon="bi-heart-pulse" tone="violet" value={p.seen} label="สัตว์เลี้ยงที่ได้รับการตรวจ" hint={`ลงทะเบียนใหม่ ${p.newInRange} ตัว`} />
       </div>
 
       <div className="row g-4 mb-4">
@@ -192,9 +196,9 @@ function ReportBody({ report }) {
         </div>
         <div className="col-lg-6">
           <Card icon="bi-people" title="สัตว์เลี้ยงทั้งหมดในระบบ">
-            <div className="stat">
-              <div className="num">{p.registered}</div>
-              <div className="small">สัตว์เลี้ยงที่ลงทะเบียน</div>
+            <div className="d-flex align-items-baseline gap-2">
+              <span className="mitr" style={{ fontSize: '2.6rem', lineHeight: 1, color: 'var(--sky-dark)' }}>{p.registered}</span>
+              <span className="text-muted">ตัวที่ลงทะเบียนในระบบ</span>
             </div>
           </Card>
         </div>
@@ -235,12 +239,11 @@ export default function ReportsPage() {
     <VetLayout>
       <div className="page-wrap">
         <div className="container">
-          <div className="page-head">
-            <div>
-              <h1>รายงาน</h1>
-              <p>สรุปงานของคลินิก ช่วง {formatDate(from)} - {formatDate(to)}</p>
-            </div>
-          </div>
+          <VetPageHeader
+            icon="bi-bar-chart-line"
+            title="รายงาน"
+            subtitle={`สรุปงานของคลินิก ช่วง ${formatDate(from)} - ${formatDate(to)}`}
+          />
 
           <div className="card-soft mb-4">
             <div className="d-flex flex-wrap align-items-center gap-2">
@@ -248,7 +251,7 @@ export default function ReportsPage() {
                 <button
                   type="button"
                   key={x.value}
-                  className={`btn btn-sm ${preset === x.value ? 'btn-sky' : 'btn-soft'}`}
+                  className={`btn btn-sm vet-chip ${preset === x.value ? 'btn-sky' : 'btn-soft'}`}
                   onClick={() => setPreset(x.value)}
                 >
                   {x.label}
@@ -256,7 +259,7 @@ export default function ReportsPage() {
               ))}
               <button
                 type="button"
-                className={`btn btn-sm ${preset === 'custom' ? 'btn-sky' : 'btn-soft'}`}
+                className={`btn btn-sm vet-chip ${preset === 'custom' ? 'btn-sky' : 'btn-soft'}`}
                 onClick={() => setPreset('custom')}
               >
                 กำหนดเอง

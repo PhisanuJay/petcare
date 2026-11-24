@@ -145,7 +145,7 @@ export default function VeterinarianDashboardPage() {
                 </div>
                 <h1 className="mb-1">
                   {greeting()}
-                  {vetName ? ` คุณหมอ${vetName}` : ' คุณหมอ'}
+                  {vetName ? (/^(น\.สพ\.|สพ\.)/.test(vetName) ? ` ${vetName}` : ` คุณหมอ${vetName}`) : ' คุณหมอ'}
                 </h1>
                 <div className="hero-sub">
                   {loading
