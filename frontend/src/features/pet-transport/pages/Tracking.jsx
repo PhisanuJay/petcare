@@ -28,7 +28,7 @@ export default function TrackingPage() {
       <section className="tp-page">
         <TransportSubnav title="Driver · Tracking" items={NAV} />
         <p>เลือกงานจาก Assigned Jobs เพื่ออัปเดตสถานะ</p>
-        <Link className="btn btn-sky" to="/pet-transport/assigned-jobs">ไป Assigned Jobs</Link>
+        <Link className="tp-btn" to="/pet-transport/assigned-jobs">ไป Assigned Jobs</Link>
       </section>
     );
   }
@@ -79,10 +79,10 @@ export default function TrackingPage() {
           </div>
         </div>
         <div className="tp-actions">
-          <button type="button" className="btn btn-sky" disabled={!next || !paid} onClick={advance}>
+          <button type="button" className="tp-btn" disabled={!next || !paid} onClick={advance}>
             {next ? `อัปเดต → ${next.label}` : 'ครบ 7 สถานะแล้ว'}
           </button>
-          <Link className="btn btn-soft" to={`/pet-transport/jobs/${trip.id}`}>กลับ Job Detail</Link>
+          <Link className="tp-btn tp-btn--ghost" to={`/pet-transport/jobs/${trip.id}`}>กลับ Job Detail</Link>
         </div>
       </div>
     </section>

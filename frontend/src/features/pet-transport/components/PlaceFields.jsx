@@ -17,6 +17,7 @@ export function emptyZonePlace(address = '', kind = 'custom') {
     subdistrictId: '',
     zoneId: null,
     address: address || '',
+    mapUrl: '',
   };
 }
 
@@ -30,6 +31,7 @@ export function placeFromCatalog(item, kind = 'facility') {
     subdistrictId: item.subdistrictId || '',
     zoneId: item.zoneId || zoneIdFromSubdistrict(item.subdistrictId) || null,
     address: item.address || '',
+    mapUrl: item.mapUrl || '',
     catalogType: item.catalogType || null,
   };
 }
@@ -58,24 +60,35 @@ export default function PlaceFields({
   const catalogLocked = isFacilityKind(kind);
   const facilities = mergeFacilities(clinics, hotels);
   const subMeta = value.subdistrictId ? subdistrictById(value.subdistrictId) : null;
-  const showClinicReadonly = locked && catalogLocked;
+  const forceFacilityUi = locked && allowedKinds?.length === 1 && allowedKinds[0] === 'facility';
+  const showClinicReadonly = forceFacilityUi || (locked && catalogLocked);
 
   function setKind(nextKind) {
-    if (nextKind === 'home') {
+    if (locked) return;
+    const normalized = normalizePlaceKind(nextKind);
+    if (normalized === kind) return;
+
+    if (normalized === 'home') {
       onChange({
         ...emptyZonePlace(value.address || '', 'home'),
         address: value.address || '',
+        mapUrl: value.mapUrl || '',
       });
       return;
     }
-    if (nextKind === 'facility' && facilities[0]) {
-      onChange(placeFromCatalog(facilities[0], 'facility'));
+    if (normalized === 'facility') {
+      const item = facilities.find((f) => f.id === value.refId) || facilities[0];
+      onChange(item ? placeFromCatalog(item, 'facility') : emptyZonePlace('', 'facility'));
       return;
     }
-    onChange(emptyZonePlace('', nextKind));
+    onChange({
+      ...emptyZonePlace(value.address || '', normalized),
+      mapUrl: value.mapUrl || '',
+    });
   }
 
   function setCatalogRef(refId) {
+    if (locked) return;
     const item = facilities.find((x) => x.id === refId);
     if (item) onChange(placeFromCatalog(item, 'facility'));
   }
@@ -113,34 +126,50 @@ export default function PlaceFields({
           </div>
           <div className="field">
             <label>ชื่อคลินิก</label>
-            <div className="tp-readonly-value">{value.name || '—'}</div>
+            <div className="tp-readonly-value">{value.name || facilities[0]?.name || '—'}</div>
           </div>
           <div className="field">
             <label>รายละเอียดที่อยู่</label>
             <div className="tp-readonly-value tp-readonly-value--block">
-              {value.address || '—'}
+              {value.address || facilities[0]?.address || '—'}
             </div>
           </div>
+          {(value.mapUrl || facilities[0]?.mapUrl) ? (
+            <div className="field">
+              <label>ลิงก์แผนที่</label>
+              <div className="tp-readonly-value tp-readonly-value--block">
+                <a href={value.mapUrl || facilities[0]?.mapUrl} target="_blank" rel="noreferrer">
+                  {value.mapUrl || facilities[0]?.mapUrl}
+                </a>
+              </div>
+            </div>
+          ) : null}
           <div className="field">
             <label>เขต / แขวง</label>
             <div className="tp-readonly-value">
-              {[districtLabel(value.districtId), subMeta?.label].filter(Boolean).join(' · ') || '—'}
+              {[districtLabel(value.districtId || facilities[0]?.districtId), subMeta?.label || subdistrictById(facilities[0]?.subdistrictId)?.label]
+                .filter(Boolean)
+                .join(' · ') || '—'}
             </div>
           </div>
           <div className="field">
             <label>Zone</label>
             <div className="tp-zone-badge" aria-live="polite">
-              {zoneMeta ? (
+              {zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))) ? (
                 <>
-                  <strong>{zoneMeta.label}</strong>
-                  <span className="tp-muted"> · ฿{zoneMeta.price} ฐาน</span>
+                  <strong>
+                    {(zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))))?.label}
+                  </strong>
+                  <span className="tp-muted">
+                    {' '}
+                    · ฿{(zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))))?.price} ฐาน
+                  </span>
                 </>
               ) : (
                 <span className="tp-muted">—</span>
               )}
             </div>
           </div>
-          
         </div>
       </div>
     );
@@ -151,17 +180,26 @@ export default function PlaceFields({
       <h3>{prefix}</h3>
       <div className="tp-form">
         <div className="field">
-          <label htmlFor={`${prefix}-kind`}>ประเภทสถานที่</label>
-          <select
-            id={`${prefix}-kind`}
-            value={kind}
-            disabled={locked}
-            onChange={(e) => setKind(e.target.value)}
+          <span className="tp-field-label" id={`${prefix}-kind-label`}>ประเภทสถานที่</span>
+          <div
+            className="tp-kind-toggle"
+            role="radiogroup"
+            aria-labelledby={`${prefix}-kind-label`}
           >
             {kinds.map((k) => (
-              <option key={k.id} value={k.id}>{k.label}</option>
+              <button
+                key={k.id}
+                type="button"
+                role="radio"
+                aria-checked={kind === k.id}
+                className={`tp-kind-toggle__btn ${kind === k.id ? 'is-active' : ''}`}
+                disabled={locked}
+                onClick={() => setKind(k.id)}
+              >
+                {k.label}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
         {catalogLocked && (
@@ -169,7 +207,7 @@ export default function PlaceFields({
             <label htmlFor={`${prefix}-facility`}>คลินิกในระบบ</label>
             <select
               id={`${prefix}-facility`}
-              value={value.refId || ''}
+              value={value.refId || facilities[0]?.id || ''}
               disabled={locked}
               onChange={(e) => setCatalogRef(e.target.value)}
             >
@@ -242,6 +280,27 @@ export default function PlaceFields({
           {catalogLocked && !locked && (
             <p className="tp-muted">ที่อยู่จากคลินิกในระบบ — แก้ไขไม่ได้</p>
           )}
+        </div>
+
+        <div className="field">
+          <label htmlFor={`${prefix}-map`}>ลิงก์แผนที่ (Google Maps)</label>
+          <input
+            id={`${prefix}-map`}
+            type="url"
+            inputMode="url"
+            value={value.mapUrl || ''}
+            readOnly={catalogLocked || locked}
+            onChange={(e) => onChange({ ...value, mapUrl: e.target.value })}
+            placeholder="วางลิงก์จาก Google Maps เช่น https://maps.google.com/..."
+          />
+          {!catalogLocked && !locked ? (
+            <p className="tp-muted">ช่วยให้คนขับเปิดเส้นทางไปยังจุดรับ–ส่งได้ทันที</p>
+          ) : null}
+          {value.mapUrl && !catalogLocked && !locked ? (
+            <p className="tp-muted" style={{ marginTop: '0.35rem' }}>
+              <a href={value.mapUrl} target="_blank" rel="noreferrer">เปิดดูลิงก์นี้</a>
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

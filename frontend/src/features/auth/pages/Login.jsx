@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { DEMO_ADMIN_LOGIN, useAuth } from '../AuthContext.jsx';
+import { DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, DEMO_OWNER_LOGIN, useAuth } from '../AuthContext.jsx';
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
 import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
 
@@ -124,7 +124,12 @@ export default function LoginPage() {
           คนขับไม่สามารถสมัครเองได้ — ให้แอดมินสร้างบัญชีให้
         </p>
         <p className="text-center small text-muted mt-2 mb-0">
-          Demo Admin: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
+          Owner: {DEMO_OWNER_LOGIN.email} / {DEMO_OWNER_LOGIN.password}
+        </p>
+        <p className="text-center small text-muted mt-1 mb-0">
+          คนขับ: {DEMO_DRIVER_LOGIN.email} / {DEMO_DRIVER_LOGIN.password}
+          {' · '}
+          แอดมิน: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
         </p>
       </form>
     </AuthCard>

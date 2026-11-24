@@ -21,6 +21,9 @@ export const SERVICE_SUBDISTRICTS = [
 /** Round trip no longer uses a discount — kept at 0 for legacy reads */
 export const ROUND_TRIP_DISCOUNT = 0;
 
+/** Fixed demo driver id — used by seed auth + sample jobs */
+export const DEMO_DRIVER_ID = 'driver-seed';
+
 /** 7 trip statuses — per trip, not per booking */
 export const TRIP_STATUSES = [
   { id: 'assigned', label: 'มอบหมายแล้ว', step: 1 },

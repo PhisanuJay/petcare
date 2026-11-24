@@ -1,19 +1,156 @@
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { fileToResizedDataUrl } from '../../../shared/utils/storage.js';
-import TransportSubnav from '../components/TransportSubnav.jsx';
-import TripStatusTimeline from '../components/TripStatusTimeline.jsx';
-import { ISSUE_REASONS, TRIP_TYPES, nextTripStatus } from '../constants.js';
-import { placeLabel } from '../store.js';
+import { fileToResizedDataUrl, STORAGE_KEYS, readJSON } from '../../../shared/utils/storage.js';
+import IssueFields from '../components/IssueFields.jsx';
+import { TRIP_STATUSES, nextTripStatus, tripStatusMeta } from '../constants.js';
+import { placeParts } from '../store.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { SEX_OPTIONS, speciesOf } from '../../pet-owner/petUtils.js';
 import { useTransport } from '../useTransport.js';
 import '../transport.css';
 
-const NAV = [
-  { to: '/pet-transport', label: 'Dashboard', icon: 'bi-speedometer2', end: true },
-  { to: '/pet-transport/assigned-jobs', label: 'Assigned Jobs', icon: 'bi-list-task' },
-  { to: '/pet-transport/history', label: 'History', icon: 'bi-clock-history' },
-];
+const JOB_KIND = {
+  pickup: 'รับขึ้นโรงแรม',
+  dropoff: 'ส่งกลับบ้าน',
+};
+
+const SPECIES_SHORT = {
+  dog: 'หมา',
+  cat: 'แมว',
+};
+
+const STEP_HINT = {
+  assigned: 'รอเริ่มงานตามเวลานัด',
+  en_route_pickup: 'กำลังมุ่งหน้าไปจุดรับ',
+  arrived_pickup: 'ถึงจุดรับแล้ว รอรับน้อง',
+  picked_up: 'รับน้องแล้ว พร้อมเดินทาง',
+  in_transit: 'กำลังพาน้องไปปลายทาง',
+  arrived_dropoff: 'ถึงจุดส่งแล้ว',
+  completed: 'ส่งน้องถึงปลายทางเรียบร้อย',
+};
+
+function findPet(petId) {
+  if (!petId) return null;
+  const pets = readJSON(STORAGE_KEYS.pets, []);
+  return pets.find((p) => p.id === petId) || null;
+}
+
+function phoneHref(phone) {
+  const digits = String(phone || '').replace(/[^\d+]/g, '');
+  return digits ? `tel:${digits}` : '';
+}
+
+function mapsHref(place) {
+  const direct = String(place?.mapUrl || '').trim();
+  if (direct) return direct;
+  const q = String(place?.address || '').trim();
+  return q ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}` : '';
+}
+
+function dateParts(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { day: '—', time: '' };
+  }
+  return {
+    day: date.toLocaleDateString('th-TH', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }),
+    time: `${date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`,
+  };
+}
+
+function BackIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CalIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8 3.5v3M16 3.5v3M4 9.5h16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M8.5 12.2l2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function UserIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5.5 19c1.6-3 4-4.5 6.5-4.5S16.9 16 18.5 19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="11" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function WarnIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 4 21 20H3L12 4Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M12 10v4.5M12 17.5h.01" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.5 4.5h3l1.2 3-1.8 1.2a11 11 0 0 0 5.4 5.4l1.2-1.8 3 1.2v3A1.5 1.5 0 0 1 18 18 13.5 13.5 0 0 1 4.5 4.5 1.5 1.5 0 0 1 6 3h1.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function MapIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 4.5 3.5 6.5v13L9 17.5l6 2 5.5-2v-13L15 6.5 9 4.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9 4.5v13M15 6.5v13" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function PhotoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3.5" y="6" width="17" height="13" rx="2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="12.5" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M7 6 8.2 4.2h7.6L17 6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function NoteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7 4.5h7.5L19 9v10.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-14a1 1 0 0 1 1-1Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M14.5 4.5V9H19M9 12.5h6M9 16h4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export default function JobDetailPage() {
   const { tripId } = useParams();
@@ -26,47 +163,49 @@ export default function JobDetailPage() {
     attachEvidence,
     reportIssue,
   } = transport;
-  const trip = trips.find((t) => t.id === tripId);
-  const booking = bookings.find((b) => b.id === trip?.bookingId);
+  const trip = trips.find((item) => item.id === tripId);
+  const booking = bookings.find((item) => item.id === trip?.bookingId);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
-  const [issueReason, setIssueReason] = useState(ISSUE_REASONS[0].id);
-  const [issueMsg, setIssueMsg] = useState('');
-
-  if (!tripId) {
-    return (
-      <section className="tp-page">
-        <TransportSubnav title="Driver" items={NAV} />
-        <p>เลือกงานจาก Assigned Jobs</p>
-        <Link className="btn btn-sky" to="/pet-transport/assigned-jobs">ไป Assigned Jobs</Link>
-      </section>
-    );
-  }
+  const [issueOpen, setIssueOpen] = useState(false);
 
   if (!trip) {
     return (
-      <section className="tp-page">
-        <p>ไม่พบงาน</p>
-        <Link to="/pet-transport/assigned-jobs">กลับ</Link>
+      <section className="tp-page driver-page dv-light">
+        <p>ไม่พบงานนี้</p>
+        <Link className="dv-btn dv-btn--primary" to="/pet-transport">กลับตารางงาน</Link>
       </section>
     );
   }
 
   if (trip.driverId !== currentUser?.id) {
-    return <Navigate to="/pet-transport/assigned-jobs" replace />;
+    return <Navigate to="/pet-transport" replace />;
   }
 
   const next = nextTripStatus(trip.status);
+  const meta = tripStatusMeta(trip.status);
   const paid = booking?.paymentStatus === 'paid';
+  const phone = phoneHref(booking?.ownerPhone);
+  const pet = findPet(booking?.petId);
+  const when = dateParts(trip.pickupTime);
+  const from = placeParts(trip.from, transport);
+  const to = placeParts(trip.to, transport);
+  const mapLink = mapsHref(to.mapUrl ? to : from.mapUrl ? from : (to.address ? to : from));
+  const speciesKey = pet?.species || booking?.petSpecies;
+  const speciesLabel = SPECIES_SHORT[speciesKey] || speciesOf(speciesKey).label;
+  const photo = pet?.photo || booking?.petPhoto || '';
+  const sex = SEX_OPTIONS.find((item) => item.value === pet?.sex);
+  const sexMark = pet?.sex === 'female' ? '♀' : pet?.sex === 'male' ? '♂' : '';
+  const done = meta.step >= 7;
 
   async function onEvidence(kind, file) {
     setErr('');
     try {
       const url = await fileToResizedDataUrl(file, 800, 0.85);
       attachEvidence(trip.id, kind, url);
-      setMsg(`แนบหลักฐาน${kind === 'pickup' ? 'รับ' : 'ส่ง'}แล้ว`);
-    } catch (e) {
-      setErr(e.message);
+      setMsg(kind === 'pickup' ? 'แนบรูปตอนรับแล้ว' : 'แนบรูปตอนส่งแล้ว');
+    } catch (error) {
+      setErr(error.message);
     }
   }
 
@@ -75,93 +214,197 @@ export default function JobDetailPage() {
     try {
       advanceTripStatus(trip.id);
       setMsg('อัปเดตสถานะแล้ว');
-    } catch (e) {
-      setErr(e.message);
+    } catch (error) {
+      setErr(error.message);
     }
   }
 
-  function sendIssue() {
-    setErr('');
-    if (!issueMsg.trim()) return setErr('กรอกรายละเอียดปัญหา');
+  function submitIssue(reasonId, message) {
     reportIssue({
       tripId: trip.id,
       driverId: currentUser.id,
-      reasonId: issueReason,
-      message: issueMsg.trim(),
+      reasonId,
+      message,
     });
-    setIssueMsg('');
-    setMsg('ส่งปัญหาให้ Admin แล้ว');
-    return undefined;
+    setIssueOpen(false);
+    setErr('');
+    setMsg('ส่งปัญหาให้แอดมินแล้ว');
   }
 
   return (
-    <section className="tp-page">
-      <TransportSubnav title="Driver · Job Detail" items={NAV} />
-      <h1>Job Detail</h1>
-      <p className="tp-lead">
-        {TRIP_TYPES[trip.type]?.label} · {booking?.petName}
-      </p>
-      {msg && <div className="tp-alert tp-alert--ok">{msg}</div>}
-      {err && <div className="tp-alert tp-alert--danger">{err}</div>}
+    <section className="tp-page driver-page dv-light dv-detail">
+      <Link className="dv-detail__back" to="/pet-transport">
+        <BackIcon />
+        กลับตารางงาน
+      </Link>
 
-      {!paid && (
-        <div className="tp-alert tp-alert--info">
-          ยังไม่สามารถเริ่มอัปเดตสถานะได้จนกว่า Admin จะ Mark as Paid
-        </div>
-      )}
+      {msg ? <div className="tp-alert tp-alert--ok">{msg}</div> : null}
+      {err ? <div className="tp-alert tp-alert--danger">{err}</div> : null}
+      {!paid ? (
+        <div className="tp-alert tp-alert--info">รอแอดมินยืนยันการชำระก่อน จึงจะเริ่มอัปเดตสถานะได้</div>
+      ) : null}
 
-      <div className="tp-grid tp-grid--2">
-        <div className="tp-card">
-          <p className="tp-muted">จาก: {placeLabel(trip.from, transport)}</p>
-          <p className="tp-muted">ถึง: {placeLabel(trip.to, transport)}</p>
-          <p className="tp-muted">Owner: {booking?.ownerName} · {booking?.ownerPhone}</p>
-          <p className="tp-muted">หมายเหตุสัตว์: {booking?.petNotes || '-'}</p>
-          <TripStatusTimeline status={trip.status} />
-          <div className="tp-actions">
-            <button type="button" className="btn btn-sky" disabled={!next || !paid} onClick={advance}>
-              {next ? `ถัดไป: ${next.label}` : 'เสร็จสิ้นแล้ว'}
-            </button>
-            <Link className="btn btn-soft" to={`/pet-transport/jobs/${trip.id}/status`}>
-              หน้า Tracking
-            </Link>
+      <article className="dv-detail__card">
+        <header className="dv-detail__head">
+          <div className="dv-detail__when">
+            <CalIcon />
+            <div>
+              <strong>{when.day}</strong>
+              <span>{when.time}</span>
+            </div>
+          </div>
+          <div className="dv-detail__title">
+            <h1>งานรับ-ส่งสัตว์เลี้ยง</h1>
+            <em className={`dv-chip is-${trip.type}`}>{JOB_KIND[trip.type] || 'งานส่งสัตว์'}</em>
+          </div>
+          <span className={`dv-appt__badge ${done ? 'is-done' : 'is-info'}`}>
+            <CheckIcon />
+            {meta.label}
+          </span>
+        </header>
+
+        <div className="dv-detail__hero">
+          <div className="dv-detail__pet">
+            {photo ? (
+              <img className="dv-detail__avatar" src={photo} alt="" />
+            ) : (
+              <span className="dv-detail__avatar is-fallback" aria-hidden="true">
+                {speciesOf(speciesKey).emoji}
+              </span>
+            )}
+            <div>
+              <strong>
+                {booking?.petName || pet?.name || 'สัตว์เลี้ยง'}
+                {sexMark ? <i className={`dv-detail__sex is-${pet?.sex}`}>{sexMark}</i> : null}
+                <b className="dv-detail__species">{speciesLabel}</b>
+              </strong>
+              <span>
+                โทร {booking?.ownerName || 'เจ้าของ'}
+                {sex?.label ? ` · ${sex.label}` : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className={`dv-detail__banner ${done ? 'is-done' : 'is-live'}`}>
+            <CheckIcon />
+            <div>
+              <strong>{meta.label}</strong>
+              <span>{STEP_HINT[trip.status] || 'อัปเดตสถานะตามขั้นตอน'}</span>
+            </div>
           </div>
         </div>
 
-        <div className="tp-card">
-          <h3>หลักฐานรับ / ส่ง</h3>
-          <div className="tp-form">
-            <div className="field">
-              <label htmlFor="ev-pick">อัปโหลดหลักฐานรับสัตว์</label>
-              <input id="ev-pick" type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && onEvidence('pickup', e.target.files[0])} />
-              {trip.evidencePickup && (
-                <div className="tp-evidence"><img src={trip.evidencePickup.url} alt="รับ" /></div>
-              )}
-            </div>
-            <div className="field">
-              <label htmlFor="ev-drop">อัปโหลดหลักฐานส่งสัตว์</label>
-              <input id="ev-drop" type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && onEvidence('dropoff', e.target.files[0])} />
-              {trip.evidenceDropoff && (
-                <div className="tp-evidence"><img src={trip.evidenceDropoff.url} alt="ส่ง" /></div>
-              )}
+        <div className="dv-detail__stops">
+          <div className="dv-detail__stop">
+            <UserIcon />
+            <div>
+              <span>รับจาก</span>
+              <strong>{from.name || 'ไม่ระบุสถานที่'}</strong>
+              <p>{from.address || 'ยังไม่มีเลขที่อยู่'}</p>
             </div>
           </div>
+          <div className="dv-detail__stop">
+            <PinIcon />
+            <div>
+              <span>ส่งที่</span>
+              <strong>{to.name || 'ไม่ระบุสถานที่'}</strong>
+              <p>{to.address || 'ยังไม่มีเลขที่อยู่'}</p>
+            </div>
+          </div>
+        </div>
 
-          <h3 style={{ marginTop: '1rem' }}>แจ้งปัญหาให้ Admin</h3>
-          <div className="tp-form">
-            <div className="field">
-              <label htmlFor="reason">เหตุผล</label>
-              <select id="reason" value={issueReason} onChange={(e) => setIssueReason(e.target.value)}>
-                {ISSUE_REASONS.map((r) => (
-                  <option key={r.id} value={r.id}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="imsg">รายละเอียด</label>
-              <textarea id="imsg" rows={2} value={issueMsg} onChange={(e) => setIssueMsg(e.target.value)} />
-            </div>
+        <div className="dv-detail__actions">
+          <button
+            type="button"
+            className="dv-btn dv-btn--warn"
+            aria-expanded={issueOpen}
+            onClick={() => setIssueOpen((open) => !open)}
+          >
+            <WarnIcon />
+            แจ้งปัญหา
+          </button>
+          {phone ? (
+            <a className="dv-btn dv-btn--ghost" href={phone}>
+              <PhoneIcon />
+              โทรติดต่อ
+            </a>
+          ) : (
+            <span className="dv-btn dv-btn--ghost" style={{ opacity: 0.5 }}>ไม่มีเบอร์</span>
+          )}
+          {mapLink ? (
+            <a className="dv-btn dv-btn--ghost" href={mapLink} target="_blank" rel="noreferrer">
+              <MapIcon />
+              ดูเส้นทาง
+            </a>
+          ) : null}
+          <button
+            type="button"
+            className="dv-btn dv-btn--primary"
+            disabled={!next || !paid}
+            onClick={advance}
+          >
+            {next ? `อัปเดตเป็น ${next.label}` : 'ส่งแล้ว'}
+          </button>
+        </div>
+
+        {issueOpen ? (
+          <IssueFields onClose={() => setIssueOpen(false)} onSubmit={submitIssue} />
+        ) : null}
+
+        <div className="dv-detail__progress">
+          <div className="dv-detail__progress-head">
+            <strong>ขั้นตอนการทำงาน</strong>
+            <span>({meta.step}/{TRIP_STATUSES.length})</span>
           </div>
-          <button type="button" className="btn btn-soft" onClick={sendIssue}>ส่งรายงาน</button>
+          <ol className="dv-detail__steps" aria-label="สถานะงาน">
+            {TRIP_STATUSES.map((step, index) => {
+              const state = step.step < meta.step ? 'is-done' : step.step === meta.step ? 'is-active' : '';
+              return (
+                <li key={step.id} className={state}>
+                  {index > 0 ? <i className="dv-detail__line" aria-hidden="true" /> : null}
+                  <span className="dv-detail__dot">
+                    {step.step <= meta.step ? <CheckIcon /> : step.step}
+                  </span>
+                  <em>{step.label}</em>
+                </li>
+              );
+            })}
+          </ol>
+        </div>
+      </article>
+
+      <div className="dv-detail__extras">
+        <div className="dv-detail__extra">
+          <header>
+            <PhotoIcon />
+            <div>
+              <strong>แนบรูป</strong>
+              <span>รูปตอนรับ-ส่งน้อง</span>
+            </div>
+          </header>
+          <div className="dv-detail__uploads">
+            <label className="dv-detail__upload">
+              <span>รูปตอนรับ</span>
+              <input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && onEvidence('pickup', event.target.files[0])} />
+              {trip.evidencePickup ? <img src={trip.evidencePickup.url} alt="รูปตอนรับ" /> : <PhotoIcon />}
+            </label>
+            <label className="dv-detail__upload">
+              <span>รูปตอนส่ง</span>
+              <input type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && onEvidence('dropoff', event.target.files[0])} />
+              {trip.evidenceDropoff ? <img src={trip.evidenceDropoff.url} alt="รูปตอนส่ง" /> : <PhotoIcon />}
+            </label>
+          </div>
+        </div>
+
+        <div className="dv-detail__extra">
+          <header>
+            <NoteIcon />
+            <div>
+              <strong>รายละเอียดเพิ่มเติม</strong>
+              <span>บันทึกจากเจ้าของ</span>
+            </div>
+          </header>
+          <p>{booking?.petNotes || 'ไม่มีบันทึกเพิ่มเติม'}</p>
         </div>
       </div>
     </section>

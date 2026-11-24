@@ -14,7 +14,7 @@ const NAV = [
 
 export default function AdminTransportLayout() {
   return (
-    <section className="tp-page">
+    <section className="tp-page tp-page--admin">
       <TransportSubnav title="Admin · Pet Transport" items={NAV} />
       <Outlet />
     </section>

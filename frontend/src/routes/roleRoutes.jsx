@@ -42,6 +42,8 @@ import AssignedJobsPage from '../features/pet-transport/pages/AssignedJobs.jsx';
 import JobDetailPage from '../features/pet-transport/pages/JobDetail.jsx';
 import TrackingPage from '../features/pet-transport/pages/Tracking.jsx';
 import HistoryPage from '../features/pet-transport/pages/History.jsx';
+import DriverProfilePage from '../features/pet-transport/pages/DriverProfile.jsx';
+import DriverNotificationsPage from '../features/pet-transport/pages/DriverNotifications.jsx';
 import AdminTransportLayout from '../features/pet-transport/admin/AdminTransportLayout.jsx';
 import TransportDashboard from '../features/pet-transport/admin/TransportDashboard.jsx';
 import BookingManagement from '../features/pet-transport/admin/BookingManagement.jsx';
@@ -123,6 +125,8 @@ export const driverTransportRoutes = (
     <Route path="jobs/:tripId/status" element={<TrackingPage />} />
     <Route path="tracking" element={<TrackingPage />} />
     <Route path="history" element={<HistoryPage />} />
+    <Route path="notifications" element={<DriverNotificationsPage />} />
+    <Route path="profile" element={<DriverProfilePage />} />
   </>
 );
 

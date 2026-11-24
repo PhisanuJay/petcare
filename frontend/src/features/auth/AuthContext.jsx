@@ -1,11 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
-import { hashPassword, verifyPassword } from './password.js';
+import { hashPassword, needsPasswordRehash, verifyPassword } from './password.js';
 import { ROLES, homePathForRole, normalizeRole } from './roles.js';
 
 const AuthContext = createContext(null);
 
 const WELCOME_POINTS = 50;
+
+/** Keep in sync with pet-transport DEMO_DRIVER_ID (avoid circular import). */
+const DEMO_DRIVER_ID = 'driver-seed';
+const DEMO_OWNER_ID = 'owner-seed';
 
 const SEED_ADMIN = {
   email: 'admin@petcare.local',
@@ -14,6 +18,74 @@ const SEED_ADMIN = {
   lastName: 'PetCare',
   phone: '0200000000',
 };
+
+const SEED_OWNER = {
+  id: DEMO_OWNER_ID,
+  email: 'owner@petcare.local',
+  password: 'Owner1234',
+  firstName: 'มานี',
+  lastName: 'รักสัตว์',
+  phone: '0810001111',
+};
+
+const SEED_DRIVER = {
+  id: DEMO_DRIVER_ID,
+  email: 'driver@petcare.local',
+  password: '1234',
+  firstName: 'สมชาย',
+  lastName: 'คนขับ',
+  phone: '0890001122',
+  vehicle: 'รถตู้',
+  plateNumber: 'สก 1234',
+  licenseNumber: 'DL-88001234',
+  licenseExpiry: '2028-12-31',
+};
+
+async function upsertSeedUser(users, seed, role) {
+  const existing = users.find((u) => u.email === seed.email || (seed.id && u.id === seed.id));
+  const salt = newId();
+  const passwordHash = await hashPassword(seed.password, salt);
+  const base = {
+    id: seed.id || existing?.id || newId(),
+    firstName: seed.firstName,
+    lastName: seed.lastName,
+    email: seed.email,
+    phone: seed.phone || '',
+    address: existing?.address || '',
+    emergencyName: existing?.emergencyName || '',
+    emergencyPhone: existing?.emergencyPhone || '',
+    avatar: existing?.avatar || '',
+    points: existing?.points ?? (role === ROLES.owner ? WELCOME_POINTS : 0),
+    role,
+    vehicle: seed.vehicle || existing?.vehicle || '',
+    plateNumber: seed.plateNumber || existing?.plateNumber || '',
+    licenseNumber: seed.licenseNumber || existing?.licenseNumber || '',
+    licenseExpiry: seed.licenseExpiry || existing?.licenseExpiry || '',
+    active: true,
+    createdAt: existing?.createdAt || new Date().toISOString(),
+    salt,
+    passwordHash,
+  };
+
+  if (!existing) {
+    users.push(base);
+    return true;
+  }
+
+  const passwordOk = await verifyPassword(seed.password, existing.salt, existing.passwordHash);
+  const needsSync =
+    existing.id !== base.id
+    || existing.role !== role
+    || existing.active === false
+    || !passwordOk
+    || needsPasswordRehash(existing.passwordHash);
+
+  if (!needsSync) return false;
+
+  const idx = users.findIndex((u) => u.id === existing.id || u.email === seed.email);
+  if (idx >= 0) users[idx] = { ...existing, ...base };
+  return true;
+}
 
 const usersListeners = new Set();
 
@@ -42,7 +114,7 @@ function saveUsers(users) {
   notifyUsers();
 }
 
-/** Migrate legacy users + ensure seed admin exists. */
+/** Migrate legacy users + ensure seed admin/driver exist. */
 async function ensureUsersBootstrapped() {
   let users = loadUsersRaw();
   let changed = false;
@@ -53,29 +125,9 @@ async function ensureUsersBootstrapped() {
     return { ...u, role: ROLES.owner };
   });
 
-  const adminEmail = SEED_ADMIN.email;
-  if (!users.some((u) => u.email === adminEmail)) {
-    const salt = newId();
-    users.push({
-      id: newId(),
-      firstName: SEED_ADMIN.firstName,
-      lastName: SEED_ADMIN.lastName,
-      email: adminEmail,
-      phone: SEED_ADMIN.phone,
-      address: '',
-      emergencyName: '',
-      emergencyPhone: '',
-      avatar: '',
-      points: 0,
-      role: ROLES.admin,
-      vehicle: '',
-      active: true,
-      createdAt: new Date().toISOString(),
-      salt,
-      passwordHash: await hashPassword(SEED_ADMIN.password, salt),
-    });
-    changed = true;
-  }
+  if (await upsertSeedUser(users, SEED_ADMIN, ROLES.admin)) changed = true;
+  if (await upsertSeedUser(users, SEED_OWNER, ROLES.owner)) changed = true;
+  if (await upsertSeedUser(users, SEED_DRIVER, ROLES.driver)) changed = true;
 
   if (changed) saveUsers(users);
   return users;
@@ -83,7 +135,12 @@ async function ensureUsersBootstrapped() {
 
 let bootPromise = null;
 function bootUsers() {
-  if (!bootPromise) bootPromise = ensureUsersBootstrapped();
+  if (!bootPromise) {
+    bootPromise = ensureUsersBootstrapped().catch((err) => {
+      bootPromise = null;
+      throw err;
+    });
+  }
   return bootPromise;
 }
 
@@ -180,17 +237,29 @@ export function AuthProvider({ children }) {
   const login = useCallback(
     async (email, password, remember = true) => {
       await bootUsers();
-      const user = loadUsers().find((u) => u.email === email.trim().toLowerCase());
+      let users = loadUsers();
+      const user = users.find((u) => u.email === email.trim().toLowerCase());
       if (!user || !(await verifyPassword(password, user.salt, user.passwordHash))) {
         throw new Error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
       }
       if (user.active === false) {
         throw new Error('บัญชีนี้ถูกระงับการใช้งาน ติดต่อแอดมิน');
       }
+      // Migrate legacy sha256 hashes → fnv so LAN http origins keep working
+      if (needsPasswordRehash(user.passwordHash)) {
+        const salt = newId();
+        const passwordHash = await hashPassword(password, salt);
+        users = users.map((u) => (u.id === user.id ? { ...u, salt, passwordHash } : u));
+        saveUsers(users);
+        bumpUsers();
+        const migrated = users.find((u) => u.id === user.id);
+        startSession(migrated, remember);
+        return toPublicUser(migrated);
+      }
       startSession(user, remember);
       return toPublicUser(user);
     },
-    [startSession],
+    [startSession, bumpUsers],
   );
 
   const logout = useCallback(() => {
@@ -263,6 +332,9 @@ export function AuthProvider({ children }) {
         points: 0,
         role: ROLES.driver,
         vehicle: (vehicle || '').trim(),
+        plateNumber: '',
+        licenseNumber: '',
+        licenseExpiry: '',
         active: true,
         createdAt: new Date().toISOString(),
         createdBy: currentUser.id,
@@ -366,8 +438,18 @@ export function useAuth() {
   return ctx;
 }
 
-/** Demo seed credentials (shown on login for staff). */
+/** Demo seed credentials (shown on login). */
+export const DEMO_OWNER_LOGIN = {
+  email: SEED_OWNER.email,
+  password: SEED_OWNER.password,
+};
+
 export const DEMO_ADMIN_LOGIN = {
   email: SEED_ADMIN.email,
   password: SEED_ADMIN.password,
+};
+
+export const DEMO_DRIVER_LOGIN = {
+  email: SEED_DRIVER.email,
+  password: SEED_DRIVER.password,
 };

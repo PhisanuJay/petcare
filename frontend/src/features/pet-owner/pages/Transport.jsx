@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { usePets } from '../usePets.js';
@@ -55,8 +55,15 @@ export default function TransportPage() {
   const [outboundDate, setOutboundDate] = useState('');
   const [outboundTime, setOutboundTime] = useState('');
   const [error, setError] = useState('');
+  const [fromTouched, setFromTouched] = useState(false);
+  const appliedServiceType = useRef(null);
 
+  // Apply defaults once per service type — never fight user edits on จุดรับ
   useEffect(() => {
+    if (appliedServiceType.current === serviceType) return;
+    appliedServiceType.current = serviceType;
+    setFromTouched(false);
+
     if (serviceType === 'outbound') {
       setFrom(homeSeed);
       setTo(facilitySeed);
@@ -72,11 +79,33 @@ export default function TransportPage() {
     }
   }, [serviceType, homeSeed, facilitySeed]);
 
+  // Fill locked clinic side when catalog loads (do not overwrite user-edited pickup)
+  useEffect(() => {
+    if (!facilitySeed?.refId && !facilitySeed?.address) return;
+    const sameFacility = (place) =>
+      place?.kind === 'facility' && place?.refId === facilitySeed.refId;
+
+    if (serviceType === 'outbound' || isRoundTrip(serviceType)) {
+      setTo((prev) => (sameFacility(prev) ? prev : facilitySeed));
+    }
+    if (serviceType === 'inbound' && !fromTouched) {
+      setFrom((prev) => (sameFacility(prev) ? prev : facilitySeed));
+    }
+    if (isRoundTrip(serviceType) && !returnEdited) {
+      setReturnFrom((prev) => (sameFacility(prev) ? prev : facilitySeed));
+    }
+  }, [facilitySeed, serviceType, returnEdited, fromTouched]);
+
   useEffect(() => {
     if (!isRoundTrip(serviceType) || returnEdited) return;
     setReturnFrom(clonePlace(to));
     setReturnTo(clonePlace(from));
   }, [from, to, serviceType, returnEdited]);
+
+  function onFromChange(next) {
+    setFromTouched(true);
+    setFrom(next);
+  }
 
   const estimate = useMemo(() => {
     if (!from.zoneId || !to.zoneId) return null;
@@ -238,10 +267,10 @@ export default function TransportPage() {
               <PlaceFields
                 prefix={isRoundTrip(serviceType) ? 'เที่ยวไป · จุดรับ' : fromLabel}
                 value={from}
-                onChange={setFrom}
+                onChange={onFromChange}
                 clinics={clinics}
                 hotels={hotels}
-                allowedKinds={lockInboundFrom ? ['facility'] : null}
+                allowedKinds={lockInboundFrom ? ['facility'] : ['home', 'custom']}
                 locked={lockInboundFrom}
               />
               <PlaceFields
@@ -250,7 +279,7 @@ export default function TransportPage() {
                 onChange={setTo}
                 clinics={clinics}
                 hotels={hotels}
-                allowedKinds={lockOutboundTo ? ['facility'] : null}
+                allowedKinds={lockOutboundTo ? ['facility'] : ['home', 'custom']}
                 locked={lockOutboundTo}
               />
             </div>
@@ -279,6 +308,7 @@ export default function TransportPage() {
                     onChange={onReturnToChange}
                     clinics={clinics}
                     hotels={hotels}
+                    allowedKinds={['home', 'custom']}
                   />
                 </div>
               </div>

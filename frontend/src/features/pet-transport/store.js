@@ -22,9 +22,58 @@ function defaultState() {
     bookings: [],
     trips: [],
     issues: [],
+    notifications: [],
     seeded: true,
     pricingVersion: PRICING_VERSION,
   };
+}
+
+const UPCOMING_WINDOW_MS = 2 * 60 * 60 * 1000; // 2 hours
+const MAX_NOTIFICATIONS = 120;
+
+function ensureNotifications(draft) {
+  if (!Array.isArray(draft.notifications)) draft.notifications = [];
+}
+
+function formatNotifyWhen(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function pushDriverNotification(draft, {
+  driverId,
+  type,
+  title,
+  body = '',
+  tripId = null,
+  bookingId = null,
+  dedupeKey = null,
+}) {
+  if (!driverId) return;
+  ensureNotifications(draft);
+  if (dedupeKey && draft.notifications.some((n) => n.dedupeKey === dedupeKey)) return;
+  draft.notifications.unshift({
+    id: newId(),
+    driverId,
+    type,
+    title,
+    body,
+    tripId,
+    bookingId,
+    dedupeKey,
+    read: false,
+    createdAt: new Date().toISOString(),
+  });
+  if (draft.notifications.length > MAX_NOTIFICATIONS) {
+    draft.notifications = draft.notifications.slice(0, MAX_NOTIFICATIONS);
+  }
 }
 
 function zonesNeedMigration(zones) {
@@ -64,6 +113,18 @@ function getState() {
         hotels: mergeCatalog(cache.hotels, DEMO_HOTELS),
         pricingVersion: PRICING_VERSION,
       };
+      persist(cache);
+    }
+    if (cache.demoDriverVersion !== 'purged') {
+      const bookings = (cache.bookings || []).filter((item) => !String(item.id).startsWith('demo-booking-'));
+      const trips = (cache.trips || []).filter((item) => !String(item.id).startsWith('demo-trip-'));
+      if (bookings.length !== (cache.bookings || []).length || trips.length !== (cache.trips || []).length || cache.demoDriverVersion !== 'purged') {
+        cache = { ...cache, bookings, trips, demoDriverVersion: 'purged' };
+        persist(cache);
+      }
+    }
+    if (!Array.isArray(cache.notifications)) {
+      cache = { ...cache, notifications: [] };
       persist(cache);
     }
   }
@@ -120,17 +181,44 @@ function makeTrip({ bookingId, type, from, to, pickupTime, dropoffTime }) {
   };
 }
 
-function placeLabel(place) {
+export function placeParts(place, state = getState()) {
+  if (!place) return { name: '', address: '', mapUrl: '' };
+  if (place.kind === 'clinic' || place.kind === 'facility') {
+    const clinic = (state.clinics || []).find((item) => item.id === place.refId);
+    return {
+      name: clinic?.name || place.name || 'คลินิก',
+      address: clinic?.address || place.address || '',
+      mapUrl: place.mapUrl || clinic?.mapUrl || '',
+    };
+  }
+  if (place.kind === 'hotel') {
+    const hotel = (state.hotels || []).find((item) => item.id === place.refId);
+    return {
+      name: hotel?.name || place.name || 'โรงแรม',
+      address: hotel?.address || place.address || '',
+      mapUrl: place.mapUrl || hotel?.mapUrl || '',
+    };
+  }
+  if (place.kind === 'home') {
+    return { name: place.name || 'บ้าน', address: place.address || '', mapUrl: place.mapUrl || '' };
+  }
+  return { name: place.name || '', address: place.address || '', mapUrl: place.mapUrl || '' };
+}
+
+function placeLabel(place, state = getState()) {
   if (!place) return '';
+  const parts = placeParts(place, state);
+  if (parts.name || parts.address) {
+    return [parts.name, parts.address].filter(Boolean).join(' — ');
+  }
   const sub = place.subdistrictId ? subdistrictById(place.subdistrictId) : null;
-  const parts = [
+  return [
     place.name || null,
     districtLabel(place.districtId) || null,
     sub?.label || null,
     place.zoneId ? `Zone ${place.zoneId}` : null,
     place.address || null,
-  ].filter(Boolean);
-  return parts.join(' · ') || place.address || '';
+  ].filter(Boolean).join(' · ') || place.address || '';
 }
 
 /** Owner creates booking */
@@ -250,6 +338,20 @@ export function assignDriver(tripId, driverId, driverLabel = '') {
     const trip = draft.trips.find((t) => t.id === tripId);
     if (!trip) throw new Error('ไม่พบทริป');
     const booking = draft.bookings.find((b) => b.id === trip.bookingId);
+    const prevDriverId = trip.driverId;
+    const petName = booking?.petName || 'สัตว์เลี้ยง';
+
+    if (prevDriverId && prevDriverId !== driverId) {
+      pushDriverNotification(draft, {
+        driverId: prevDriverId,
+        type: 'cancelled',
+        title: 'งานถูกมอบหมายให้คนขับอื่น',
+        body: `${petName} · เวลารับ ${formatNotifyWhen(trip.pickupTime)}`,
+        tripId: trip.id,
+        bookingId: trip.bookingId,
+      });
+    }
+
     trip.driverId = driverId;
     trip.status = 'assigned';
     trip.statusHistory.push({
@@ -257,6 +359,19 @@ export function assignDriver(tripId, driverId, driverLabel = '') {
       at: new Date().toISOString(),
       note: `มอบหมายคนขับ ${driverLabel || driverId}`,
     });
+
+    if (driverId && driverId !== prevDriverId) {
+      pushDriverNotification(draft, {
+        driverId,
+        type: 'assigned',
+        title: 'มีงานใหม่ที่ Admin มอบหมาย',
+        body: `${petName} · เวลารับ ${formatNotifyWhen(trip.pickupTime)}`,
+        tripId: trip.id,
+        bookingId: trip.bookingId,
+        dedupeKey: `assigned:${trip.id}:${driverId}:${new Date().toISOString().slice(0, 13)}`,
+      });
+    }
+
     if (booking) {
       const related = draft.trips.filter((t) => t.bookingId === booking.id);
       const allAssigned = related.every((t) => t.driverId);
@@ -266,6 +381,34 @@ export function assignDriver(tripId, driverId, driverLabel = '') {
         booking.status = 'driver_assigned';
       }
       booking.updatedAt = new Date().toISOString();
+    }
+  });
+}
+
+/** Admin changes pickup/dropoff time — notifies assigned driver. */
+export function updateTripSchedule(tripId, { pickupTime, dropoffTime }) {
+  update((draft) => {
+    const trip = draft.trips.find((t) => t.id === tripId);
+    if (!trip) throw new Error('ไม่พบทริป');
+    const booking = draft.bookings.find((b) => b.id === trip.bookingId);
+    const prevPickup = trip.pickupTime;
+    if (pickupTime != null) trip.pickupTime = pickupTime;
+    if (dropoffTime != null) trip.dropoffTime = dropoffTime;
+    trip.statusHistory.push({
+      status: trip.status,
+      at: new Date().toISOString(),
+      note: `เปลี่ยนเวลานัดรับเป็น ${formatNotifyWhen(trip.pickupTime)}`,
+    });
+    if (booking) booking.updatedAt = new Date().toISOString();
+    if (trip.driverId && prevPickup !== trip.pickupTime) {
+      pushDriverNotification(draft, {
+        driverId: trip.driverId,
+        type: 'time_changed',
+        title: 'มีการเปลี่ยนแปลงเวลานัดรับ',
+        body: `${booking?.petName || 'สัตว์เลี้ยง'} · จาก ${formatNotifyWhen(prevPickup)} เป็น ${formatNotifyWhen(trip.pickupTime)}`,
+        tripId: trip.id,
+        bookingId: trip.bookingId,
+      });
     }
   });
 }
@@ -351,6 +494,84 @@ export function resolveCancel(bookingId, approve, adminNote = '') {
     b.cancelRequest.resolvedAt = new Date().toISOString();
     b.status = approve ? 'cancelled' : 'paid';
     b.updatedAt = new Date().toISOString();
+    if (approve) {
+      const related = draft.trips.filter((t) => t.bookingId === bookingId && t.driverId);
+      related.forEach((trip) => {
+        pushDriverNotification(draft, {
+          driverId: trip.driverId,
+          type: 'cancelled',
+          title: 'งานถูกยกเลิก',
+          body: `${b.petName || 'สัตว์เลี้ยง'} · เวลารับ ${formatNotifyWhen(trip.pickupTime)}${adminNote ? ` — ${adminNote}` : ''}`,
+          tripId: trip.id,
+          bookingId,
+          dedupeKey: `cancelled:${bookingId}:${trip.driverId}:${b.cancelRequest.resolvedAt}`,
+        });
+      });
+    }
+  });
+}
+
+export function notificationsForDriver(driverId) {
+  if (!driverId) return [];
+  const state = getState();
+  return (state.notifications || [])
+    .filter((n) => n.driverId === driverId)
+    .slice()
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+
+export function unreadNotificationCount(driverId) {
+  return notificationsForDriver(driverId).filter((n) => !n.read).length;
+}
+
+export function markNotificationRead(notificationId) {
+  update((draft) => {
+    ensureNotifications(draft);
+    const item = draft.notifications.find((n) => n.id === notificationId);
+    if (item) item.read = true;
+  });
+}
+
+export function markAllNotificationsRead(driverId) {
+  update((draft) => {
+    ensureNotifications(draft);
+    draft.notifications.forEach((n) => {
+      if (n.driverId === driverId) n.read = true;
+    });
+  });
+}
+
+/** Create upcoming-job reminders for trips within the next 2 hours. */
+export function ensureUpcomingReminders(driverId) {
+  if (!driverId) return;
+  const state = getState();
+  const now = Date.now();
+  const pending = [];
+  (state.trips || [])
+    .filter((t) => t.driverId === driverId && t.status !== 'completed')
+    .forEach((trip) => {
+      const booking = (state.bookings || []).find((b) => b.id === trip.bookingId);
+      if (!booking || booking.status === 'cancelled') return;
+      const at = new Date(trip.pickupTime).getTime();
+      if (Number.isNaN(at)) return;
+      const delta = at - now;
+      if (delta <= 0 || delta > UPCOMING_WINDOW_MS) return;
+      const hourKey = new Date(trip.pickupTime).toISOString().slice(0, 13);
+      const dedupeKey = `upcoming:${trip.id}:${hourKey}`;
+      if ((state.notifications || []).some((n) => n.dedupeKey === dedupeKey)) return;
+      pending.push({
+        driverId,
+        type: 'upcoming',
+        title: 'แจ้งเตือนงานที่กำลังจะถึง',
+        body: `${booking.petName || 'สัตว์เลี้ยง'} · นัดรับ ${formatNotifyWhen(trip.pickupTime)}`,
+        tripId: trip.id,
+        bookingId: trip.bookingId,
+        dedupeKey,
+      });
+    });
+  if (!pending.length) return;
+  update((draft) => {
+    pending.forEach((item) => pushDriverNotification(draft, item));
   });
 }
 
@@ -390,6 +611,25 @@ export function resetTransportDemo() {
   persist(defaultState());
 }
 
+/** Remove legacy demo trips/bookings so driver only sees real assigned jobs. */
+export function purgeDemoDriverJobs() {
+  const current = getState();
+  if (current.demoDriverVersion === 'purged') return;
+  const hasDemo = current.bookings.some((b) => String(b.id).startsWith('demo-booking-'))
+    || current.trips.some((t) => String(t.id).startsWith('demo-trip-'));
+  if (!hasDemo && current.demoDriverVersion == null) {
+    update((draft) => {
+      draft.demoDriverVersion = 'purged';
+    });
+    return;
+  }
+  update((draft) => {
+    draft.bookings = draft.bookings.filter((item) => !String(item.id).startsWith('demo-booking-'));
+    draft.trips = draft.trips.filter((item) => !String(item.id).startsWith('demo-trip-'));
+    draft.demoDriverVersion = 'purged';
+  });
+}
+
 export function enrichBooking(booking, state = getState(), drivers = []) {
   if (!booking) return null;
   const trips = state.trips
@@ -412,11 +652,13 @@ export function enrichBooking(booking, state = getState(), drivers = []) {
 /** Map auth driver user → assign list shape */
 export function toAssignDriver(user) {
   if (!user) return null;
+  const vehicleBits = [user.vehicle, user.plateNumber].filter(Boolean);
   return {
     id: user.id,
     name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
     phone: user.phone || '',
-    vehicle: user.vehicle || '',
+    vehicle: vehicleBits.join(' · '),
+    plateNumber: user.plateNumber || '',
     email: user.email,
     active: user.active !== false,
   };
