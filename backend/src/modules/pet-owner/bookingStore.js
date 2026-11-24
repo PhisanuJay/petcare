@@ -28,6 +28,13 @@ const CLINIC_RESCHEDULABLE = ['pending', 'confirmed'];
 /** Bookings that no longer hold their time slot. */
 const INACTIVE = ['cancelled', 'rejected'];
 export const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'no_show', 'rejected', 'cancelled'];
+/**
+ * Hand-over rule between the Medical Assistant and the Veterinarian: a booking reaches the vet only
+ * after the Medical Assistant has confirmed it ('pending' → 'confirmed'). The vet never sees
+ * 'pending', 'rejected' or 'cancelled' bookings; after confirmation it continues as
+ * 'confirmed' → 'completed' (vet) or 'no_show' (Medical Assistant).
+ */
+export const VET_VISIBLE_STATUSES = ['confirmed', 'completed', 'no_show'];
 
 export function listBookings(ownerId) {
   return bookings.read().then((all) =>

@@ -10,8 +10,8 @@ import { daysUntil, formatDate, reminderText, speciesOf } from '../../pet-owner/
 
 /**
  * Veterinarian Dashboard — Role: Veterinarian (มะแอ่ว)
- * The day at a glance: today's appointments (confirm / finish them here), bookings waiting for
- * confirmation, vaccines that are due, and the load for the coming week.
+ * The day at a glance: today's appointments (finish them here), upcoming appointments, vaccines that
+ * are due, and the load for the coming week. Only bookings the Medical Assistant confirmed appear.
  * Built from /api/veterinarian/appointments and /vaccination/due (no extra endpoint).
  */
 
@@ -77,8 +77,7 @@ function PetAvatar({ pet, fallback }) {
 }
 
 function SlotAction({ a, busy, onAction }) {
-  // Confirming is the Medical Assistant's job; the vet only closes confirmed cases.
-  if (a.status === 'pending') return <span className="tag warn">รอผู้ช่วยฯ ยืนยัน</span>;
+  // Confirming is the Medical Assistant's job (only confirmed bookings reach this page); the vet closes the case.
   if (a.status === 'confirmed') {
     return (
       <button type="button" className="btn btn-sky btn-sm" disabled={busy} onClick={() => onAction(a, 'completed')}>
@@ -102,8 +101,9 @@ export default function VeterinarianDashboardPage() {
 
   const todays = appointments.filter((a) => a.date === today && isActive(a)).sort((x, y) => x.time.localeCompare(y.time));
   const todayDone = todays.filter((a) => a.status === 'completed' || a.status === 'no_show').length;
-  const pending = appointments
-    .filter((a) => a.status === 'pending' && a.date >= today)
+  // Confirmed by the Medical Assistant, from tomorrow on (today's are in the schedule above).
+  const upcoming = appointments
+    .filter((a) => a.status === 'confirmed' && a.date > today)
     .sort((x, y) => `${x.date} ${x.time}`.localeCompare(`${y.date} ${y.time}`));
 
   const week = Array.from({ length: 7 }, (_, i) => {
@@ -153,7 +153,6 @@ export default function VeterinarianDashboardPage() {
                     : todays.length === 0
                       ? 'วันนี้ยังไม่มีนัดหมาย'
                       : `วันนี้มี ${todays.length} นัด${remaining > 0 ? ` เหลืออีก ${remaining} นัด` : ' ดำเนินการครบแล้ว'}`}
-                  {pending.length > 0 && ` · มี ${pending.length} นัดรอยืนยัน`}
                 </div>
               </div>
               <div className="d-flex flex-wrap gap-2">
@@ -190,9 +189,9 @@ export default function VeterinarianDashboardPage() {
               icon="bi-hourglass-split"
               bg="#fff1c9"
               fg="#c48f00"
-              value={pending.length}
-              label="รอยืนยัน"
-              sub={pending.length ? 'รอผู้ช่วยฯ ยืนยัน' : 'ไม่มีนัดค้าง'}
+              value={remaining}
+              label="รอตรวจวันนี้"
+              sub={remaining ? 'ยืนยันแล้ว รอตรวจ' : 'ไม่มีนัดค้าง'}
             />
             <Tile
               to="/veterinarian/vaccination"
@@ -230,7 +229,7 @@ export default function VeterinarianDashboardPage() {
                     const status = BOOKING_STATUS[a.status] ?? { label: a.status, tone: '' };
                     const done = a.status === 'completed' || a.status === 'no_show';
                     return (
-                      <div key={a.id} className={`vet-slot ${done ? 'done' : a.status === 'pending' ? 'pending' : ''}`}>
+                      <div key={a.id} className={`vet-slot ${done ? 'done' : ''}`}>
                         <div className="slot-time">{a.time}</div>
                         <div className="slot-card">
                           <div className="d-flex flex-wrap align-items-center gap-2">
@@ -306,16 +305,16 @@ export default function VeterinarianDashboardPage() {
             <div className="col-lg-7">
               <Panel
                 icon="bi-hourglass-split"
-                title={`รอยืนยัน (${pending.length})`}
+                title={`นัดที่ยืนยันแล้ว (${upcoming.length})`}
                 action={<Link to="/veterinarian/appointments" className="small text-decoration-none">ดูทั้งหมด</Link>}
               >
                 {loading ? (
                   <div className="empty-box py-3">กำลังโหลด...</div>
-                ) : pending.length === 0 ? (
-                  <Empty icon="bi-inbox" text="ไม่มีนัดที่รอยืนยัน" />
+                ) : upcoming.length === 0 ? (
+                  <Empty icon="bi-inbox" text="ไม่มีนัดล่วงหน้าที่ยืนยันแล้ว" />
                 ) : (
                   <div className="d-grid gap-2">
-                    {pending.slice(0, 5).map((a) => (
+                    {upcoming.slice(0, 5).map((a) => (
                       <div key={a.id} className="vet-quick">
                         <PetAvatar pet={a.pet} fallback={a.petSpecies} />
                         <span className="flex-grow-1">
@@ -324,10 +323,10 @@ export default function VeterinarianDashboardPage() {
                             {formatDate(a.date)} · {a.time} น. · {a.serviceLabel}
                           </span>
                         </span>
-                        <span className="tag warn">รอผู้ช่วยฯ ยืนยัน</span>
+                        <span className="tag sky">ยืนยันแล้ว</span>
                       </div>
                     ))}
-                    {pending.length > 5 && <div className="small text-muted">และอีก {pending.length - 5} รายการ</div>}
+                    {upcoming.length > 5 && <div className="small text-muted">และอีก {upcoming.length - 5} รายการ</div>}
                   </div>
                 )}
               </Panel>

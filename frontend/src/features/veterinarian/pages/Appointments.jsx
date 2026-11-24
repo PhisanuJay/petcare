@@ -12,23 +12,22 @@ import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
  * Data comes from /api/veterinarian/appointments.
  */
 
-/** Status labels as the vet sees them (owners keep the labels in BOOKING_STATUS). */
-const vetStatus = (status) =>
-  status === 'pending'
-    ? { label: 'รอผู้ช่วยฯ ยืนยัน', tone: 'warn' }
-    : BOOKING_STATUS[status] ?? { label: status, tone: '' };
+/**
+ * The API only returns bookings the Medical Assistant has already confirmed (confirmed, completed,
+ * no_show), so there is no "waiting for confirmation" state on this page.
+ */
+const vetStatus = (status) => BOOKING_STATUS[status] ?? { label: status, tone: '' };
 
 const FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
-  { value: 'pending', label: 'รอผู้ช่วยฯ ยืนยัน' },
-  { value: 'confirmed', label: 'ยืนยันแล้ว' },
+  { value: 'confirmed', label: 'รอตรวจ' },
   { value: 'completed', label: 'เสร็จสิ้น' },
-  { value: 'other', label: 'อื่นๆ' },
+  { value: 'other', label: 'ไม่มาตามนัด' },
 ];
 
 const inFilter = (a, filter) => {
   if (filter === 'all') return true;
-  if (filter === 'other') return !['pending', 'confirmed', 'completed'].includes(a.status);
+  if (filter === 'other') return a.status === 'no_show';
   return a.status === filter;
 };
 
@@ -147,7 +146,7 @@ export default function AppointmentsPage() {
         <div className="page-head">
           <div>
             <h1>นัดหมาย</h1>
-            <p>นัดที่เจ้าของสัตว์เลี้ยงจองเข้ามา บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ (ผู้ช่วยฯ เป็นผู้ยืนยันนัด)</p>
+            <p>นัดที่ผู้ช่วยสัตวแพทย์ยืนยันแล้ว บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ</p>
           </div>
         </div>
 

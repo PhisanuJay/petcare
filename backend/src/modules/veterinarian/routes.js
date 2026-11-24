@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { BOOKING_STATUSES, listAllBookings, updateBookingStatus } from '../pet-owner/bookingStore.js';
+import { BOOKING_STATUSES, VET_VISIBLE_STATUSES, listAllBookings, updateBookingStatus } from '../pet-owner/bookingStore.js';
 import { getPetById, listAllPets, updatePetAsClinic } from '../pet-owner/store.js';
 import { dueVaccines } from './dueVaccines.js';
 
@@ -35,6 +35,12 @@ function requireVet(req, _res, next) {
 }
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
+
+/**
+ * Every booking the vet side reads goes through here: only bookings the Medical Assistant has
+ * confirmed (and what followed) are visible. See VET_VISIBLE_STATUSES in bookingStore.js.
+ */
+const listVetBookings = async () => (await listAllBookings()).filter((b) => VET_VISIBLE_STATUSES.includes(b.status));
 const isDateString = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(v).getTime());
 
 router.get('/', (_req, res) => {
@@ -58,7 +64,7 @@ router.get('/appointments', wrap(async (req, res) => {
   if (date !== undefined && !isDateString(date)) throw httpError(400, 'วันที่ไม่ถูกต้อง');
   if (status !== undefined && !BOOKING_STATUSES.includes(status)) throw httpError(400, 'สถานะไม่ถูกต้อง');
 
-  const bookings = (await listAllBookings()).filter((b) => (!date || b.date === date) && (!status || b.status === status));
+  const bookings = (await listVetBookings()).filter((b) => (!date || b.date === date) && (!status || b.status === status));
   const result = [];
   for (const b of bookings) {
     result.push({ ...b, pet: petSummary(await getPetById(b.petId)) });
@@ -74,6 +80,8 @@ router.post('/appointments/:id/status', wrap(async (req, res) => {
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
   if (!BOOKING_STATUSES.includes(status)) throw httpError(400, 'สถานะไม่ถูกต้อง');
   if (status !== 'completed') throw httpError(403, 'ผู้ช่วยสัตวแพทย์เป็นผู้ดำเนินการ สัตวแพทย์ปิดเคสได้อย่างเดียว');
+  // updateBookingStatus only allows confirmed → completed, so a booking still waiting for the
+  // Medical Assistant (pending) is refused with 409.
   const booking = await updateBookingStatus(req.params.id, status, note);
   res.json({ ...booking, pet: petSummary(await getPetById(booking.petId)) });
 }));
@@ -92,7 +100,7 @@ const today = () => {
 function visitStats(bookings) {
   const t = today();
   const completed = bookings.filter((b) => b.status === 'completed');
-  const upcoming = bookings.filter((b) => ['pending', 'confirmed'].includes(b.status) && b.date >= t);
+  const upcoming = bookings.filter((b) => b.status === 'confirmed' && b.date >= t);
   const next = upcoming[0];
   return {
     visitCount: completed.length,
@@ -116,7 +124,7 @@ const byPetId = (bookings) => {
 router.use('/patients', requireVet);
 
 router.get('/patients', wrap(async (_req, res) => {
-  const [pets, bookings] = await Promise.all([listAllPets(), listAllBookings()]);
+  const [pets, bookings] = await Promise.all([listAllPets(), listVetBookings()]);
   const grouped = byPetId(bookings);
   const list = pets.map((pet) => patientListItem(pet, grouped.get(pet.id) ?? []));
   list.sort((a, b) => a.name.localeCompare(b.name, 'th'));
@@ -127,7 +135,7 @@ router.get('/patients', wrap(async (_req, res) => {
 router.get('/patients/:id', wrap(async (req, res) => {
   const pet = await getPetById(req.params.id);
   if (!pet) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
-  const bookings = (await listAllBookings()).filter((b) => b.petId === pet.id);
+  const bookings = (await listVetBookings()).filter((b) => b.petId === pet.id);
   const { ownerId: _ownerId, ...record } = pet;
   res.json({
     ...record,
@@ -307,11 +315,11 @@ router.get('/reports', wrap(async (req, res) => {
   const days = dayNumber(to) - dayNumber(from) + 1;
   if (days > MAX_REPORT_DAYS) throw httpError(400, `เลือกช่วงเวลาได้ไม่เกิน ${MAX_REPORT_DAYS} วัน`);
 
-  const [pets, allBookings] = await Promise.all([listAllPets(), listAllBookings()]);
+  const [pets, allBookings] = await Promise.all([listAllPets(), listVetBookings()]);
 
   // Appointments
   const bookings = allBookings.filter((b) => inRange(b.date, from, to));
-  const byStatus = Object.fromEntries(BOOKING_STATUSES.map((s) => [s, 0]));
+  const byStatus = Object.fromEntries(VET_VISIBLE_STATUSES.map((s) => [s, 0]));
   for (const [status, count] of countBy(bookings, (b) => b.status)) byStatus[status] = count;
   const byDayCounts = countBy(bookings, (b) => b.date);
   const byDay = Array.from({ length: days }, (_, i) => {

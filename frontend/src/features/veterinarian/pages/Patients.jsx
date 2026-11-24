@@ -172,7 +172,7 @@ function PatientDetail({ patient: p }) {
                   </span>
                   <span>{a.serviceLabel}</span>
                   <span className={`tag ${status.tone}`}>{status.label}</span>
-                  {a.date >= todayString() && ['pending', 'confirmed'].includes(a.status) && <span className="tag sky">กำลังจะถึง</span>}
+                  {a.date >= todayString() && a.status === 'confirmed' && <span className="tag sky">กำลังจะถึง</span>}
                 </div>
               );
             })}
