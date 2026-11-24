@@ -1,6 +1,7 @@
 import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
 import {
   DEMO_CLINICS,
+  DEMO_DRIVER_ID,
   DEMO_HOTELS,
   ZONES,
   bookingStatusMeta,
@@ -83,17 +84,22 @@ function makeTrip({ bookingId, type, from, to, pickupTime, dropoffTime }) {
   };
 }
 
-function placeLabel(place, state) {
-  if (!place) return '';
+function placeParts(place, state) {
+  if (!place) return { name: '', address: '' };
   if (place.kind === 'clinic') {
-    const c = state.clinics.find((x) => x.id === place.refId);
-    return c ? `${c.name} — ${c.address}` : place.address || place.name || '';
+    const clinic = state.clinics.find((item) => item.id === place.refId);
+    return { name: clinic?.name || place.name || 'คลินิก', address: clinic?.address || place.address || '' };
   }
   if (place.kind === 'hotel') {
-    const h = state.hotels.find((x) => x.id === place.refId);
-    return h ? `${h.name} — ${h.address}` : place.address || place.name || '';
+    const hotel = state.hotels.find((item) => item.id === place.refId);
+    return { name: hotel?.name || place.name || 'โรงแรม', address: hotel?.address || place.address || '' };
   }
-  return [place.name, place.address].filter(Boolean).join(' — ');
+  return { name: place.name || '', address: place.address || '' };
+}
+
+function placeLabel(place, state) {
+  const parts = placeParts(place, state);
+  return [parts.name, parts.address].filter(Boolean).join(' — ');
 }
 
 /** Owner creates booking */
@@ -141,6 +147,8 @@ export function createBooking(input) {
     ownerPhone: input.ownerPhone,
     petId: input.petId || null,
     petName: input.petName,
+    petSpecies: input.petSpecies || '',
+    petBreed: input.petBreed || '',
     petNotes: input.petNotes || '',
     serviceType: input.serviceType,
     distanceKm: Number(input.distanceKm),
@@ -326,6 +334,79 @@ export function resetTransportDemo() {
   persist(defaultState());
 }
 
+export function ensureDemoDriverJobs(driverId) {
+  if (driverId !== DEMO_DRIVER_ID) return;
+  const current = getState();
+  if (current.demoDriverVersion === 6 && current.trips.some((trip) => trip.driverId === driverId)) return;
+  const transportNotes = {
+    มะลิ: 'รับที่หน้าบ้าน แมวอยู่ในกล่องแล้ว',
+    ชาไทย: 'ส่งถึงมือเจ้าของ อย่าเปิดกล่องบนรถ',
+    ชานม: 'โทรก่อนถึง เจ้าของออกมารอที่ประตู',
+    มะพร้าว: 'สุนัขตัวใหญ่ ให้เจ้าของช่วยพาขึ้นรถ',
+    โอปอล: 'ส่งทั้งกล่องที่หน้าบ้าน อย่าเปิดฝา',
+  };
+  if (current.trips.some((trip) => trip.driverId === driverId)) {
+    update((draft) => {
+      draft.bookings.forEach((booking) => {
+        if (transportNotes[booking.petName]) booking.petNotes = transportNotes[booking.petName];
+      });
+      draft.demoDriverVersion = 6;
+    });
+    return;
+  }
+  const atHour = (dayOffset, hour) => {
+    const when = new Date();
+    when.setDate(when.getDate() + dayOffset);
+    when.setHours(hour, 0, 0, 0);
+    return when.toISOString();
+  };
+  const samples = [
+    { pet: 'มะลิ', species: 'cat', breed: 'สก็อตติชโฟลด์', day: 0, hour: 9, type: 'pickup', fromName: 'บ้านคุณแพร', fromAddress: '45 ซอยอารีย์ แขวงพญาไท กรุงเทพฯ', hotel: 'hotel-1', status: 'assigned', ownerName: 'คุณแพร', ownerPhone: '0811112222', petNotes: 'รับที่หน้าบ้าน แมวอยู่ในกล่องแล้ว' },
+    { pet: 'ชาไทย', species: 'dog', breed: 'ชิวาวา', day: 0, hour: 11, type: 'dropoff', fromName: 'บ้านคุณแพร', fromAddress: '88 ถนนลาดพร้าว แขวงจอมพล กรุงเทพฯ', hotel: 'hotel-2', status: 'picked_up', ownerName: 'คุณแพร', ownerPhone: '0811112222', petNotes: 'ส่งถึงมือเจ้าของ อย่าเปิดกล่องบนรถ' },
+    { pet: 'ชานม', species: 'cat', breed: 'เปอร์เซีย', day: 0, hour: 15, type: 'pickup', fromName: 'บ้านคุณแพร', fromAddress: '12 ซอยทองหล่อ แขวงคลองตันเหนือ กรุงเทพฯ', hotel: 'hotel-1', status: 'en_route_pickup', ownerName: 'คุณแพร', ownerPhone: '0811112222', petNotes: 'โทรก่อนถึง เจ้าของออกมารอที่ประตู' },
+    { pet: 'มะพร้าว', species: 'dog', breed: 'โกลเด้นรีทรีฟเวอร์', day: 1, hour: 10, type: 'pickup', fromName: 'บ้านคุณนุ่น', fromAddress: '27 ซอยสุขุมวิท 39 แขวงคลองตันเหนือ กรุงเทพฯ', hotel: 'hotel-1', status: 'assigned', ownerName: 'คุณนุ่น', ownerPhone: '0823334444', petNotes: 'สุนัขตัวใหญ่ ให้เจ้าของช่วยพาขึ้นรถ' },
+    { pet: 'โอปอล', species: 'cat', breed: 'บริติชชอร์ตแฮร์', day: 2, hour: 13, type: 'dropoff', fromName: 'บ้านคุณต้น', fromAddress: '156 ถนนพระราม 9 แขวงห้วยขวาง กรุงเทพฯ', hotel: 'hotel-2', status: 'assigned', ownerName: 'คุณต้น', ownerPhone: '0835556666', petNotes: 'ส่งทั้งกล่องที่หน้าบ้าน อย่าเปิดฝา' },
+  ];
+  update((draft) => {
+    DEMO_HOTELS.forEach((hotel) => {
+      const saved = draft.hotels.find((item) => item.id === hotel.id);
+      if (saved) saved.address = hotel.address;
+    });
+    draft.bookings = draft.bookings.filter((item) => !String(item.id).startsWith('demo-booking-'));
+    draft.trips = draft.trips.filter((item) => !String(item.id).startsWith('demo-trip-'));
+    draft.demoDriverVersion = 6;
+    samples.forEach((sample, index) => {
+      const bookingId = `demo-booking-${index + 1}`;
+      const hotel = draft.hotels.find((item) => item.id === sample.hotel);
+      draft.bookings.push({
+        id: bookingId,
+        petName: sample.pet,
+        petSpecies: sample.species,
+        petBreed: sample.breed,
+        ownerName: sample.ownerName,
+        ownerPhone: sample.ownerPhone,
+        petNotes: sample.petNotes,
+        paymentStatus: 'paid',
+        status: 'paid',
+        updatedAt: new Date().toISOString(),
+      });
+      const trip = makeTrip({
+        bookingId,
+        type: sample.type,
+        from: { kind: 'home', name: sample.fromName, address: sample.fromAddress },
+        to: { kind: 'hotel', refId: sample.hotel, name: hotel?.name, address: hotel?.address },
+        pickupTime: atHour(sample.day, sample.hour),
+        dropoffTime: atHour(sample.day, sample.hour + 1),
+      });
+      trip.id = `demo-trip-${index + 1}`;
+      trip.driverId = driverId;
+      trip.status = sample.status;
+      trip.statusHistory = [{ status: sample.status, at: new Date().toISOString(), note: 'งานตัวอย่าง' }];
+      draft.trips.push(trip);
+    });
+  });
+}
+
 export function enrichBooking(booking, state = getState(), drivers = []) {
   if (!booking) return null;
   const trips = state.trips
@@ -358,4 +439,4 @@ export function toAssignDriver(user) {
   };
 }
 
-export { placeLabel };
+export { placeLabel, placeParts };

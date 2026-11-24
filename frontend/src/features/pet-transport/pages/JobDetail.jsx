@@ -1,19 +1,45 @@
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { fileToResizedDataUrl } from '../../../shared/utils/storage.js';
-import TransportSubnav from '../components/TransportSubnav.jsx';
-import TripStatusTimeline from '../components/TripStatusTimeline.jsx';
-import { ISSUE_REASONS, TRIP_TYPES, nextTripStatus } from '../constants.js';
-import { placeLabel } from '../store.js';
+import IssueFields from '../components/IssueFields.jsx';
+import PetKind from '../components/PetKind.jsx';
+import { TRIP_STATUSES, nextTripStatus, tripStatusMeta } from '../constants.js';
+import { placeParts } from '../store.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { useTransport } from '../useTransport.js';
 import '../transport.css';
 
-const NAV = [
-  { to: '/pet-transport', label: 'Dashboard', icon: 'bi-speedometer2', end: true },
-  { to: '/pet-transport/assigned-jobs', label: 'Assigned Jobs', icon: 'bi-list-task' },
-  { to: '/pet-transport/history', label: 'History', icon: 'bi-clock-history' },
-];
+const JOB_KIND = {
+  pickup: 'รับขึ้นโรงแรม',
+  dropoff: 'ส่งกลับบ้าน',
+};
+
+function whenLabel(value) {
+  if (!value) return '';
+  return new Date(value).toLocaleString('th-TH', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function phoneHref(phone) {
+  const digits = String(phone || '').replace(/[^\d+]/g, '');
+  return digits ? `tel:${digits}` : '';
+}
+
+function Stop({ label, place, state }) {
+  const parts = placeParts(place, state);
+  return (
+    <div className="driver-stop">
+      <span>{label}</span>
+      <strong>{parts.name || 'ไม่ระบุสถานที่'}</strong>
+      <p>{parts.address || 'ยังไม่มีเลขที่อยู่'}</p>
+    </div>
+  );
+}
 
 export default function JobDetailPage() {
   const { tripId } = useParams();
@@ -26,47 +52,38 @@ export default function JobDetailPage() {
     attachEvidence,
     reportIssue,
   } = transport;
-  const trip = trips.find((t) => t.id === tripId);
-  const booking = bookings.find((b) => b.id === trip?.bookingId);
+  const trip = trips.find((item) => item.id === tripId);
+  const booking = bookings.find((item) => item.id === trip?.bookingId);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
-  const [issueReason, setIssueReason] = useState(ISSUE_REASONS[0].id);
-  const [issueMsg, setIssueMsg] = useState('');
-
-  if (!tripId) {
-    return (
-      <section className="tp-page">
-        <TransportSubnav title="Driver" items={NAV} />
-        <p>เลือกงานจาก Assigned Jobs</p>
-        <Link className="tp-btn" to="/pet-transport/assigned-jobs">ไป Assigned Jobs</Link>
-      </section>
-    );
-  }
+  const [issueOpen, setIssueOpen] = useState(false);
 
   if (!trip) {
     return (
-      <section className="tp-page">
-        <p>ไม่พบงาน</p>
-        <Link to="/pet-transport/assigned-jobs">กลับ</Link>
+      <section className="tp-page driver-page">
+        <p>ไม่พบงานนี้</p>
+        <Link className="tp-btn" to="/pet-transport">กลับตารางงาน</Link>
       </section>
     );
   }
 
   if (trip.driverId !== currentUser?.id) {
-    return <Navigate to="/pet-transport/assigned-jobs" replace />;
+    return <Navigate to="/pet-transport" replace />;
   }
 
   const next = nextTripStatus(trip.status);
+  const meta = tripStatusMeta(trip.status);
   const paid = booking?.paymentStatus === 'paid';
+  const phone = phoneHref(booking?.ownerPhone);
 
   async function onEvidence(kind, file) {
     setErr('');
     try {
       const url = await fileToResizedDataUrl(file, 800, 0.85);
       attachEvidence(trip.id, kind, url);
-      setMsg(`แนบหลักฐาน${kind === 'pickup' ? 'รับ' : 'ส่ง'}แล้ว`);
-    } catch (e) {
-      setErr(e.message);
+      setMsg(kind === 'pickup' ? 'แนบรูปตอนรับแล้ว' : 'แนบรูปตอนส่งแล้ว');
+    } catch (error) {
+      setErr(error.message);
     }
   }
 
@@ -75,95 +92,109 @@ export default function JobDetailPage() {
     try {
       advanceTripStatus(trip.id);
       setMsg('อัปเดตสถานะแล้ว');
-    } catch (e) {
-      setErr(e.message);
+    } catch (error) {
+      setErr(error.message);
     }
   }
 
-  function sendIssue() {
-    setErr('');
-    if (!issueMsg.trim()) return setErr('กรอกรายละเอียดปัญหา');
+  function submitIssue(reasonId, message) {
     reportIssue({
       tripId: trip.id,
       driverId: currentUser.id,
-      reasonId: issueReason,
-      message: issueMsg.trim(),
+      reasonId,
+      message,
     });
-    setIssueMsg('');
-    setMsg('ส่งปัญหาให้ Admin แล้ว');
-    return undefined;
+    setIssueOpen(false);
+    setErr('');
+    setMsg('ส่งปัญหาให้แอดมินแล้ว');
   }
 
   return (
-    <section className="tp-page">
-      <TransportSubnav title="Driver · Job Detail" items={NAV} />
-      <h1>Job Detail</h1>
-      <p className="tp-lead">
-        {TRIP_TYPES[trip.type]?.label} · {booking?.petName}
-      </p>
-      {msg && <div className="tp-alert tp-alert--ok">{msg}</div>}
-      {err && <div className="tp-alert tp-alert--danger">{err}</div>}
+    <section className="tp-page driver-page driver-detail">
+      <Link className="driver-back" to="/pet-transport">
+        <span aria-hidden="true">←</span>
+        กลับตารางงาน
+      </Link>
+      {msg ? <div className="tp-alert tp-alert--ok">{msg}</div> : null}
+      {err ? <div className="tp-alert tp-alert--danger">{err}</div> : null}
+      {!paid ? (
+        <div className="tp-alert tp-alert--info">รอแอดมินยืนยันการชำระก่อน จึงจะเริ่มอัปเดตสถานะได้</div>
+      ) : null}
 
-      {!paid && (
-        <div className="tp-alert tp-alert--info">
-          ยังไม่สามารถเริ่มอัปเดตสถานะได้จนกว่า Admin จะ Mark as Paid
+      <article className="driver-job driver-job--detail">
+        <header>
+          <div className="driver-job__who">
+            {trip.pickupTime ? <time>{whenLabel(trip.pickupTime)}</time> : null}
+            <strong>{booking?.petName || 'สัตว์เลี้ยง'}</strong>
+            <div className="driver-job__meta">
+              <em className={`driver-kind is-${trip.type}`}>{JOB_KIND[trip.type] || 'งานส่งสัตว์'}</em>
+              <PetKind booking={booking} />
+            </div>
+          </div>
+          <span className={`driver-status step-${meta.step}`}>{meta.label}</span>
+        </header>
+        <div className="driver-detail-bar">
+          {phone ? (
+            <a className="driver-call" href={phone}>โทร {booking?.ownerName || 'เจ้าของ'}</a>
+          ) : (
+            <span className="driver-call is-muted">ไม่มีเบอร์</span>
+          )}
+          <button type="button" className="tp-btn" disabled={!next || !paid} onClick={advance}>
+            {next ? `อัปเดตเป็น ${next.label}` : 'ส่งแล้ว'}
+          </button>
         </div>
-      )}
-
-      <div className="tp-grid tp-grid--2">
-        <div className="tp-card">
-          <p className="tp-muted">จาก: {placeLabel(trip.from, transport)}</p>
-          <p className="tp-muted">ถึง: {placeLabel(trip.to, transport)}</p>
-          <p className="tp-muted">Owner: {booking?.ownerName} · {booking?.ownerPhone}</p>
-          <p className="tp-muted">หมายเหตุสัตว์: {booking?.petNotes || '-'}</p>
-          <TripStatusTimeline status={trip.status} />
-          <div className="tp-actions">
-            <button type="button" className="tp-btn" disabled={!next || !paid} onClick={advance}>
-              {next ? `ถัดไป: ${next.label}` : 'เสร็จสิ้นแล้ว'}
-            </button>
-            <Link className="tp-btn tp-btn--ghost" to={`/pet-transport/jobs/${trip.id}/status`}>
-              หน้า Tracking
-            </Link>
-          </div>
+        <div className="driver-stops">
+          <Stop label="รับจาก" place={trip.from} state={transport} />
+          <Stop label="ส่งที่" place={trip.to} state={transport} />
         </div>
+        {booking?.petNotes ? <p className="driver-note">{booking.petNotes}</p> : null}
+        <div className="driver-job__actions">
+          <button
+            type="button"
+            className="tp-btn tp-btn--ghost"
+            aria-expanded={issueOpen}
+            onClick={() => setIssueOpen((open) => !open)}
+          >
+            แจ้งปัญหา
+          </button>
+        </div>
+        {issueOpen ? (
+          <IssueFields onClose={() => setIssueOpen(false)} onSubmit={submitIssue} />
+        ) : null}
+        <div className="driver-progress">
+          <span>ขั้น {meta.step} จาก {TRIP_STATUSES.length}</span>
+          <ol aria-label="สถานะงาน">
+            {TRIP_STATUSES.map((step) => (
+              <li
+                key={step.id}
+                className={step.step < meta.step ? 'is-done' : step.step === meta.step ? 'is-active' : ''}
+                title={step.label}
+              />
+            ))}
+          </ol>
+        </div>
+      </article>
 
-        <div className="tp-card">
-          <h3>หลักฐานรับ / ส่ง</h3>
-          <div className="tp-form">
-            <div className="field">
-              <label htmlFor="ev-pick">อัปโหลดหลักฐานรับสัตว์</label>
-              <input id="ev-pick" type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && onEvidence('pickup', e.target.files[0])} />
-              {trip.evidencePickup && (
-                <div className="tp-evidence"><img src={trip.evidencePickup.url} alt="รับ" /></div>
-              )}
-            </div>
-            <div className="field">
-              <label htmlFor="ev-drop">อัปโหลดหลักฐานส่งสัตว์</label>
-              <input id="ev-drop" type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && onEvidence('dropoff', e.target.files[0])} />
-              {trip.evidenceDropoff && (
-                <div className="tp-evidence"><img src={trip.evidenceDropoff.url} alt="ส่ง" /></div>
-              )}
-            </div>
+      <div className="tp-card">
+        <h2>แนบรูป</h2>
+        <div className="tp-form">
+          <div className="field">
+            <label htmlFor="ev-pick">รูปตอนรับสัตว์</label>
+            <input id="ev-pick" type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && onEvidence('pickup', event.target.files[0])} />
+            {trip.evidencePickup ? (
+              <div className="tp-evidence"><img src={trip.evidencePickup.url} alt="รูปตอนรับ" /></div>
+            ) : null}
           </div>
-
-          <h3 style={{ marginTop: '1rem' }}>แจ้งปัญหาให้ Admin</h3>
-          <div className="tp-form">
-            <div className="field">
-              <label htmlFor="reason">เหตุผล</label>
-              <select id="reason" value={issueReason} onChange={(e) => setIssueReason(e.target.value)}>
-                {ISSUE_REASONS.map((r) => (
-                  <option key={r.id} value={r.id}>{r.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="imsg">รายละเอียด</label>
-              <textarea id="imsg" rows={2} value={issueMsg} onChange={(e) => setIssueMsg(e.target.value)} />
-            </div>
+          <div className="field">
+            <label htmlFor="ev-drop">รูปตอนส่งสัตว์</label>
+            <input id="ev-drop" type="file" accept="image/*" onChange={(event) => event.target.files?.[0] && onEvidence('dropoff', event.target.files[0])} />
+            {trip.evidenceDropoff ? (
+              <div className="tp-evidence"><img src={trip.evidenceDropoff.url} alt="รูปตอนส่ง" /></div>
+            ) : null}
           </div>
-          <button type="button" className="tp-btn tp-btn--ghost" onClick={sendIssue}>ส่งรายงาน</button>
         </div>
       </div>
+
     </section>
   );
 }

@@ -18,6 +18,7 @@ import {
   addHotel,
   removeHotel,
   resetTransportDemo,
+  ensureDemoDriverJobs,
   toAssignDriver,
 } from './store.js';
 
@@ -90,5 +91,6 @@ export function useTransport() {
     addHotel,
     removeHotel,
     resetTransportDemo,
+    ensureDemoDriverJobs,
   };
 }

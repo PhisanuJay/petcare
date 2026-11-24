@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
 import { hashPassword, verifyPassword } from './password.js';
+import { DEMO_DRIVER_ID } from '../pet-transport/constants.js';
 import { ROLES, homePathForRole, normalizeRole } from './roles.js';
 
 const AuthContext = createContext(null);
@@ -13,6 +14,15 @@ const SEED_ADMIN = {
   firstName: 'Admin',
   lastName: 'PetCare',
   phone: '0200000000',
+};
+
+const SEED_DRIVER = {
+  id: DEMO_DRIVER_ID,
+  email: 'driver@petcare.local',
+  password: '1234',
+  firstName: 'สมชาย',
+  lastName: 'คนขับ',
+  phone: '0890001122',
 };
 
 const usersListeners = new Set();
@@ -73,6 +83,29 @@ async function ensureUsersBootstrapped() {
       createdAt: new Date().toISOString(),
       salt,
       passwordHash: await hashPassword(SEED_ADMIN.password, salt),
+    });
+    changed = true;
+  }
+
+  if (!users.some((u) => u.email === SEED_DRIVER.email || u.id === SEED_DRIVER.id)) {
+    const salt = newId();
+    users.push({
+      id: SEED_DRIVER.id,
+      firstName: SEED_DRIVER.firstName,
+      lastName: SEED_DRIVER.lastName,
+      email: SEED_DRIVER.email,
+      phone: SEED_DRIVER.phone,
+      address: '',
+      emergencyName: '',
+      emergencyPhone: '',
+      avatar: '',
+      points: 0,
+      role: ROLES.driver,
+      vehicle: 'รถตู้ สก 1234',
+      active: true,
+      createdAt: new Date().toISOString(),
+      salt,
+      passwordHash: await hashPassword(SEED_DRIVER.password, salt),
     });
     changed = true;
   }
@@ -370,4 +403,9 @@ export function useAuth() {
 export const DEMO_ADMIN_LOGIN = {
   email: SEED_ADMIN.email,
   password: SEED_ADMIN.password,
+};
+
+export const DEMO_DRIVER_LOGIN = {
+  email: SEED_DRIVER.email,
+  password: SEED_DRIVER.password,
 };

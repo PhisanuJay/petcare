@@ -9,6 +9,8 @@ export const ZONES = [
 
 export const ROUND_TRIP_DISCOUNT = 0.1;
 
+export const DEMO_DRIVER_ID = 'driver-seed';
+
 /** 7 trip statuses — per trip, not per booking */
 export const TRIP_STATUSES = [
   { id: 'assigned', label: 'มอบหมายแล้ว', step: 1 },
@@ -70,8 +72,8 @@ export const DEMO_CLINICS = [
 ];
 
 export const DEMO_HOTELS = [
-  { id: 'hotel-1', name: 'PetCare Hotel Ari', address: '45 อารีย์ กรุงเทพฯ' },
-  { id: 'hotel-2', name: 'Cat Nest Thonglor', address: '12 ทองหล่อ กรุงเทพฯ' },
+  { id: 'hotel-1', name: 'PetCare Hotel Ari', address: '99 ซอยอารีย์ 1 แขวงพญาไท กรุงเทพฯ' },
+  { id: 'hotel-2', name: 'Cat Nest Thonglor', address: '18 ซอยทองหล่อ 10 แขวงคลองตันเหนือ กรุงเทพฯ' },
 ];
 
 export function tripStatusMeta(id) {
