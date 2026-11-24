@@ -1,5 +1,7 @@
 import { Route } from 'react-router-dom';
 
+import RequireStaff from '../features/auth/RequireStaff.jsx';
+
 import PetOwnerDashboardPage from '../features/pet-owner/pages/Dashboard.jsx';
 import MyPetsPage from '../features/pet-owner/pages/MyPets.jsx';
 import PetFormPage from '../features/pet-owner/pages/PetForm.jsx';
@@ -19,11 +21,21 @@ import MedicalRecordsPage from '../features/veterinarian/pages/MedicalRecords.js
 import VaccinationPage from '../features/veterinarian/pages/Vaccination.jsx';
 import VetReportsPage from '../features/veterinarian/pages/Reports.jsx';
 
+import MedicalAssistantLayout from '../features/medical-assistant/layout/MedicalAssistantLayout.jsx';
 import MedicalAssistantDashboardPage from '../features/medical-assistant/pages/Dashboard.jsx';
 import MaAppointmentsPage from '../features/medical-assistant/pages/Appointments.jsx';
 import MaPatientsPage from '../features/medical-assistant/pages/Patients.jsx';
+import MaPatientDetailPage from '../features/medical-assistant/pages/PatientDetail.jsx';
 import BookingManagementPage from '../features/medical-assistant/pages/BookingManagement.jsx';
 import MedicalSupportPage from '../features/medical-assistant/pages/MedicalSupport.jsx';
+import SupportCasePage from '../features/medical-assistant/pages/SupportCase.jsx';
+
+import ClinicAdminLayout from '../features/clinic-admin/layout/ClinicAdminLayout.jsx';
+import ClinicAdminOverviewPage from '../features/clinic-admin/pages/Overview.jsx';
+import ClinicAdminStaffPage from '../features/clinic-admin/pages/Staff.jsx';
+import ClinicAdminSchedulePage from '../features/clinic-admin/pages/Schedule.jsx';
+import ClinicAdminSettingsPage from '../features/clinic-admin/pages/Settings.jsx';
+import ClinicAdminReportsPage from '../features/clinic-admin/pages/Reports.jsx';
 
 import PetProfile from '../features/pet-profile/PetProfile.jsx';
 
@@ -89,7 +101,7 @@ export const petOwnerRoutes = (
 export const roleRoutes = (
   <>
     {/* Veterinarian — มะแอ่ว */}
-    <Route path="veterinarian">
+    <Route path="veterinarian" element={<RequireStaff role="veterinarian" />}>
       <Route index element={<VeterinarianDashboardPage />} />
       <Route path="appointments" element={<VetAppointmentsPage />} />
       <Route path="patients" element={<VetPatientsPage />} />
@@ -99,12 +111,27 @@ export const roleRoutes = (
     </Route>
 
     {/* Medical Assistant — เอิร์ท */}
-    <Route path="medical-assistant">
-      <Route index element={<MedicalAssistantDashboardPage />} />
-      <Route path="appointments" element={<MaAppointmentsPage />} />
-      <Route path="patients" element={<MaPatientsPage />} />
-      <Route path="booking-management" element={<BookingManagementPage />} />
-      <Route path="medical-support" element={<MedicalSupportPage />} />
+    <Route path="medical-assistant" element={<RequireStaff role="medical_assistant" />}>
+      <Route element={<MedicalAssistantLayout />}>
+        <Route index element={<MedicalAssistantDashboardPage />} />
+        <Route path="appointments" element={<MaAppointmentsPage />} />
+        <Route path="patients" element={<MaPatientsPage />} />
+        <Route path="patients/:patientId" element={<MaPatientDetailPage />} />
+        <Route path="booking-management" element={<BookingManagementPage />} />
+        <Route path="medical-support" element={<MedicalSupportPage />} />
+        <Route path="medical-support/:appointmentId" element={<SupportCasePage />} />
+      </Route>
+    </Route>
+
+    {/* Clinic Admin — เอิร์ท */}
+    <Route path="clinic-admin" element={<RequireStaff role="clinic_admin" />}>
+      <Route element={<ClinicAdminLayout />}>
+        <Route index element={<ClinicAdminOverviewPage />} />
+        <Route path="staff" element={<ClinicAdminStaffPage />} />
+        <Route path="schedule" element={<ClinicAdminSchedulePage />} />
+        <Route path="settings" element={<ClinicAdminSettingsPage />} />
+        <Route path="reports" element={<ClinicAdminReportsPage />} />
+      </Route>
     </Route>
 
     {/* Pet Profile (shared) — เอิร์ท, ปร่ย */}

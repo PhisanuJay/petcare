@@ -2,9 +2,19 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
+import { STAFF_HOME } from '../staffSession.js';
+
+/** Staff go back to the staff page they were sent from, otherwise to the start page of their role. */
+function staffDestination(staff, next) {
+  const home = STAFF_HOME[staff.role] ?? '/';
+  return next === home || next.startsWith(`${home}/`) ? next : home;
+}
+
+/** True when `next` is a staff page (vet, medical assistant, clinic admin). */
+const isStaffPath = (next) => Object.values(STAFF_HOME).some((home) => next === home || next.startsWith(`${home}/`));
 
 export default function LoginPage() {
-  const { currentUser, login } = useAuth();
+  const { currentUser, login, staffLogin } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = safeNext(params.get('next'));
@@ -14,7 +24,11 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (currentUser) return <Navigate to={next} replace />;
+  // Only a customer session skips this page. A staff session is shared by every tab of the browser, so
+  // redirecting on it would stop a customer from logging in on another tab while a vet is logged in.
+  // A customer sent here from a staff page stays on the form (to log in as staff); redirecting back
+  // would loop, since RequireStaff sends them straight back to this page.
+  if (currentUser && !isStaffPath(next)) return <Navigate to={next} replace />;
 
   const set = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
@@ -29,9 +43,15 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(form.email, form.password, form.remember);
-      navigate(next, { replace: true });
-    } catch (err) {
-      setError(err.message);
+      navigate(isStaffPath(next) ? '/' : next, { replace: true });
+    } catch (customerError) {
+      // Not a customer account: staff (veterinarians) log in on this same page, their accounts are in the backend.
+      try {
+        const staff = await staffLogin(form.email, form.password, form.remember);
+        navigate(staffDestination(staff, next), { replace: true });
+      } catch {
+        setError(customerError.message);
+      }
     } finally {
       setSubmitting(false);
     }
