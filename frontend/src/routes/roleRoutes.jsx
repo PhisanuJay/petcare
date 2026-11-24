@@ -1,5 +1,7 @@
 import { Route } from 'react-router-dom';
 
+import RequireStaff from '../features/auth/RequireStaff.jsx';
+
 import PetOwnerDashboardPage from '../features/pet-owner/pages/Dashboard.jsx';
 import MyPetsPage from '../features/pet-owner/pages/MyPets.jsx';
 import PetFormPage from '../features/pet-owner/pages/PetForm.jsx';
@@ -92,7 +94,7 @@ export const petOwnerRoutes = (
 export const roleRoutes = (
   <>
     {/* Veterinarian — มะแอ่ว */}
-    <Route path="veterinarian">
+    <Route path="veterinarian" element={<RequireStaff role="veterinarian" />}>
       <Route index element={<VeterinarianDashboardPage />} />
       <Route path="appointments" element={<VetAppointmentsPage />} />
       <Route path="patients" element={<VetPatientsPage />} />

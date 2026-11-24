@@ -3,6 +3,8 @@ import { Router } from 'express';
 import { BOOKING_STATUSES, VET_VISIBLE_STATUSES, listAllBookings, updateBookingStatus } from '../pet-owner/bookingStore.js';
 import { getPetById, listAllPets, updatePetAsClinic } from '../pet-owner/store.js';
 import { dueVaccines } from './dueVaccines.js';
+import { requireStaff } from '../auth/middleware.js';
+import { OWNER_FIELDS, listOwnerProfiles } from '../pet-owner/ownerStore.js';
 
 /**
  * Veterinarian API module
@@ -23,16 +25,8 @@ function httpError(status, message) {
   return error;
 }
 
-/**
- * PLACEHOLDER access check — NOT real security.
- * The project has no staff login yet, so the veterinarian pages send `x-staff-role: veterinarian`.
- * Anyone can send that header. Replace this with a real authentication check once staff accounts exist,
- * before these endpoints (which expose every owner's pets) are used outside development.
- */
-function requireVet(req, _res, next) {
-  if (req.get('x-staff-role') !== 'veterinarian') return next(httpError(401, 'กรุณาเข้าสู่ระบบสัตวแพทย์'));
-  next();
-}
+/** Only a logged-in veterinarian (staff login, see modules/auth) can use these endpoints. */
+const requireVet = requireStaff('veterinarian');
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
 
@@ -86,9 +80,10 @@ router.post('/appointments/:id/status', wrap(async (req, res) => {
   res.json({ ...booking, pet: petSummary(await getPetById(booking.petId)) });
 }));
 
-/* ---------- Patients ---------- */
+/* ---------- Customers (owners) and their pets ---------- */
 
-// A "patient" is any pet registered by an owner. Visit statistics come from the owners' bookings.
+// A customer is an owner who registered pets; each pet is seen as a patient of the clinic ("สัตว์เลี้ยง" on
+// the pages). Visit statistics come from the owners' bookings.
 
 const today = () => {
   const d = new Date();
@@ -109,10 +104,34 @@ function visitStats(bookings) {
   };
 }
 
-/** Pet fields for the list (no photo: it can be large). Owner id is not exposed. */
-function patientListItem(pet, bookings) {
+const NO_CONTACT = { name: '', phone: '', email: '', address: '', emergencyName: '', emergencyPhone: '' };
+
+/**
+ * How to reach each owner, by owner id: the contact details the owner's pages sent (owners.json),
+ * with the name and phone of their latest booking as a fallback. Owners we know nothing about get empty fields.
+ */
+async function ownerContacts() {
+  const [profiles, bookings] = await Promise.all([listOwnerProfiles(), listAllBookings()]);
+  const contacts = new Map();
+  for (const b of bookings) {
+    // bookings are sorted oldest first, so later ones overwrite earlier ones
+    if (b.ownerName || b.ownerPhone) contacts.set(b.ownerId, { ...NO_CONTACT, name: b.ownerName ?? '', phone: b.ownerPhone ?? '' });
+  }
+  for (const p of profiles) {
+    const fallback = contacts.get(p.ownerId) ?? NO_CONTACT;
+    const own = Object.fromEntries(OWNER_FIELDS.filter((k) => p[k]).map((k) => [k, p[k]]));
+    contacts.set(p.ownerId, { ...fallback, ...own });
+  }
+  return (ownerId) => ({ id: ownerId, ...NO_CONTACT, ...contacts.get(ownerId) });
+}
+
+/** Pet fields for the list (no photo: it can be large). `ownerName` lets the pickers show whose pet it is. */
+function patientListItem(pet, bookings, ownerName = '') {
   const { id, name, species, breed, sex, birthDate, weight, allergies, chronicDiseases } = pet;
-  return { id, name, species, breed, sex, birthDate, weight, allergies, chronicDiseases, ...visitStats(bookings) };
+  // `visited`: the pet has a confirmed or finished appointment, i.e. it has been brought to the clinic
+  // (the vet records the treatment during a confirmed visit, before closing it).
+  const visited = bookings.some((b) => b.status === 'confirmed' || b.status === 'completed');
+  return { id, name, species, breed, sex, birthDate, weight, allergies, chronicDiseases, ownerName, visited, ...visitStats(bookings) };
 }
 
 const byPetId = (bookings) => {
@@ -122,26 +141,64 @@ const byPetId = (bookings) => {
 };
 
 router.use('/patients', requireVet);
+router.use('/owners', requireVet);
 
 router.get('/patients', wrap(async (_req, res) => {
-  const [pets, bookings] = await Promise.all([listAllPets(), listVetBookings()]);
+  const [pets, bookings, contactOf] = await Promise.all([listAllPets(), listVetBookings(), ownerContacts()]);
   const grouped = byPetId(bookings);
-  const list = pets.map((pet) => patientListItem(pet, grouped.get(pet.id) ?? []));
+  const list = pets.map((pet) => patientListItem(pet, grouped.get(pet.id) ?? [], contactOf(pet.ownerId).name));
   list.sort((a, b) => a.name.localeCompare(b.name, 'th'));
   res.json(list);
 }));
 
-// Full record of one patient, with its appointments (newest first).
+// Full record of one pet, with its appointments (newest first) and how to reach its owner.
 router.get('/patients/:id', wrap(async (req, res) => {
   const pet = await getPetById(req.params.id);
-  if (!pet) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
-  const bookings = (await listVetBookings()).filter((b) => b.petId === pet.id);
-  const { ownerId: _ownerId, ...record } = pet;
+  if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยง');
+  const [allBookings, contactOf] = await Promise.all([listVetBookings(), ownerContacts()]);
+  const bookings = allBookings.filter((b) => b.petId === pet.id);
+  const { ownerId, ...record } = pet;
   res.json({
     ...record,
+    owner: contactOf(ownerId),
     ...visitStats(bookings),
     appointments: bookings.slice().reverse().map(({ ownerId: _o, ...b }) => b),
   });
+}));
+
+/** The earlier of two `nextAppointment` values (either may be null). */
+const earlierAppointment = (a, b) => {
+  if (!a || !b) return a ?? b;
+  return `${a.date} ${a.time}` <= `${b.date} ${b.time}` ? a : b;
+};
+
+/** One owner with the pets they registered: contact details, visit totals and a short pet list. */
+function ownerSummary(ownerId, ownerPets, contactOf, grouped) {
+  const items = ownerPets.map((pet) => patientListItem(pet, grouped.get(pet.id) ?? [], contactOf(ownerId).name));
+  items.sort((a, b) => a.name.localeCompare(b.name, 'th'));
+  return {
+    ...contactOf(ownerId),
+    petCount: items.length,
+    visitCount: items.reduce((sum, p) => sum + p.visitCount, 0),
+    lastVisit: items.reduce((latest, p) => (p.lastVisit && (!latest || p.lastVisit > latest) ? p.lastVisit : latest), null),
+    nextAppointment: items.reduce((next, p) => earlierAppointment(next, p.nextAppointment), null),
+    pets: items,
+  };
+}
+
+const groupByOwner = (pets) => {
+  const map = new Map();
+  for (const pet of pets) map.set(pet.ownerId, [...(map.get(pet.ownerId) ?? []), pet]);
+  return map;
+};
+
+// GET /owners — every customer who registered a pet, with contact details and their pets
+router.get('/owners', wrap(async (_req, res) => {
+  const [pets, bookings, contactOf] = await Promise.all([listAllPets(), listVetBookings(), ownerContacts()]);
+  const grouped = byPetId(bookings);
+  const list = [...groupByOwner(pets)].map(([ownerId, ownerPets]) => ownerSummary(ownerId, ownerPets, contactOf, grouped));
+  list.sort((a, b) => (a.name || '￿').localeCompare(b.name || '￿', 'th'));
+  res.json(list);
 }));
 
 /* ---------- Medical records ---------- */
@@ -179,7 +236,7 @@ function parseRecord(body) {
  * Both helpers run inside the store's write queue.
  */
 async function addClinicEntry(petId, listKey, record) {
-  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกคนไข้');
+  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกสัตว์เลี้ยง');
   const now = new Date().toISOString();
   const entry = { ...record, id: randomUUID(), source: 'vet', createdAt: now, updatedAt: now };
   await updatePetAsClinic(petId, (pet) => ({ ...pet, [listKey]: [...(pet[listKey] ?? []), entry] }));

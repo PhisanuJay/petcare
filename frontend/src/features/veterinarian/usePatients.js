@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { vetRequest } from './vetApi.js';
 
-/** All patients (every registered pet) with visit statistics, from `/api/veterinarian/patients`. */
-export function usePatients() {
-  const [patients, setPatients] = useState([]);
+/** Load a list from the Veterinarian API; `reload` fetches it again. */
+function useVetList(url) {
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -11,22 +11,37 @@ export function usePatients() {
     setLoading(true);
     setError('');
     try {
-      setPatients(await vetRequest('/patients'));
+      setItems(await vetRequest(url));
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [url]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
-  return { patients, loading, error, reload };
+  return { items, loading, error, reload };
 }
 
-/** The full record of one patient (`id` may be empty: then nothing is loaded). */
+/** All pets (patients of the clinic) with visit statistics and the owner's name, from `/api/veterinarian/patients`. */
+export function usePatients() {
+  const { items, loading, error, reload } = useVetList('/patients');
+  return { patients: items, loading, error, reload };
+}
+
+/**
+ * All customers (owners who registered pets) with how to reach them, visit totals and their pets,
+ * from `/api/veterinarian/owners`.
+ */
+export function useOwners() {
+  const { items, loading, error, reload } = useVetList('/owners');
+  return { owners: items, loading, error, reload };
+}
+
+/** The full record of one pet, with its owner's contact details (`id` may be empty: then nothing is loaded). */
 export function usePatient(id) {
   const [state, setState] = useState({ id: '', patient: null, error: '' });
 

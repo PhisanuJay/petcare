@@ -1,6 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
+import { API_BASE } from '../pet-owner/api.js';
 import { hashPassword, verifyPassword } from './password.js';
+import { STAFF_SESSION_EXPIRED, clearStaffSession, readStaffSession, saveStaffSession } from './staffSession.js';
 
 const AuthContext = createContext(null);
 
@@ -97,6 +99,43 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
   }, []);
 
+  /* Staff (veterinarian) login: accounts live in the backend, see features/auth/staffSession.js. */
+  const [currentStaff, setCurrentStaff] = useState(() => readStaffSession()?.staff ?? null);
+
+  const staffLogin = useCallback(async (email, password, remember = true) => {
+    let res;
+    try {
+      res = await fetch(`${API_BASE}/api/auth/staff/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+    } catch {
+      throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบว่า backend ทำงานอยู่');
+    }
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    saveStaffSession({ token: body.token, staff: body.staff }, remember);
+    setCurrentStaff(body.staff);
+    return body.staff;
+  }, []);
+
+  const staffLogout = useCallback(() => {
+    const token = readStaffSession()?.token;
+    clearStaffSession();
+    setCurrentStaff(null);
+    if (token) {
+      fetch(`${API_BASE}/api/auth/staff/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    }
+  }, []);
+
+  // vetApi.js clears the saved session when the backend answers 401 (e.g. it was restarted).
+  useEffect(() => {
+    const onExpired = () => setCurrentStaff(null);
+    window.addEventListener(STAFF_SESSION_EXPIRED, onExpired);
+    return () => window.removeEventListener(STAFF_SESSION_EXPIRED, onExpired);
+  }, []);
+
   const updateProfile = useCallback(
     (patch) => {
       if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบ');
@@ -130,8 +169,11 @@ export function AuthProvider({ children }) {
   );
 
   const value = useMemo(
-    () => ({ currentUser, register, login, logout, updateProfile, changePassword }),
-    [currentUser, register, login, logout, updateProfile, changePassword],
+    () => ({
+      currentUser, register, login, logout, updateProfile, changePassword,
+      currentStaff, staffLogin, staffLogout,
+    }),
+    [currentUser, register, login, logout, updateProfile, changePassword, currentStaff, staffLogin, staffLogout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

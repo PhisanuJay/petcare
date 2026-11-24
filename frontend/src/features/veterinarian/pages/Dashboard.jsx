@@ -145,7 +145,7 @@ export default function VeterinarianDashboardPage() {
                 </div>
                 <h1 className="mb-1">
                   {greeting()}
-                  {vetName ? ` คุณหมอ${vetName}` : ' คุณหมอ'}
+                  {vetName ? (/^(น\.สพ\.|สพ\.)/.test(vetName) ? ` ${vetName}` : ` คุณหมอ${vetName}`) : ' คุณหมอ'}
                 </h1>
                 <div className="hero-sub">
                   {loading
@@ -349,7 +349,7 @@ export default function VeterinarianDashboardPage() {
                   </Link>
                   <Link to="/veterinarian/patients" className="vet-quick">
                     <i className="bi bi-heart" />
-                    <span>ค้นหาคนไข้</span>
+                    <span>ค้นหาลูกค้า / สัตว์เลี้ยง</span>
                   </Link>
                 </div>
               </Panel>

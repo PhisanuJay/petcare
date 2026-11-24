@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Link, NavLink, useLocation } from 'react-router-dom';
+import { startTransition, useEffect, useState } from 'react';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import '../vet.css';
+import '../vet-pages.css';
 
 /** Menu in the order of the Page 17 flow: Dashboard → Appointments → Patients → Medical Records → Vaccination → Reports. */
 const MENU = [
   { to: '/veterinarian', label: 'ภาพรวม', icon: 'bi-speedometer2', end: true },
   { to: '/veterinarian/appointments', label: 'นัดหมาย', icon: 'bi-calendar2-check' },
-  { to: '/veterinarian/patients', label: 'คนไข้', icon: 'bi-heart' },
+  { to: '/veterinarian/patients', label: 'ลูกค้า', icon: 'bi-people' },
   { to: '/veterinarian/medical-records', label: 'ประวัติการรักษา', icon: 'bi-journal-medical' },
   { to: '/veterinarian/vaccination', label: 'วัคซีน', icon: 'bi-capsule' },
   { to: '/veterinarian/reports', label: 'รายงาน', icon: 'bi-bar-chart-line' },
@@ -15,10 +17,20 @@ const MENU = [
 function VetNavbar() {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
+  const { currentStaff, staffLogout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  function handleLogout() {
+    // Batched with the navigation so the login guard does not redirect back with a stale `next`.
+    startTransition(() => {
+      staffLogout();
+      navigate('/login', { replace: true });
+    });
+  }
 
   return (
     <div className="nav-shell">
@@ -50,6 +62,13 @@ function VetNavbar() {
                 </li>
               ))}
             </ul>
+            <div className="d-flex align-items-center gap-2 ms-xl-auto pb-2 pb-xl-0">
+              {currentStaff && <span className="small fw-medium"><i className="bi bi-person-circle me-1" />{currentStaff.name}</span>}
+              <button type="button" className="btn btn-soft btn-sm" onClick={handleLogout}>
+                <i className="bi bi-box-arrow-right me-1" />
+                ออกจากระบบ
+              </button>
+            </div>
           </div>
         </nav>
       </div>
@@ -58,9 +77,9 @@ function VetNavbar() {
 }
 
 /** Page frame for every veterinarian page: navbar on top, page content below. */
-export default function VetLayout({ children }) {
+export default function VetLayout({ children, inner = true }) {
   return (
-    <div className="pc-site vet-site">
+    <div className={`pc-site vet-site${inner ? ' vet-inner' : ''}`}>
       <VetNavbar />
       <main>{children}</main>
     </div>
