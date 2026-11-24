@@ -63,7 +63,7 @@ export async function reloadMaStore({ silent = false } = {}) {
       const [appointments, patients, meta] = await Promise.all([
         maRequest('/appointments'),
         maRequest('/patients'),
-        state.meta ? Promise.resolve(state.meta) : maRequest('/meta'),
+        maRequest('/meta').catch(() => state.meta),
       ]);
 
       // Ignore in-flight results if the store was reset (logout / session expiry)

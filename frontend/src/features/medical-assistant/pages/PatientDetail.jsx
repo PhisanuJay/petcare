@@ -20,6 +20,7 @@ import {
 import { useToast } from '../../../shared/components/Toast.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import MaDataState from '../components/MaDataState.jsx';
+import { apptVetName } from '../data/clinicMeta.js';
 import {
   CAUTION_FLAGS,
   CAUTION_FLAG_LIST,
@@ -119,7 +120,7 @@ export default function PatientDetailPage() {
         <div className="mb-3">
           <Link to="/medical-assistant/patients" className="small text-decoration-none">
             <i className="bi bi-arrow-left me-1" />
-            กลับไปหน้ารายชื่อผู้ป่วย
+            กลับไปหน้ารายชื่อสัตว์เลี้ยง
           </Link>
         </div>
 
@@ -128,10 +129,10 @@ export default function PatientDetailPage() {
         ) : (
           <div className="card-soft empty-box">
             <i className="bi bi-question-circle" />
-            <div>ไม่พบข้อมูลผู้ป่วยนี้</div>
+            <div>ไม่พบข้อมูลสัตว์เลี้ยงนี้</div>
             <div className="mt-3">
               <Link to="/medical-assistant/patients" className="btn btn-sky">
-                กลับไปหน้ารายชื่อผู้ป่วย
+                กลับไปหน้ารายชื่อสัตว์เลี้ยง
               </Link>
             </div>
           </div>
@@ -185,7 +186,7 @@ export default function PatientDetailPage() {
     try {
       await addNote({ category: noteCategory, text: noteText.trim() });
       setNoteText('');
-      show('บันทึกข้อมูลผู้ป่วยแล้ว');
+      show('บันทึกข้อมูลสัตว์เลี้ยงแล้ว');
     } catch (err) {
       setNoteError(err?.message || 'ไม่สามารถบันทึกข้อมูลได้');
     } finally {
@@ -213,7 +214,7 @@ export default function PatientDetailPage() {
       <div className="mb-3">
         <Link to="/medical-assistant/patients" className="small text-decoration-none">
           <i className="bi bi-arrow-left me-1" />
-          กลับไปหน้ารายชื่อผู้ป่วย
+          กลับไปหน้ารายชื่อสัตว์เลี้ยง
         </Link>
       </div>
 
@@ -476,8 +477,8 @@ export default function PatientDetailPage() {
                       </div>
                       <div className="fw-medium mt-1">
                         {a.serviceLabel || a.service}
-                        {visit?.vet ? (
-                          <span className="text-muted fw-normal"> · {visit.vet}</span>
+                        {apptVetName(a) ? (
+                          <span className="text-muted fw-normal"> · {apptVetName(a)}</span>
                         ) : null}
                       </div>
                       {a.note && <div className="small text-muted">ข้อความเจ้าของ: {a.note}</div>}

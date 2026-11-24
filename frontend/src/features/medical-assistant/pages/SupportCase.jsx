@@ -6,6 +6,7 @@ import { useToast } from '../../../shared/components/Toast.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import MaDataState from '../components/MaDataState.jsx';
 import PatientNameLink from '../components/PatientNameLink.jsx';
+import { apptVetName } from '../data/clinicMeta.js';
 import {
   BCS_SCALE,
   CAUTION_FLAGS,
@@ -416,7 +417,7 @@ function SupportCaseInner({ caseData, patient, meta, startTreatment, saveVisit, 
       : !isToday
         ? `นัดหมายนี้เป็นของวันที่ ${formatDate(appt.date)} (ไม่ใช่วันนี้) แสดงในโหมดอ่านอย่างเดียว`
         : !isCheckedIn
-          ? 'ผู้ป่วยยังไม่ได้เช็คอิน แสดงในโหมดอ่านอย่างเดียว'
+          ? 'สัตว์เลี้ยงยังไม่ได้เช็คอิน แสดงในโหมดอ่านอย่างเดียว'
           : '';
 
   return (
@@ -470,7 +471,7 @@ function SupportCaseInner({ caseData, patient, meta, startTreatment, saveVisit, 
       {appt.stage === 'in_treatment' && isToday && (
         <div className="alert-soft warn mb-3 ma-no-print">
           <i className="bi bi-heart-pulse" />
-          <span>ผู้ป่วยอยู่ในห้องตรวจ — รอหมอปิดเคส</span>
+          <span>สัตว์เลี้ยงอยู่ในห้องตรวจ — รอหมอปิดเคส</span>
         </div>
       )}
 
@@ -573,13 +574,13 @@ function SupportCaseInner({ caseData, patient, meta, startTreatment, saveVisit, 
               {' · '}
               <i className="bi bi-clipboard2-pulse me-1 text-sky" />
               <strong>{appt.serviceLabel || appt.service}</strong> ·{' '}
-              {appt.visit?.vet || 'ยังไม่ระบุหมอ'}
+              {apptVetName(appt) || 'ยังไม่ระบุหมอ'}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="pill-tabs ma-status-tabs mb-4 ma-no-print" role="tablist" aria-label="ขั้นตอนการดูแลผู้ป่วย">
+      <div className="pill-tabs ma-status-tabs mb-4 ma-no-print" role="tablist" aria-label="ขั้นตอนการดูแลสัตว์เลี้ยง">
         {stepTabs.map((t) => (
           <button
             key={t.id}
@@ -962,7 +963,7 @@ function SupportCaseInner({ caseData, patient, meta, startTreatment, saveVisit, 
             <div className="mitr fs-4">ใบสรุปการคัดกรองเบื้องต้น · PetCare Clinic</div>
             <div className="small text-muted">
               วันที่ {formatDate(appt.date)} · เวลา {appt.time} น. · สัตวแพทย์{' '}
-              {appt.visit?.vet || 'ยังไม่ระบุ'}
+              {apptVetName(appt) || 'ยังไม่ระบุ'}
             </div>
           </div>
 
@@ -987,7 +988,7 @@ function SupportCaseInner({ caseData, patient, meta, startTreatment, saveVisit, 
             <div className="info-item">
               <div className="k">บริการ / สัตวแพทย์</div>
               <div className="v">
-                {appt.serviceLabel || appt.service} · {appt.visit?.vet || 'ยังไม่ระบุ'}
+                {appt.serviceLabel || appt.service} · {apptVetName(appt) || 'ยังไม่ระบุ'}
               </div>
             </div>
             <div className="info-item">
@@ -1075,7 +1076,7 @@ function SupportCaseInner({ caseData, patient, meta, startTreatment, saveVisit, 
 
       <ConfirmModal
         open={sendConfirmOpen}
-        title="ส่งผู้ป่วยเข้าห้องตรวจ"
+        title="ส่งสัตว์เลี้ยงเข้าห้องตรวจ"
         icon="bi-exclamation-triangle"
         message={`ทำรายการเตรียมความพร้อมแล้ว ${checkedCount}/${checklistItems.length} รายการ ต้องการส่งน้องเข้าห้องตรวจเลยหรือไม่?`}
         confirmLabel="ส่งเข้าห้องตรวจ"
@@ -1145,7 +1146,16 @@ export default function SupportCasePage() {
 
   const handleAfterSave = useCallback((savedVisit) => {
     if (!savedVisit) return;
-    setCaseData((prev) => (prev ? { ...prev, visit: savedVisit } : prev));
+    setCaseData((prev) =>
+      prev
+        ? {
+            ...prev,
+            visit: savedVisit,
+            vetId: savedVisit.vetId ?? prev.vetId,
+            vetName: savedVisit.vetName ?? prev.vetName,
+          }
+        : prev,
+    );
   }, []);
 
   const handleStartTreatment = useCallback(

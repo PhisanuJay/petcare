@@ -1,5 +1,5 @@
+import { apptVetId, apptVetName, closureFor, hoursForMeta } from './clinicMeta.js';
 import {
-  OPENING_HOURS,
   TRIAGE_LEVELS,
   offsetDateKey,
   timeToMinutes,
@@ -56,12 +56,13 @@ export function overdueBookings(appts, todayKey = offsetDateKey(0)) {
 export function bookingConflicts(appts) {
   const results = [];
   for (const a of pendingBookings(appts)) {
-    const vet = a.visit?.vet;
-    if (!vet) continue;
+    const id = apptVetId(a);
+    const name = apptVetName(a);
+    if (!id && !name) continue;
     const conflict = findConflict(
       appts,
       {
-        vet,
+        vet: { id, name },
         date: a.date,
         time: a.time,
         durationMin: a.visit?.durationMin,
@@ -103,16 +104,17 @@ export function completedToday(appts, getVisit, todayKey = offsetDateKey(0)) {
   return sortByTriageAndCheckIn(list, getVisit);
 }
 
-export function lateArrivals(appts, now = new Date()) {
+export function lateArrivals(appts, now = new Date(), meta = null) {
   const nowDate = now instanceof Date ? now : new Date(now);
-  const day = nowDate.getDay();
-  const hours = day === 0 || day === 6 ? OPENING_HOURS.weekend : OPENING_HOURS.weekday;
+  const todayKey = toDateKey(nowDate);
+  if (closureFor(meta, todayKey)) return [];
+  const hours = hoursForMeta(meta, todayKey);
+  if (!hours) return [];
   const nowMin = nowDate.getHours() * 60 + nowDate.getMinutes();
   const openMin = timeToMinutes(hours.open);
   const closeMin = timeToMinutes(hours.close);
   if (nowMin < openMin || nowMin > closeMin) return [];
 
-  const todayKey = toDateKey(nowDate);
   return todayAppointments(appts, todayKey).filter((a) => {
     if (a.stage !== 'confirmed') return false;
     const apptMin = timeToMinutes(a.time);

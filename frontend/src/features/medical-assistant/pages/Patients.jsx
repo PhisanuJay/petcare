@@ -95,8 +95,8 @@ export default function PatientsPage() {
     <section>
       <div className="page-head">
         <div>
-          <h1>ผู้ป่วย</h1>
-          <p>ค้นหาสัตว์ป่วย ดูประวัติการรักษา ข้อควรระวัง และบันทึกภายในก่อนเข้าตรวจ</p>
+          <h1>สัตว์เลี้ยง</h1>
+          <p>ค้นหาสัตว์เลี้ยง ดูประวัติการรักษา ข้อควรระวัง และบันทึกภายในก่อนเข้าตรวจ</p>
         </div>
         <button type="button" className="btn btn-soft" disabled={loading} onClick={reload}>
           <i className="bi bi-arrow-clockwise me-1" />
@@ -115,7 +115,7 @@ export default function PatientsPage() {
                   <i className="bi bi-clipboard2-heart" />
                 </span>
                 <div className="num">{counts.all}</div>
-                <div className="small text-muted">ผู้ป่วยทั้งหมด</div>
+                <div className="small text-muted">สัตว์เลี้ยงทั้งหมด</div>
               </div>
             </div>
             <div className="col-4">
@@ -139,7 +139,7 @@ export default function PatientsPage() {
           </div>
 
           <div className="card-soft mb-4">
-            <div className="pill-tabs ma-status-tabs mb-3" role="tablist" aria-label="หมวดหมู่ผู้ป่วย">
+            <div className="pill-tabs ma-status-tabs mb-3" role="tablist" aria-label="หมวดหมู่สัตว์เลี้ยง">
               {tabs.map((t) => (
                 <button
                   key={t.id}
@@ -164,7 +164,7 @@ export default function PatientsPage() {
                   type="search"
                   className="form-control"
                   placeholder="ค้นหาชื่อสัตว์ / เจ้าของ / เบอร์โทร"
-                  aria-label="ค้นหาผู้ป่วย"
+                  aria-label="ค้นหาสัตว์เลี้ยง"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
@@ -186,7 +186,7 @@ export default function PatientsPage() {
 
               <select
                 className="form-select w-auto"
-                aria-label="เรียงลำดับผู้ป่วย"
+                aria-label="เรียงลำดับสัตว์เลี้ยง"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
               >
@@ -209,8 +209,8 @@ export default function PatientsPage() {
                 <i className="bi bi-search" />
                 <div>
                   {patients.length === 0
-                    ? 'ยังไม่มีผู้ป่วย — ผู้ป่วยมาจากสัตว์ที่เจ้าของลงทะเบียนในระบบ'
-                    : 'ไม่พบผู้ป่วยที่ตรงกับเงื่อนไข'}
+                    ? 'ยังไม่มีสัตว์เลี้ยง — รายชื่อมาจากสัตว์ที่เจ้าของลงทะเบียนในระบบ'
+                    : 'ไม่พบสัตว์เลี้ยงที่ตรงกับเงื่อนไข'}
                 </div>
                 {hasActiveFilter && (
                   <button type="button" className="btn btn-soft mt-3" onClick={clearFilters}>

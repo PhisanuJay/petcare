@@ -1,3 +1,4 @@
+import { listStaff } from '../auth/staffAccounts.js';
 import { createJsonCollection } from './jsonCollection.js';
 
 const visits = createJsonCollection('visits.json');
@@ -22,6 +23,29 @@ export function listVisits() {
   return visits.read();
 }
 
+export async function backfillVetIds() {
+  try {
+    const current = await visits.read();
+    const vetIdByName = new Map(listStaff('veterinarian').map((v) => [v.name, v.id]));
+    const needsUpdate = current.some(
+      (v) => v && v.vet && !v.vetId && vetIdByName.has(v.vet),
+    );
+    if (!needsUpdate) return;
+
+    await visits.update((all) => {
+      const next = all.map((v) => {
+        if (v && v.vet && !v.vetId && vetIdByName.has(v.vet)) {
+          return { ...v, vetId: vetIdByName.get(v.vet) };
+        }
+        return v;
+      });
+      return { records: next, result: true };
+    });
+  } catch (err) {
+    console.warn('[visitStore] backfillVetIds warning:', err?.message ?? err);
+  }
+}
+
 export function upsertVisit(bookingId, patch) {
   return visits.update((all) => {
     const index = all.findIndex((v) => v.bookingId === bookingId);
@@ -42,16 +66,20 @@ export function upsertVisit(bookingId, patch) {
     const record = {
       bookingId,
       petId: existing.petId ?? null,
+      vetId: existing.vetId ?? null,
       vet: existing.vet ?? null,
       durationMin: existing.durationMin ?? null,
       handledAt: existing.handledAt ?? null,
       handledBy: existing.handledBy ?? null,
+      handledById: existing.handledById ?? null,
       rejectReason: existing.rejectReason ?? null,
       rescheduledFrom: existing.rescheduledFrom ?? null,
       contactedAt: existing.contactedAt ?? null,
       contactedBy: existing.contactedBy ?? null,
+      contactedById: existing.contactedById ?? null,
       checkedInAt: existing.checkedInAt ?? null,
       checkedInBy: existing.checkedInBy ?? null,
+      checkedInById: existing.checkedInById ?? null,
       treatmentStartedAt: existing.treatmentStartedAt ?? null,
       triage: existing.triage ?? '',
       chiefComplaint: existing.chiefComplaint ?? '',

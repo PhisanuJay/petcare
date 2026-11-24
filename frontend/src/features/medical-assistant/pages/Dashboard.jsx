@@ -7,6 +7,15 @@ import ConfirmModal from '../components/ConfirmModal.jsx';
 import MaDataState from '../components/MaDataState.jsx';
 import PatientNameLink from '../components/PatientNameLink.jsx';
 import {
+  apptVetId,
+  apptVetName,
+  closureFor,
+  hoursForMeta,
+  isSameVet,
+  vetList,
+  vetsOnDutyFor,
+} from '../data/clinicMeta.js';
+import {
   BOOKING_SERVICES,
   OPENING_HOURS,
   STAGE_META,
@@ -112,13 +121,18 @@ export default function MedicalAssistantDashboardPage() {
     [patients],
   );
 
-  const vetNames = meta?.VET_NAMES ?? [];
-
   const todayKey = toDateKey(now);
   const tomorrowKey = offsetDateKey(1);
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-  const clinicHours = isWeekend ? OPENING_HOURS.weekend : OPENING_HOURS.weekday;
+  const todayClosure = closureFor(meta, todayKey);
+  const todayHours = hoursForMeta(meta, todayKey);
+  const clinicHours = todayHours ?? (isWeekend ? OPENING_HOURS.weekend : OPENING_HOURS.weekday);
+  const clinicHoursLabel = todayClosure
+    ? `คลินิกปิดทำการ (${todayClosure.reason})`
+    : !todayHours
+      ? 'ปิดทำการวันนี้'
+      : `เวลาทำการ ${todayHours.open}–${todayHours.close} น.`;
 
   const openMin = timeToMinutes(clinicHours.open);
   const closeMin = timeToMinutes(clinicHours.close);
@@ -172,8 +186,58 @@ export default function MedicalAssistantDashboardPage() {
     });
   }, [treatmentList, readyList, triageList]);
 
+  const closureAffected = useMemo(
+    () => appointments.filter((a) => Boolean(a.closure)),
+    [appointments],
+  );
+
+  const ganttVetRows = useMemo(() => {
+    const dutyVets = vetsOnDutyFor(meta, todayKey);
+    const allActive = vetList(meta);
+    const rows = dutyVets.map((v) => ({
+      id: v.id,
+      name: v.name,
+      key: v.id ?? v.name,
+      onDuty: true,
+    }));
+
+    for (const a of todayAll) {
+      if (GANTT_HIDDEN_STAGES.includes(a.stage)) continue;
+      const vId = apptVetId(a);
+      const vName = apptVetName(a);
+      if (!vId && !vName) continue;
+      const alreadyInRows = rows.some((r) => isSameVet(a, r));
+      if (!alreadyInRows) {
+        const matchedActive = allActive.find((v) =>
+          vId && v.id ? v.id === vId : Boolean(vName && v.name === vName),
+        );
+        rows.push({
+          id: vId ?? matchedActive?.id ?? null,
+          name: matchedActive?.name || vName,
+          key: vId || vName,
+          onDuty: false,
+        });
+      }
+    }
+    return rows;
+  }, [meta, todayKey, todayAll]);
+
   const todoItems = useMemo(() => {
     const items = [];
+
+    if (closureAffected.length > 0) {
+      items.push({
+        key: 'closure-affected',
+        level: 'danger',
+        icon: 'bi-calendar-x',
+        title: `นัดตรงวันปิดคลินิก ${closureAffected.length} รายการ ต้องโทรเลื่อนนัด`,
+        text: 'กรุณาติดต่อเจ้าของสัตว์เพื่อเลื่อนนัดหรือจัดการคำขอ',
+        actionType: 'link',
+        actionLabel: 'ดูนัดวันปิด',
+        actionTo: '/medical-assistant/booking-management?closure=1',
+        actionVariant: 'btn-soft-danger',
+      });
+    }
 
     // 1. Pending bookings whose requested date is today/tomorrow (<= 1 day) or overdue
     for (const a of pendingList) {
@@ -198,7 +262,7 @@ export default function MedicalAssistantDashboardPage() {
     }
 
     // 2. Confirmed appointments >= 15 min past scheduled time without check-in
-    for (const a of lateArrivals(appointments, now)) {
+    for (const a of lateArrivals(appointments, now, meta)) {
       const lateMin = Math.max(15, nowMin - timeToMinutes(a.time));
       items.push({
         key: `late-${a.id}`,
@@ -210,7 +274,7 @@ export default function MedicalAssistantDashboardPage() {
         allergies: a.pet?.allergies,
         ownerPhone: a.ownerPhone,
         appt: a,
-        text: `เลยเวลานัด ${lateMin} นาที ยังไม่เช็คอิน (นัด ${a.time} น. · ${a.visit?.vet || 'ยังไม่ระบุหมอ'})`,
+        text: `เลยเวลานัด ${lateMin} นาที ยังไม่เช็คอิน (นัด ${a.time} น. · ${apptVetName(a) || 'ยังไม่ระบุหมอ'})`,
         actionType: 'late',
       });
     }
@@ -272,7 +336,7 @@ export default function MedicalAssistantDashboardPage() {
     }
 
     return items;
-  }, [pendingList, tomorrowKey, todayKey, appointments, now, nowMin, triageList, followUps]);
+  }, [closureAffected, pendingList, tomorrowKey, todayKey, appointments, now, nowMin, meta, triageList, followUps]);
 
   const visibleTodos = showAllTodos ? todoItems : todoItems.slice(0, 6);
 
@@ -339,7 +403,7 @@ export default function MedicalAssistantDashboardPage() {
         events.push({
           id: `${a.id}-start`,
           time: a.visit.treatmentStartedAt,
-          text: `ส่ง ${a.petName} เข้าห้องตรวจกับ ${a.visit.vet || 'สัตวแพทย์'}`,
+          text: `ส่ง ${a.petName} เข้าห้องตรวจกับ ${apptVetName(a) || 'สัตวแพทย์'}`,
         });
       }
       if (a.visit?.checkedInAt) {
@@ -408,7 +472,7 @@ export default function MedicalAssistantDashboardPage() {
         <div>
           <h1>{greetingFor(now)}</h1>
           <p>
-            {fullThaiDate(now)} · เวลาทำการ {clinicHours.open}–{clinicHours.close} น.
+            {fullThaiDate(now)} · {clinicHoursLabel}
           </p>
         </div>
         <div className="d-flex gap-2 flex-wrap">
@@ -418,7 +482,7 @@ export default function MedicalAssistantDashboardPage() {
           </button>
           <Link to="/medical-assistant/patients" className="btn btn-soft">
             <i className="bi bi-search me-1" />
-            ค้นหาผู้ป่วย
+            ค้นหาสัตว์เลี้ยง
           </Link>
           <Link to="/medical-assistant/booking-management" className="btn btn-sky">
             <i className="bi bi-journal-bookmark me-1" />
@@ -521,15 +585,19 @@ export default function MedicalAssistantDashboardPage() {
                               <i className={`bi ${item.icon}`} />
                             </span>
                             <div style={{ minWidth: 0 }}>
-                              <div className="fw-medium">
-                                <PatientNameLink
-                                  petId={item.petId}
-                                  petName={item.petName}
-                                  petSpecies={item.petSpecies}
-                                  flags={pat?.flags}
-                                  allergies={item.allergies ?? pat?.allergies}
-                                />
-                              </div>
+                              {item.title ? (
+                                <div className="fw-medium">{item.title}</div>
+                              ) : (
+                                <div className="fw-medium">
+                                  <PatientNameLink
+                                    petId={item.petId}
+                                    petName={item.petName}
+                                    petSpecies={item.petSpecies}
+                                    flags={pat?.flags}
+                                    allergies={item.allergies ?? pat?.allergies}
+                                  />
+                                </div>
+                              )}
                               <div className="small text-muted">{item.text}</div>
                             </div>
                           </div>
@@ -597,7 +665,7 @@ export default function MedicalAssistantDashboardPage() {
                 {inClinicQueue.length === 0 ? (
                   <div className="empty-box py-4 my-auto">
                     <i className="bi bi-bandaid" />
-                    <div>ยังไม่มีผู้ป่วยเช็คอินเข้าคลินิก</div>
+                    <div>ยังไม่มีสัตว์เลี้ยงเช็คอินเข้าคลินิก</div>
                   </div>
                 ) : (
                   <div className="d-grid gap-2">
@@ -677,36 +745,45 @@ export default function MedicalAssistantDashboardPage() {
                   </div>
                 </div>
 
-                {vetNames.map((vetName) => {
-                  const vetAppts = todayAll.filter(
-                    (a) => a.visit?.vet === vetName && !GANTT_HIDDEN_STAGES.includes(a.stage),
-                  );
-                  const nextSlot =
-                    vetAppts.length > 0 && !isAfterClose
-                      ? suggestSlots(
-                          appointments,
-                          { vet: vetName, date: todayKey, durationMin: 30 },
-                          1,
-                        )[0]
-                      : null;
+                {ganttVetRows.length === 0 ? (
+                  <div className="empty-box py-4">
+                    <i className="bi bi-calendar-x" />
+                    <div>วันนี้ไม่มีสัตวแพทย์เข้าเวร</div>
+                  </div>
+                ) : (
+                  ganttVetRows.map((row) => {
+                    const vetAppts = todayAll.filter(
+                      (a) => isSameVet(a, row) && !GANTT_HIDDEN_STAGES.includes(a.stage),
+                    );
+                    const nextSlot =
+                      row.onDuty && vetAppts.length > 0 && !isAfterClose && !todayClosure && todayHours
+                        ? suggestSlots(
+                            appointments,
+                            { vet: row, date: todayKey, durationMin: 30, meta },
+                            1,
+                          )[0]
+                        : null;
 
-                  let subStatusText = '';
-                  if (vetAppts.length === 0) {
-                    subStatusText = 'ไม่มีนัดวันนี้';
-                  } else if (!isAfterClose) {
-                    subStatusText = nextSlot ? `ว่างถัดไป ${nextSlot} น.` : 'ไม่มีคิวว่างวันนี้';
-                  } else {
-                    subStatusText = `${vetAppts.length} นัดวันนี้`;
-                  }
+                    let subStatusText = '';
+                    if (!row.onDuty) {
+                      subStatusText = `${vetAppts.length} นัดวันนี้`;
+                    } else if (vetAppts.length === 0) {
+                      subStatusText = 'ไม่มีนัดวันนี้';
+                    } else if (!isAfterClose) {
+                      subStatusText = nextSlot ? `ว่างถัดไป ${nextSlot} น.` : 'ไม่มีคิวว่างวันนี้';
+                    } else {
+                      subStatusText = `${vetAppts.length} นัดวันนี้`;
+                    }
 
-                  return (
-                    <div className="ma-gantt-row" key={vetName}>
-                      <div className="ma-gantt-vet">
-                        <div className="fw-medium small text-truncate" title={vetName}>
-                          {vetName}
+                    return (
+                      <div className="ma-gantt-row" key={row.key}>
+                        <div className="ma-gantt-vet">
+                          <div className="fw-medium small text-truncate" title={row.name}>
+                            {row.name}
+                          </div>
+                          {!row.onDuty && <span className="tag warn m-0">ไม่อยู่เวร</span>}
+                          <div className="small text-muted">{subStatusText}</div>
                         </div>
-                        <div className="small text-muted">{subStatusText}</div>
-                      </div>
 
                       <div className="ma-gantt-track">
                         {hourTicks.map((tick) => (
@@ -753,7 +830,7 @@ export default function MedicalAssistantDashboardPage() {
                       </div>
                     </div>
                   );
-                })}
+                }))}
               </div>
             </div>
           </div>

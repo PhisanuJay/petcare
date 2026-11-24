@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { requireStaff } from '../auth/middleware.js';
-import { listStaff } from '../auth/staffAccounts.js';
+import { findStaffAnyById, listStaff } from '../auth/staffAccounts.js';
+import { getClosure, getSettings, listServices } from '../clinic-admin/clinicSettings.js';
+import { isVetOnDuty, vetsOnDuty } from '../clinic-admin/rosterStore.js';
 import {
   BOOKING_STATUSES,
   VET_VISIBLE_STATUSES,
@@ -31,7 +33,7 @@ import {
   toMinutes,
 } from './maRules.js';
 import { addNote, deleteNote, getEntry, listEntries, setFlags } from './patientNoteStore.js';
-import { getVisit, listVisits, upsertVisit } from './visitStore.js';
+import { backfillVetIds, getVisit, listVisits, upsertVisit } from './visitStore.js';
 
 /**
  * Medical Assistant API module
@@ -43,10 +45,42 @@ import { getVisit, listVisits, upsertVisit } from './visitStore.js';
  */
 const router = Router();
 
+backfillVetIds();
+
 const requireMA = requireStaff('medical_assistant');
 const vetNames = () => listStaff('veterinarian').map((s) => s.name);
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
+
+function resolveVetName(visit) {
+  if (!visit) return null;
+  if (visit.vetId) {
+    const staff = findStaffAnyById(visit.vetId);
+    if (staff?.name) return staff.name;
+  }
+  return visit.vet ?? null;
+}
+
+function decorateVisit(visit) {
+  if (!visit) return null;
+  const vetName = resolveVetName(visit);
+  return {
+    ...visit,
+    vetId: visit.vetId ?? null,
+    vetName,
+  };
+}
+
+function resolveActiveVet({ vetId, vet }) {
+  const activeVets = listStaff('veterinarian');
+  if (typeof vetId === 'string' && vetId.trim()) {
+    return activeVets.find((s) => s.id === vetId.trim()) ?? null;
+  }
+  if (typeof vet === 'string' && vet.trim()) {
+    return activeVets.find((s) => s.name === vet.trim()) ?? null;
+  }
+  return null;
+}
 
 function petSummary(pet) {
   if (!pet) return null;
@@ -89,18 +123,36 @@ function computeStage(booking, visit) {
 
 function appointmentView(booking, visit, pet) {
   const { ownerId: _ownerId, ...rest } = booking;
+  const decoratedVisit = decorateVisit(visit);
+  const closure = ['pending', 'confirmed'].includes(booking.status)
+    ? getClosure(booking.date)
+    : null;
   return {
     ...rest,
     ownerName: rest.ownerName ?? '',
     ownerPhone: rest.ownerPhone ?? '',
     pet: petSummary(pet),
-    visit: visit ?? null,
+    visit: decoratedVisit,
+    vetId: decoratedVisit?.vetId ?? null,
+    vetName: decoratedVisit?.vetName ?? null,
     stage: computeStage(booking, visit),
     visibleToVet: VET_VISIBLE_STATUSES.includes(booking.status),
+    closure: closure ? { reason: closure.reason } : null,
   };
 }
 
-function findVetConflict(bookings, visitsMap, { vet, date, time, durationMin }, excludeId = null) {
+function sameVet(visit, { vetId, vet }) {
+  if (vetId && visit.vetId) return visit.vetId === vetId;
+  if (vetId && !visit.vetId) return visit.vet === vet;
+  return Boolean(vet && visit.vet === vet);
+}
+
+function findVetConflict(
+  bookings,
+  visitsMap,
+  { vetId = null, vet, date, time, durationMin },
+  excludeId = null,
+) {
   const targetStart = toMinutes(time);
   const targetDur = Number(durationMin) || 30;
   if (Number.isNaN(targetStart)) return null;
@@ -110,7 +162,7 @@ function findVetConflict(bookings, visitsMap, { vet, date, time, durationMin }, 
     if (b.status !== 'confirmed' && b.status !== 'completed') continue;
     if (b.date !== date) continue;
     const v = visitsMap.get(b.id);
-    if (!v || v.vet !== vet) continue;
+    if (!v || !sameVet(v, { vetId, vet })) continue;
 
     const bStart = toMinutes(b.time);
     const bDur = Number(v.durationMin) || 30;
@@ -137,6 +189,7 @@ function visitStatsFor(bookings, visitsMap) {
     (b) => ['pending', 'confirmed'].includes(b.status) && b.date >= t,
   );
   const next = upcoming[0];
+  const nextVisit = next ? visitsMap.get(next.id) : null;
   return {
     visitCount: completed.length,
     lastVisit: completed.length ? completed[completed.length - 1].date : null,
@@ -147,7 +200,8 @@ function visitStatsFor(bookings, visitsMap) {
           time: next.time,
           status: next.status,
           serviceLabel: next.serviceLabel,
-          vet: visitsMap.get(next.id)?.vet ?? null,
+          vetId: nextVisit?.vetId ?? null,
+          vet: resolveVetName(nextVisit),
         }
       : null,
   };
@@ -272,31 +326,37 @@ router.post(
       if (current.status !== 'pending') {
         throw httpError(409, 'สามารถยืนยันได้เฉพาะนัดที่รอยืนยันเท่านั้น');
       }
-      const { vet } = body;
+      const vetStaff = resolveActiveVet({ vetId: body.vetId, vet: body.vet });
       const durationMin = Number(body.durationMin);
-      if (!vetNames().includes(vet)) throw httpError(400, 'กรุณาเลือกสัตวแพทย์ที่ถูกต้อง');
+      if (!vetStaff) throw httpError(400, 'กรุณาเลือกสัตวแพทย์ที่ถูกต้อง');
       if (!DURATIONS.includes(durationMin)) throw httpError(400, 'กรุณาเลือกระยะเวลาที่ถูกต้อง');
+
+      if (!isVetOnDuty(vetStaff.id, current.date)) {
+        throw httpError(409, `${vetStaff.name} ไม่ได้เข้าเวรวันที่ ${current.date}`);
+      }
 
       const conflict = findVetConflict(
         bookings,
         visitsMap,
-        { vet, date: current.date, time: current.time, durationMin },
+        { vetId: vetStaff.id, vet: vetStaff.name, date: current.date, time: current.time, durationMin },
         current.id,
       );
       if (conflict) {
         throw httpError(
           409,
-          `${vet} มีนัดชนกับ ${conflict.booking.petName} ช่วงเวลา ${conflict.rangeText}`,
+          `${vetStaff.name} มีนัดชนกับ ${conflict.booking.petName} ช่วงเวลา ${conflict.rangeText}`,
         );
       }
 
       const booking = await updateBookingStatus(current.id, 'confirmed', note);
       const visit = await upsertVisit(current.id, {
         petId: booking.petId,
-        vet,
+        vetId: vetStaff.id,
+        vet: vetStaff.name,
         durationMin,
         handledAt: now,
         handledBy: req.staff.name,
+        handledById: req.staff.id,
       });
       const pet = await getPetById(booking.petId);
       return res.json(appointmentView(booking, visit, pet));
@@ -319,6 +379,7 @@ router.post(
         rejectReason: reason,
         handledAt: now,
         handledBy: req.staff.name,
+        handledById: req.staff.id,
       });
       const pet = await getPetById(booking.petId);
       return res.json(appointmentView(booking, visit, pet));
@@ -364,23 +425,36 @@ router.post(
       throw httpError(409, 'ผู้ป่วยเช็คอินแล้ว ไม่สามารถเลื่อนนัดได้');
     }
 
-    if (currentVisit?.vet && isDateString(date) && typeof time === 'string' && time) {
-      const conflict = findVetConflict(
-        bookings,
-        visitsMap,
-        {
-          vet: currentVisit.vet,
-          date,
-          time,
-          durationMin: currentVisit.durationMin || 30,
-        },
-        current.id,
-      );
-      if (conflict) {
-        throw httpError(
-          409,
-          `${currentVisit.vet} มีนัดชนกับ ${conflict.booking.petName} ช่วงเวลา ${conflict.rangeText}`,
+    if (currentVisit && (currentVisit.vetId || currentVisit.vet) && isDateString(date)) {
+      const assignedVetId =
+        currentVisit.vetId ??
+        listStaff('veterinarian').find((s) => s.name === currentVisit.vet)?.id ??
+        null;
+      const assignedVetName = resolveVetName(currentVisit);
+
+      if (assignedVetId && !isVetOnDuty(assignedVetId, date)) {
+        throw httpError(409, `${assignedVetName} ไม่ได้เข้าเวรวันที่ ${date}`);
+      }
+
+      if (typeof time === 'string' && time) {
+        const conflict = findVetConflict(
+          bookings,
+          visitsMap,
+          {
+            vetId: assignedVetId,
+            vet: assignedVetName,
+            date,
+            time,
+            durationMin: currentVisit.durationMin || 30,
+          },
+          current.id,
         );
+        if (conflict) {
+          throw httpError(
+            409,
+            `${assignedVetName} มีนัดชนกับ ${conflict.booking.petName} ช่วงเวลา ${conflict.rangeText}`,
+          );
+        }
       }
     }
 
@@ -424,6 +498,7 @@ router.post(
       petId: current.petId,
       checkedInAt: new Date().toISOString(),
       checkedInBy: req.staff.name,
+      checkedInById: req.staff.id,
     });
     const pet = await getPetById(current.petId);
     res.json(appointmentView(current, visit, pet));
@@ -473,6 +548,7 @@ router.post(
       petId: current.petId,
       contactedAt: new Date().toISOString(),
       contactedBy: req.staff.name,
+      contactedById: req.staff.id,
     });
     const pet = await getPetById(current.petId);
     res.json(appointmentView(current, visit, pet));
@@ -582,7 +658,7 @@ router.put(
     if (checklist !== undefined) patch.checklist = checklist;
 
     const updated = await upsertVisit(booking.id, patch);
-    res.json(updated);
+    res.json(decorateVisit(updated));
   }),
 );
 
@@ -602,7 +678,7 @@ router.get(
       const v = visitsMap.get(b.id);
       if (!v) continue;
       result.push({
-        ...v,
+        ...decorateVisit(v),
         petName: b.petName,
         petSpecies: b.petSpecies,
         time: b.time,
@@ -848,11 +924,27 @@ router.get(
 
 // GET /meta
 router.get('/meta', (_req, res) => {
+  const t = todayString();
+  const limit60 = addDaysTo(t, 60);
+  const settings = getSettings();
+  const activeVets = listStaff('veterinarian');
+
+  const onDutyByDate = {};
+  for (let i = 0; i < 14; i += 1) {
+    const dateKey = addDaysTo(t, i);
+    onDutyByDate[dateKey] = vetsOnDuty(dateKey).map((v) => v.id);
+  }
+
   res.json({
     BOOKING_SERVICES,
     WEEKDAY_HOURS,
     WEEKEND_HOURS,
     VET_NAMES: vetNames(),
+    VETS: activeVets.map(({ id, name }) => ({ id, name })),
+    SERVICES: listServices(),
+    HOURS: settings.hours,
+    onDutyByDate,
+    closures: settings.closures.filter((c) => c.date >= t && c.date <= limit60),
     DURATIONS,
     CAUTION_FLAGS,
     NOTE_CATEGORIES,

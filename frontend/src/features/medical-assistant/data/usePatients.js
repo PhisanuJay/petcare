@@ -26,7 +26,7 @@ export function usePatient(id) {
     if (!id) {
       setPatient(null);
       setLoading(false);
-      setError('ไม่พบรหัสผู้ป่วย');
+      setError('ไม่พบรหัสสัตว์เลี้ยง');
       return null;
     }
     setLoading(true);
@@ -49,7 +49,7 @@ export function usePatient(id) {
       if (!id) {
         setPatient(null);
         setLoading(false);
-        setError('ไม่พบรหัสผู้ป่วย');
+        setError('ไม่พบรหัสสัตว์เลี้ยง');
         return;
       }
       setLoading(true);
@@ -71,7 +71,7 @@ export function usePatient(id) {
 
   const setFlags = useCallback(
     async (flags) => {
-      if (!id) throw new Error('ไม่พบรหัสผู้ป่วย');
+      if (!id) throw new Error('ไม่พบรหัสสัตว์เลี้ยง');
       const updated = await maRequest(`/patients/${encodeURIComponent(id)}/flags`, {
         method: 'PUT',
         body: JSON.stringify({ flags }),
@@ -85,7 +85,7 @@ export function usePatient(id) {
 
   const addNote = useCallback(
     async ({ category, text }) => {
-      if (!id) throw new Error('ไม่พบรหัสผู้ป่วย');
+      if (!id) throw new Error('ไม่พบรหัสสัตว์เลี้ยง');
       const created = await maRequest(`/patients/${encodeURIComponent(id)}/notes`, {
         method: 'POST',
         body: JSON.stringify({ category, text }),

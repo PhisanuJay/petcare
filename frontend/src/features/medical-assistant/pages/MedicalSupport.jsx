@@ -6,6 +6,7 @@ import { useToast } from '../../../shared/components/Toast.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import MaDataState from '../components/MaDataState.jsx';
 import PatientNameLink from '../components/PatientNameLink.jsx';
+import { apptVetName } from '../data/clinicMeta.js';
 import { CAUTION_FLAGS, STAGE_META, TRIAGE_LEVELS, offsetDateKey } from '../data/constants.js';
 import {
   awaitingTriage,
@@ -154,7 +155,7 @@ export default function MedicalSupportPage() {
           </div>
 
           <div className="card-soft mb-4">
-            <div className="pill-tabs ma-status-tabs mb-0" role="tablist" aria-label="คิวผู้ป่วยวันนี้">
+            <div className="pill-tabs ma-status-tabs mb-0" role="tablist" aria-label="คิวสัตว์เลี้ยงวันนี้">
               {tabs.map((t) => (
                 <button
                   key={t.id}
@@ -178,9 +179,9 @@ export default function MedicalSupportPage() {
                 <i className="bi bi-bandaid" />
                 <div>
                   {tab === 'queue'
-                    ? 'ไม่มีผู้ป่วยในคิวคลินิกวันนี้'
+                    ? 'ไม่มีสัตว์เลี้ยงในคิวคลินิกวันนี้'
                     : tab === 'triage'
-                      ? 'ไม่มีผู้ป่วยรอคัดกรองในขณะนี้'
+                      ? 'ไม่มีสัตว์เลี้ยงรอคัดกรองในขณะนี้'
                       : 'ยังไม่มีเคสที่เสร็จสิ้นในวันนี้'}
                 </div>
                 <div className="mt-3">
@@ -251,7 +252,7 @@ export default function MedicalSupportPage() {
                         <div>
                           <i className="bi bi-clipboard2-pulse me-1 text-sky" />
                           <strong>{appt.serviceLabel || appt.service}</strong> ·{' '}
-                          {visit?.vet || 'ยังไม่ระบุหมอ'} · เวลานัด {appt.time} น.
+                          {apptVetName(appt) || 'ยังไม่ระบุหมอ'} · เวลานัด {appt.time} น.
                         </div>
                         {(visit?.chiefComplaint || appt.note) && (
                           <div className="text-muted">
@@ -358,11 +359,11 @@ export default function MedicalSupportPage() {
 
       <ConfirmModal
         open={Boolean(sendTarget)}
-        title="ส่งผู้ป่วยเข้าห้องตรวจ"
+        title="ส่งสัตว์เลี้ยงเข้าห้องตรวจ"
         icon="bi-heart-pulse"
         message={
           sendTarget
-            ? `ยืนยันส่ง "${sendTarget.petName}" เข้าห้องตรวจกับ ${sendTarget.visit?.vet || 'สัตวแพทย์'} ใช่หรือไม่?`
+            ? `ยืนยันส่ง "${sendTarget.petName}" เข้าห้องตรวจกับ ${apptVetName(sendTarget) || 'สัตวแพทย์'} ใช่หรือไม่?`
             : ''
         }
         confirmLabel="ส่งเข้าห้องตรวจ"

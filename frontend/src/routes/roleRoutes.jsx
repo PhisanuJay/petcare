@@ -30,6 +30,13 @@ import BookingManagementPage from '../features/medical-assistant/pages/BookingMa
 import MedicalSupportPage from '../features/medical-assistant/pages/MedicalSupport.jsx';
 import SupportCasePage from '../features/medical-assistant/pages/SupportCase.jsx';
 
+import ClinicAdminLayout from '../features/clinic-admin/layout/ClinicAdminLayout.jsx';
+import ClinicAdminOverviewPage from '../features/clinic-admin/pages/Overview.jsx';
+import ClinicAdminStaffPage from '../features/clinic-admin/pages/Staff.jsx';
+import ClinicAdminSchedulePage from '../features/clinic-admin/pages/Schedule.jsx';
+import ClinicAdminSettingsPage from '../features/clinic-admin/pages/Settings.jsx';
+import ClinicAdminReportsPage from '../features/clinic-admin/pages/Reports.jsx';
+
 import PetProfile from '../features/pet-profile/PetProfile.jsx';
 
 import PetHotelDashboardPage from '../features/pet-hotel/pages/Dashboard.jsx';
@@ -113,6 +120,17 @@ export const roleRoutes = (
         <Route path="booking-management" element={<BookingManagementPage />} />
         <Route path="medical-support" element={<MedicalSupportPage />} />
         <Route path="medical-support/:appointmentId" element={<SupportCasePage />} />
+      </Route>
+    </Route>
+
+    {/* Clinic Admin — เอิร์ท */}
+    <Route path="clinic-admin" element={<RequireStaff role="clinic_admin" />}>
+      <Route element={<ClinicAdminLayout />}>
+        <Route index element={<ClinicAdminOverviewPage />} />
+        <Route path="staff" element={<ClinicAdminStaffPage />} />
+        <Route path="schedule" element={<ClinicAdminSchedulePage />} />
+        <Route path="settings" element={<ClinicAdminSettingsPage />} />
+        <Route path="reports" element={<ClinicAdminReportsPage />} />
       </Route>
     </Route>
 

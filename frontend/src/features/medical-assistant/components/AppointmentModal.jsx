@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
-import { availableSlots, slotsForDate, todayString } from '../data/constants.js';
+import {
+  apptVetId,
+  apptVetName,
+  clinicSlots,
+  closureFor,
+  hoursForMeta,
+  vetsOnDutyFor,
+} from '../data/clinicMeta.js';
+import { todayString } from '../data/constants.js';
 import { findConflict, suggestSlots } from '../data/schedule.js';
 
-function RescheduleModalInner({ appointment, appointments, onClose, onReschedule }) {
+function RescheduleModalInner({ appointment, appointments, meta, onClose, onReschedule }) {
   const todayKey = todayString();
   const [date, setDate] = useState(() => appointment.date || todayKey);
   const [time, setTime] = useState(() => appointment.time || '');
@@ -18,41 +26,59 @@ function RescheduleModalInner({ appointment, appointments, onClose, onReschedule
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [submitting, onClose]);
 
-  const vetName = appointment.visit?.vet || '';
+  const vetId = apptVetId(appointment);
+  const vetName = apptVetName(appointment);
+  const vetRef = useMemo(
+    () => (vetId || vetName ? { id: vetId, name: vetName } : null),
+    [vetId, vetName],
+  );
   const durationMin = appointment.visit?.durationMin || 30;
 
+  const closureInfo = useMemo(() => closureFor(meta, date), [meta, date]);
+  const dayHours = useMemo(() => hoursForMeta(meta, date), [meta, date]);
+  const clinicClosedOnDate = Boolean(closureInfo) || !dayHours;
+
+  const vetOffDutyOnDate = useMemo(() => {
+    if (!vetRef || clinicClosedOnDate) return false;
+    const dutyVets = vetsOnDutyFor(meta, date);
+    return !dutyVets.some((v) =>
+      vetRef.id && v.id ? v.id === vetRef.id : Boolean(vetRef.name && v.name === vetRef.name),
+    );
+  }, [vetRef, clinicClosedOnDate, meta, date]);
+
   const slotOptions = useMemo(() => {
-    const futureOrAll = date === todayKey ? availableSlots(date) : slotsForDate(date);
+    if (clinicClosedOnDate) return [];
+    const futureOrAll = clinicSlots(meta, date, { futureOnly: date === todayKey });
     if (date === appointment.date && appointment.time && !futureOrAll.includes(appointment.time)) {
-      return slotsForDate(date);
+      return clinicSlots(meta, date, { futureOnly: false });
     }
     return futureOrAll;
-  }, [date, todayKey, appointment.date, appointment.time]);
+  }, [clinicClosedOnDate, meta, date, todayKey, appointment.date, appointment.time]);
 
   const conflict = useMemo(() => {
-    if (!vetName || !date || !time) return null;
+    if (!vetRef || !date || !time || clinicClosedOnDate) return null;
     return findConflict(
       appointments,
-      { vet: vetName, date, time, durationMin },
+      { vet: vetRef, date, time, durationMin },
       appointment.id,
     );
-  }, [appointments, vetName, date, time, durationMin, appointment.id]);
+  }, [appointments, vetRef, date, time, durationMin, appointment.id, clinicClosedOnDate]);
 
   const suggested = useMemo(
     () =>
       suggestSlots(
         appointments,
-        { vet: vetName, date, durationMin, excludeId: appointment.id },
+        { vet: vetRef, date, durationMin, excludeId: appointment.id, meta },
         6,
       ),
-    [appointments, vetName, date, durationMin, appointment.id],
+    [appointments, vetRef, date, durationMin, appointment.id, meta],
   );
 
   function handleDateChange(e) {
     const nextDate = e.target.value;
     setDate(nextDate);
     setError('');
-    const nextSlots = nextDate === todayKey ? availableSlots(nextDate) : slotsForDate(nextDate);
+    const nextSlots = clinicSlots(meta, nextDate, { futureOnly: nextDate === todayKey });
     if (!nextSlots.includes(time)) {
       setTime(nextSlots[0] ?? '');
     }
@@ -60,6 +86,14 @@ function RescheduleModalInner({ appointment, appointments, onClose, onReschedule
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (clinicClosedOnDate) {
+      setError(
+        closureInfo
+          ? `คลินิกปิดทำการวันที่เลือก: ${closureInfo.reason}`
+          : 'คลินิกไม่เปิดทำการในวันที่เลือก',
+      );
+      return;
+    }
     if (!date || !time) {
       setError('กรุณาเลือกวันที่และเวลาใหม่');
       return;
@@ -141,6 +175,27 @@ function RescheduleModalInner({ appointment, appointments, onClose, onReschedule
               </div>
             )}
 
+            {closureInfo && (
+              <div className="alert-soft danger mb-3" role="status">
+                <i className="bi bi-calendar-x" />
+                <span>คลินิกปิดทำการวันที่เลือก: {closureInfo.reason} กรุณาเลือกวันอื่น</span>
+              </div>
+            )}
+
+            {!closureInfo && !dayHours && (
+              <div className="alert-soft warn mb-3" role="status">
+                <i className="bi bi-clock" />
+                <span>คลินิกไม่เปิดทำการในวันที่เลือก กรุณาเลือกวันอื่น</span>
+              </div>
+            )}
+
+            {vetOffDutyOnDate && (
+              <div className="alert-soft warn mb-3" role="status">
+                <i className="bi bi-exclamation-triangle" />
+                <span>{vetName} ไม่ได้เข้าเวรในวันที่เลือก</span>
+              </div>
+            )}
+
             {conflict && (
               <div className="alert-soft warn mb-3">
                 <i className="bi bi-exclamation-triangle" />
@@ -215,9 +270,11 @@ function RescheduleModalInner({ appointment, appointments, onClose, onReschedule
                   </div>
                 ) : (
                   <div className="small text-muted">
-                    {date < todayKey
-                      ? 'วันที่เลือกผ่านมาแล้ว กรุณาเลือกวันนี้หรือวันถัดไป'
-                      : 'ไม่มีเวลาว่างแนะนำในวันที่เลือก'}
+                    {clinicClosedOnDate
+                      ? 'คลินิกปิดทำการในวันที่เลือก'
+                      : date < todayKey
+                        ? 'วันที่เลือกผ่านมาแล้ว กรุณาเลือกวันนี้หรือวันถัดไป'
+                        : 'ไม่มีเวลาว่างแนะนำในวันที่เลือก'}
                   </div>
                 )}
               </div>
@@ -229,7 +286,7 @@ function RescheduleModalInner({ appointment, appointments, onClose, onReschedule
                 <button
                   type="submit"
                   className="btn btn-sky"
-                  disabled={submitting || !date || !time || Boolean(conflict)}
+                  disabled={submitting || clinicClosedOnDate || !date || !time || Boolean(conflict)}
                 >
                   {submitting && (
                     <span className="spinner-border spinner-border-sm me-1" aria-hidden="true" />
@@ -247,13 +304,21 @@ function RescheduleModalInner({ appointment, appointments, onClose, onReschedule
   );
 }
 
-export default function AppointmentModal({ open, appointment, appointments, onClose, onReschedule }) {
+export default function AppointmentModal({
+  open,
+  appointment,
+  appointments,
+  meta = null,
+  onClose,
+  onReschedule,
+}) {
   if (!open || !appointment) return null;
   return (
     <RescheduleModalInner
       key={`resched-${appointment.id}`}
       appointment={appointment}
       appointments={appointments}
+      meta={meta}
       onClose={onClose}
       onReschedule={onReschedule}
     />

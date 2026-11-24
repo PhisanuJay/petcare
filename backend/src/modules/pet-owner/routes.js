@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { cancelBooking, createBooking, listBookings } from './bookingStore.js';
+import { isServiceOnline } from '../clinic-admin/clinicSettings.js';
 import { BOOKING_SERVICES, isDateString, todayString, validateSlot } from './clinicSchedule.js';
 import { cancelReservation, createReservation, listReservations } from './hotelStore.js';
 import { findAdoptionAnimal, listAdoptionAnimals } from './adoptionAnimals.js';
@@ -168,6 +169,7 @@ router.post('/bookings', wrap(async (req, res) => {
   const pet = await findPet(req.ownerId, petId);
   if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
   if (!Object.hasOwn(BOOKING_SERVICES, service)) throw httpError(400, 'กรุณาเลือกบริการ');
+  if (!isServiceOnline(service)) throw httpError(400, 'บริการนี้ปิดรับจองออนไลน์ชั่วคราว');
   validateSlot(date, time);
 
   // Users live in the browser (localStorage), so the clinic only learns the owner's name and phone

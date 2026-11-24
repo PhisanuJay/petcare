@@ -11,7 +11,7 @@ import '../ma.css';
 const NAV_ITEMS = [
   { to: '/medical-assistant', label: 'แดชบอร์ด', icon: 'bi-speedometer2', end: true },
   { to: '/medical-assistant/appointments', label: 'นัดหมาย', icon: 'bi-calendar2-check' },
-  { to: '/medical-assistant/patients', label: 'ผู้ป่วย', icon: 'bi-clipboard2-heart' },
+  { to: '/medical-assistant/patients', label: 'สัตว์เลี้ยง', icon: 'bi-clipboard2-heart' },
   {
     to: '/medical-assistant/booking-management',
     label: 'จัดการการจอง',

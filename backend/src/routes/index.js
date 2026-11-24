@@ -9,6 +9,7 @@ import petHotelRouter from '../modules/pet-hotel/routes.js';
 import petTransportRouter from '../modules/pet-transport/routes.js';
 import adoptionRouter from '../modules/adoption/routes.js';
 import adminRouter from '../modules/admin/routes.js';
+import clinicAdminRouter from '../modules/clinic-admin/routes.js';
 import superAdminRouter from '../modules/super-admin/routes.js';
 
 /**
@@ -27,6 +28,7 @@ export function registerRoutes(app) {
   api.use('/pet-transport', petTransportRouter);
   api.use('/adoption', adoptionRouter);
   api.use('/admin', adminRouter);
+  api.use('/clinic-admin', clinicAdminRouter);
   api.use('/super-admin', superAdminRouter);
 
   app.use('/api', api);

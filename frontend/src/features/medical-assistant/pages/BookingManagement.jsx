@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 import { useToast } from '../../../shared/components/Toast.jsx';
+import AppointmentModal from '../components/AppointmentModal.jsx';
 import ApproveBookingModal from '../components/ApproveBookingModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import MaDataState from '../components/MaDataState.jsx';
 import PatientNameLink from '../components/PatientNameLink.jsx';
 import RejectBookingModal from '../components/RejectBookingModal.jsx';
+import { apptVetName, isSameVet, vetList } from '../data/clinicMeta.js';
 import {
   STAGE_META,
   offsetDateKey,
@@ -64,11 +66,19 @@ export default function BookingManagementPage() {
   const [searchParams] = useSearchParams();
 
   const [tab, setTab] = useState(() => normalizeTab(searchParams.get('tab')));
+  const [closureOnly, setClosureOnly] = useState(() => searchParams.get('closure') === '1');
   const [vetFilter, setVetFilter] = useState('all');
   const [query, setQuery] = useState('');
 
+  useEffect(() => {
+    if (searchParams.get('closure') === '1') {
+      setClosureOnly(true);
+    }
+  }, [searchParams]);
+
   const [approveTarget, setApproveTarget] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [contactTarget, setContactTarget] = useState(null);
   const [contactSubmitting, setContactSubmitting] = useState(false);
   const [contactError, setContactError] = useState('');
@@ -78,10 +88,14 @@ export default function BookingManagementPage() {
     [patients],
   );
 
-  const vetNames = meta?.VET_NAMES ?? [];
+  const vets = useMemo(() => vetList(meta), [meta]);
 
   const pendingList = useMemo(() => pendingBookings(appointments), [appointments]);
   const needsContactList = useMemo(() => needsContact(appointments), [appointments]);
+  const closureList = useMemo(
+    () => appointments.filter((a) => Boolean(a.closure)),
+    [appointments],
+  );
 
   const historyList = useMemo(() => {
     return appointments
@@ -121,11 +135,16 @@ export default function BookingManagementPage() {
   );
 
   const filterList = useMemo(() => {
-    const base =
-      tab === 'pending' ? pendingList : tab === 'contact' ? needsContactList : historyList;
+    const base = closureOnly
+      ? closureList
+      : tab === 'pending'
+        ? pendingList
+        : tab === 'contact'
+          ? needsContactList
+          : historyList;
     const q = query.trim().toLowerCase();
     return base.filter((a) => {
-      if (vetFilter !== 'all' && (a.visit?.vet ?? '') !== vetFilter) return false;
+      if (vetFilter !== 'all' && !isSameVet(a, vetFilter)) return false;
       if (q) {
         const hit = [a.petName, a.ownerName, a.ownerPhone, a.serviceLabel].some((v) =>
           v?.toLowerCase().includes(q),
@@ -134,15 +153,23 @@ export default function BookingManagementPage() {
       }
       return true;
     });
-  }, [tab, pendingList, needsContactList, historyList, vetFilter, query]);
+  }, [closureOnly, closureList, tab, pendingList, needsContactList, historyList, vetFilter, query]);
 
-  const hasActiveFilter = vetFilter !== 'all' || query.trim() !== '';
+  const hasActiveFilter = closureOnly || vetFilter !== 'all' || query.trim() !== '';
   const hasData = Boolean(meta) || appointments.length > 0;
   const blockedByState = !hasData && (loading || Boolean(error));
 
   function clearFilters() {
+    setClosureOnly(false);
     setVetFilter('all');
     setQuery('');
+  }
+
+  async function handleRescheduleSave(values) {
+    if (!rescheduleTarget) return;
+    const updated = await reschedule(rescheduleTarget.id, values);
+    setRescheduleTarget(null);
+    show(`เปลี่ยนวันเวลานัด "${updated.petName}" ไป ${formatDate(updated.date)} ${updated.time} น. แล้ว`);
   }
 
   function handleApproveSuccess() {
@@ -254,9 +281,12 @@ export default function BookingManagementPage() {
                   key={t.id}
                   type="button"
                   role="tab"
-                  aria-selected={tab === t.id}
-                  className={tab === t.id ? 'active' : ''}
-                  onClick={() => setTab(t.id)}
+                  aria-selected={!closureOnly && tab === t.id}
+                  className={!closureOnly && tab === t.id ? 'active' : ''}
+                  onClick={() => {
+                    setClosureOnly(false);
+                    setTab(t.id);
+                  }}
                 >
                   <i className={`bi ${t.icon}`} />
                   {t.label}
@@ -266,7 +296,17 @@ export default function BookingManagementPage() {
             </div>
 
             <div className="ma-filter-bar">
-              {tab !== 'pending' && (
+              <button
+                type="button"
+                className={`btn btn-sm ${closureOnly ? 'btn-sky' : 'btn-soft'}`}
+                aria-pressed={closureOnly}
+                onClick={() => setClosureOnly((v) => !v)}
+              >
+                <i className="bi bi-calendar-x me-1" />
+                ตรงวันปิด ({closureList.length})
+              </button>
+
+              {(closureOnly || tab !== 'pending') && (
                 <select
                   className="form-select w-auto"
                   aria-label="กรองตามสัตวแพทย์"
@@ -274,11 +314,14 @@ export default function BookingManagementPage() {
                   onChange={(e) => setVetFilter(e.target.value)}
                 >
                   <option value="all">สัตวแพทย์ทั้งหมด</option>
-                  {vetNames.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
+                  {vets.map((v) => {
+                    const val = v.id ?? v.name;
+                    return (
+                      <option key={val} value={val}>
+                        {v.name}
+                      </option>
+                    );
+                  })}
                 </select>
               )}
 
@@ -309,21 +352,25 @@ export default function BookingManagementPage() {
               <div className="empty-box">
                 <i
                   className={`bi ${
-                    tab === 'pending'
-                      ? 'bi-inbox'
-                      : tab === 'contact'
-                        ? 'bi-telephone-check'
-                        : 'bi-clock-history'
+                    closureOnly
+                      ? 'bi-calendar-check'
+                      : tab === 'pending'
+                        ? 'bi-inbox'
+                        : tab === 'contact'
+                          ? 'bi-telephone-check'
+                          : 'bi-clock-history'
                   }`}
                 />
                 <div>
-                  {hasActiveFilter
-                    ? 'ไม่พบรายการที่ตรงกับตัวกรอง'
-                    : tab === 'pending'
-                      ? 'ไม่มีคำขอจองใหม่ที่รอยืนยัน'
-                      : tab === 'contact'
-                        ? 'ไม่มีรายการรอติดต่อให้จองใหม่ในขณะนี้'
-                        : 'ยังไม่มีประวัติการจัดการ'}
+                  {closureOnly
+                    ? 'ไม่มีนัดที่ตรงกับวันปิดคลินิก'
+                    : hasActiveFilter
+                      ? 'ไม่พบรายการที่ตรงกับตัวกรอง'
+                      : tab === 'pending'
+                        ? 'ไม่มีคำขอจองใหม่ที่รอยืนยัน'
+                        : tab === 'contact'
+                          ? 'ไม่มีรายการรอติดต่อให้จองใหม่ในขณะนี้'
+                          : 'ยังไม่มีประวัติการจัดการ'}
                 </div>
                 {hasActiveFilter && (
                   <button type="button" className="btn btn-soft mt-3" onClick={clearFilters}>
@@ -331,6 +378,108 @@ export default function BookingManagementPage() {
                   </button>
                 )}
               </div>
+            </div>
+          ) : closureOnly ? (
+            <div className="row g-3">
+              {filterList.map((appt) => {
+                const sp = speciesOf(appt.petSpecies);
+                const st = STAGE_META[appt.stage] ?? STAGE_META.pending;
+                const pat = patientsById.get(appt.petId);
+                const vetName = apptVetName(appt);
+
+                return (
+                  <div className="col-12 col-lg-6" key={appt.id}>
+                    <div className="card-soft ma-request-card h-100 d-flex flex-column">
+                      <div className="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                        <div>
+                          <div className="mitr fs-5 lh-sm">
+                            <PatientNameLink
+                              petId={appt.petId}
+                              petName={appt.petName}
+                              petSpecies={appt.petSpecies}
+                              flags={pat?.flags}
+                              allergies={appt.pet?.allergies ?? pat?.allergies}
+                            />{' '}
+                            <span className="small text-muted fw-normal">· {sp.label}</span>
+                          </div>
+                        </div>
+                        <span className={`tag ${st.tag} m-0`}>{st.label}</span>
+                      </div>
+
+                      {appt.closure && (
+                        <div className="mb-2">
+                          <span className="tag warn m-0">
+                            <i className="bi bi-calendar-x me-1" />
+                            ตรงวันปิดคลินิก: {appt.closure.reason}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="small mb-2 d-grid gap-1">
+                        <div>
+                          <i className="bi bi-person me-1 text-sky" />
+                          {appt.ownerName || '—'} ·{' '}
+                          {appt.ownerPhone ? (
+                            <a href={`tel:${appt.ownerPhone}`} className="text-decoration-none">
+                              {appt.ownerPhone}
+                            </a>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </div>
+                        <div>
+                          <i className="bi bi-clipboard2-pulse me-1 text-sky" />
+                          <strong>{appt.serviceLabel || appt.service}</strong>
+                          {vetName ? ` · ${vetName}` : ''}
+                        </div>
+                        <div>
+                          <i className="bi bi-calendar-event me-1 text-sky" />
+                          วันเวลานัด: <strong>{formatDate(appt.date)}</strong> เวลา{' '}
+                          <strong>{appt.time} น.</strong>
+                        </div>
+                      </div>
+
+                      <div className="ma-actions mt-auto pt-2">
+                        {appt.ownerPhone && (
+                          <a href={`tel:${appt.ownerPhone}`} className="btn btn-soft btn-sm">
+                            <i className="bi bi-telephone me-1" />
+                            โทร
+                          </a>
+                        )}
+                        {appt.stage === 'pending' && (
+                          <>
+                            <button
+                              type="button"
+                              className="btn btn-sky btn-sm"
+                              onClick={() => setApproveTarget(appt)}
+                            >
+                              <i className="bi bi-check2 me-1" />
+                              ยืนยันและเลือกหมอ
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-soft-danger btn-sm"
+                              onClick={() => setRejectTarget(appt)}
+                            >
+                              ปฏิเสธ
+                            </button>
+                          </>
+                        )}
+                        {appt.stage === 'confirmed' && (
+                          <button
+                            type="button"
+                            className="btn btn-sky btn-sm"
+                            onClick={() => setRescheduleTarget(appt)}
+                          >
+                            <i className="bi bi-calendar-event me-1" />
+                            เปลี่ยนวันเวลา
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           ) : tab === 'pending' ? (
             <div className="row g-3">
@@ -399,6 +548,15 @@ export default function BookingManagementPage() {
                             {allergies && `แพ้: ${allergies}`}
                             {allergies && chronicDiseases && ' · '}
                             {chronicDiseases && `โรคประจำตัว: ${chronicDiseases}`}
+                          </span>
+                        </div>
+                      )}
+
+                      {appt.closure && (
+                        <div className="mb-2">
+                          <span className="tag warn m-0">
+                            <i className="bi bi-calendar-x me-1" />
+                            ตรงวันปิดคลินิก: {appt.closure.reason}
                           </span>
                         </div>
                       )}
@@ -486,7 +644,7 @@ export default function BookingManagementPage() {
                           <td className="ma-service-cell">
                             <div>{appt.serviceLabel || appt.service}</div>
                             <div className="small text-muted">
-                              {appt.visit?.vet || 'ยังไม่ระบุหมอ'}
+                              {apptVetName(appt) || 'ยังไม่ระบุหมอ'}
                             </div>
                           </td>
                           <td className="text-nowrap">
@@ -542,7 +700,7 @@ export default function BookingManagementPage() {
                       </div>
                       <div className="small mb-2">
                         <i className="bi bi-clipboard2-pulse me-1 text-sky" />
-                        {appt.serviceLabel || appt.service} · {appt.visit?.vet || 'ยังไม่ระบุหมอ'}
+                        {appt.serviceLabel || appt.service} · {apptVetName(appt) || 'ยังไม่ระบุหมอ'}
                       </div>
                       <div className="ma-actions">
                         {appt.ownerPhone && (
@@ -607,8 +765,16 @@ export default function BookingManagementPage() {
                             </div>
                             <div className="small text-muted">
                               {appt.serviceLabel || appt.service}
-                              {appt.visit?.vet ? ` · ${appt.visit.vet}` : ''}
+                              {apptVetName(appt) ? ` · ${apptVetName(appt)}` : ''}
                             </div>
+                            {appt.closure && (
+                              <div className="mt-1">
+                                <span className="tag warn m-0">
+                                  <i className="bi bi-calendar-x me-1" />
+                                  ตรงวันปิดคลินิก: {appt.closure.reason}
+                                </span>
+                              </div>
+                            )}
                           </td>
                           <td>
                             <div>{appt.ownerName || '—'}</div>
@@ -733,6 +899,15 @@ export default function BookingManagementPage() {
         onReschedule={reschedule}
         onConfirm={confirm}
         onSuccess={handleApproveSuccess}
+      />
+
+      <AppointmentModal
+        open={Boolean(rescheduleTarget)}
+        appointment={rescheduleTarget}
+        appointments={appointments}
+        meta={meta}
+        onClose={() => setRescheduleTarget(null)}
+        onReschedule={handleRescheduleSave}
       />
 
       <RejectBookingModal

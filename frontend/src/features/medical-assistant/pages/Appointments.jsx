@@ -6,6 +6,7 @@ import AppointmentModal from '../components/AppointmentModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
 import MaDataState from '../components/MaDataState.jsx';
 import PatientNameLink from '../components/PatientNameLink.jsx';
+import { apptVetName, isSameVet, vetList } from '../data/clinicMeta.js';
 import {
   STAGE_LIST,
   STAGE_META,
@@ -123,9 +124,9 @@ function buildConfirmConfig(confirmAction) {
     };
   }
   return {
-    title: 'ส่งผู้ป่วยเข้าห้องตรวจ',
+    title: 'ส่งสัตว์เลี้ยงเข้าห้องตรวจ',
     icon: 'bi-heart-pulse',
-    message: `ยืนยันส่ง "${appt.petName}" เข้าห้องตรวจกับ ${appt.visit?.vet || 'สัตวแพทย์'} ใช่หรือไม่?`,
+    message: `ยืนยันส่ง "${appt.petName}" เข้าห้องตรวจกับ ${apptVetName(appt) || 'สัตวแพทย์'} ใช่หรือไม่?`,
     confirmLabel: 'ส่งเข้าห้องตรวจ',
     confirmVariant: 'sky',
   };
@@ -180,7 +181,7 @@ export default function AppointmentsPage() {
     [patients],
   );
 
-  const vetNames = meta?.VET_NAMES ?? [];
+  const vets = useMemo(() => vetList(meta), [meta]);
 
   const dayAppointments = useMemo(
     () =>
@@ -203,7 +204,7 @@ export default function AppointmentsPage() {
     const q = query.trim().toLowerCase();
     return dayAppointments.filter((a) => {
       if (stageFilter !== 'all' && a.stage !== stageFilter) return false;
-      if (vetFilter !== 'all' && (a.visit?.vet ?? '') !== vetFilter) return false;
+      if (vetFilter !== 'all' && !isSameVet(a, vetFilter)) return false;
       if (q) {
         const hit = [a.petName, a.ownerName, a.ownerPhone, a.serviceLabel].some((v) =>
           v?.toLowerCase().includes(q),
@@ -368,11 +369,14 @@ export default function AppointmentsPage() {
                 onChange={(e) => setVetFilter(e.target.value)}
               >
                 <option value="all">สัตวแพทย์ทั้งหมด</option>
-                {vetNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
+                {vets.map((v) => {
+                  const val = v.id ?? v.name;
+                  return (
+                    <option key={val} value={val}>
+                      {v.name}
+                    </option>
+                  );
+                })}
               </select>
 
               <div className="input-group ma-search-group">
@@ -462,7 +466,7 @@ export default function AppointmentsPage() {
                         const sp = speciesOf(appt.petSpecies);
                         const st = STAGE_META[appt.stage] ?? STAGE_META.pending;
                         const pat = patientsById.get(appt.petId);
-                        const vetName = appt.visit?.vet;
+                        const vetName = apptVetName(appt);
                         const durationMin = appt.visit?.durationMin;
 
                         return (
@@ -499,6 +503,14 @@ export default function AppointmentsPage() {
                             </td>
                             <td className="ma-service-cell">
                               <div>{appt.serviceLabel || appt.service}</div>
+                              {appt.closure && (
+                                <div className="mt-1">
+                                  <span className="tag warn m-0">
+                                    <i className="bi bi-calendar-x me-1" />
+                                    ตรงวันปิดคลินิก: {appt.closure.reason}
+                                  </span>
+                                </div>
+                              )}
                               {(appt.note || appt.clinicNote) && (
                                 <div
                                   className="small text-muted text-truncate d-none d-xl-block"
@@ -554,7 +566,7 @@ export default function AppointmentsPage() {
                     const sp = speciesOf(appt.petSpecies);
                     const st = STAGE_META[appt.stage] ?? STAGE_META.pending;
                     const pat = patientsById.get(appt.petId);
-                    const vetName = appt.visit?.vet;
+                    const vetName = apptVetName(appt);
                     const durationMin = appt.visit?.durationMin;
 
                     return (
@@ -568,6 +580,14 @@ export default function AppointmentsPage() {
                           </div>
                           <span className={`tag ${st.tag} m-0`}>{st.label}</span>
                         </div>
+                        {appt.closure && (
+                          <div className="mb-2">
+                            <span className="tag warn m-0">
+                              <i className="bi bi-calendar-x me-1" />
+                              ตรงวันปิดคลินิก: {appt.closure.reason}
+                            </span>
+                          </div>
+                        )}
 
                         <div className="fw-medium mb-1">
                           <PatientNameLink
@@ -633,6 +653,7 @@ export default function AppointmentsPage() {
         open={Boolean(rescheduleTarget)}
         appointment={rescheduleTarget}
         appointments={appointments}
+        meta={meta}
         onClose={() => setRescheduleTarget(null)}
         onReschedule={handleRescheduleSave}
       />

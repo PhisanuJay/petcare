@@ -23,10 +23,10 @@ export function useAppointments() {
   }, []);
 
   const confirm = useCallback(
-    (id, { vet, durationMin, note = '' }) =>
+    (id, { vetId, vet, durationMin, note = '' }) =>
       mutate(`/appointments/${encodeURIComponent(id)}/status`, {
         status: 'confirmed',
-        vet,
+        ...(vetId ? { vetId } : { vet }),
         durationMin: Number(durationMin),
         note,
       }),
