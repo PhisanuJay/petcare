@@ -87,21 +87,21 @@ export default function TransportDetailPage() {
   const primaryTrip = booking.trips[0];
   const primaryPickup = primaryTrip?.pickupTime;
 
-  function pay() {
+  async function pay() {
     setErr('');
     try {
-      ownerConfirmPayment(booking.id, note);
+      await ownerConfirmPayment(booking.id, note);
       setMsg('บันทึกแล้วว่าคุณชำระเงินแล้ว — รอ Admin ตรวจสอบ');
     } catch (e) {
       setErr(e.message);
     }
   }
 
-  function cancel() {
+  async function cancel() {
     setErr('');
     if (!cancelReason.trim()) return setErr('กรุณาระบุเหตุผล');
     try {
-      requestCancel(booking.id, cancelReason.trim());
+      await requestCancel(booking.id, cancelReason.trim());
       setMsg('ส่งคำขอยกเลิกแล้ว รอ Admin อนุมัติ');
     } catch (e) {
       setErr(e.message);

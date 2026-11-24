@@ -142,7 +142,7 @@ export default function TransportPage() {
     setReturnTo(clonePlace(from));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     if (!petName.trim()) return setError('กรุณาระบุชื่อสัตว์เลี้ยง');
@@ -161,7 +161,7 @@ export default function TransportPage() {
     }
 
     try {
-      const { booking } = createBooking({
+      const { booking } = await createBooking({
         ownerId: currentUser.id,
         ownerName: `${currentUser.firstName} ${currentUser.lastName}`.trim(),
         ownerPhone: currentUser.phone || '',

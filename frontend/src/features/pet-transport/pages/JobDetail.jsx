@@ -202,33 +202,37 @@ export default function JobDetailPage() {
     setErr('');
     try {
       const url = await fileToResizedDataUrl(file, 800, 0.85);
-      attachEvidence(trip.id, kind, url);
+      await attachEvidence(trip.id, kind, url);
       setMsg(kind === 'pickup' ? 'แนบรูปตอนรับแล้ว' : 'แนบรูปตอนส่งแล้ว');
     } catch (error) {
       setErr(error.message);
     }
   }
 
-  function advance() {
+  async function advance() {
     setErr('');
     try {
-      advanceTripStatus(trip.id);
+      await advanceTripStatus(trip.id);
       setMsg('อัปเดตสถานะแล้ว');
     } catch (error) {
       setErr(error.message);
     }
   }
 
-  function submitIssue(reasonId, message) {
-    reportIssue({
-      tripId: trip.id,
-      driverId: currentUser.id,
-      reasonId,
-      message,
-    });
-    setIssueOpen(false);
-    setErr('');
-    setMsg('ส่งปัญหาให้แอดมินแล้ว');
+  async function submitIssue(reasonId, message) {
+    try {
+      await reportIssue({
+        tripId: trip.id,
+        driverId: currentUser.id,
+        reasonId,
+        message,
+      });
+      setIssueOpen(false);
+      setErr('');
+      setMsg('ส่งปัญหาให้แอดมินแล้ว');
+    } catch (error) {
+      setErr(error.message);
+    }
   }
 
   return (

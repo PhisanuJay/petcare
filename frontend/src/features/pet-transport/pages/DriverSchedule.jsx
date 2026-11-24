@@ -204,11 +204,11 @@ export default function DriverSchedule() {
     }
   }
 
-  function markNext(job) {
+  async function markNext(job) {
     setError('');
     setNote('');
     try {
-      advanceTripStatus(job.id);
+      await advanceTripStatus(job.id);
       const next = nextTripStatus(job.status);
       setNote(next ? `${job.booking?.petName} · ${next.label}` : 'อัปเดตแล้ว');
     } catch (err) {
@@ -216,16 +216,20 @@ export default function DriverSchedule() {
     }
   }
 
-  function submitIssue(job, reasonId, message) {
-    reportIssue({
-      tripId: job.id,
-      driverId: currentUser.id,
-      reasonId,
-      message,
-    });
-    setIssueId('');
-    setError('');
-    setNote(`${job.booking?.petName || 'งานนี้'} · ส่งปัญหาให้แอดมินแล้ว`);
+  async function submitIssue(job, reasonId, message) {
+    try {
+      await reportIssue({
+        tripId: job.id,
+        driverId: currentUser.id,
+        reasonId,
+        message,
+      });
+      setIssueId('');
+      setError('');
+      setNote(`${job.booking?.petName || 'งานนี้'} · ส่งปัญหาให้แอดมินแล้ว`);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (

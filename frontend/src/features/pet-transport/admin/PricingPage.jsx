@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fareMatrixPreview, formatBaht } from '../pricing.js';
 import { useTransport } from '../useTransport.js';
 
@@ -6,6 +6,10 @@ export default function PricingPage() {
   const { zones, updateZones } = useTransport();
   const [rows, setRows] = useState(zones.map((z) => ({ ...z, price: z.price ?? '' })));
   const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    setRows(zones.map((z) => ({ ...z, price: z.price ?? '' })));
+  }, [zones]);
 
   const previewZones = useMemo(
     () => rows.map((r) => ({ ...r, price: r.price === '' ? null : Number(r.price) })),
@@ -17,8 +21,8 @@ export default function PricingPage() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, price } : r)));
   }
 
-  function save() {
-    updateZones(
+  async function save() {
+    await updateZones(
       rows.map((r) => ({
         id: r.id,
         label: r.label,

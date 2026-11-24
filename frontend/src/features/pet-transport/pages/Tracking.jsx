@@ -49,11 +49,11 @@ export default function TrackingPage() {
   const next = nextTripStatus(trip.status);
   const paid = booking?.paymentStatus === 'paid';
 
-  function advance() {
+  async function advance() {
     setErr('');
     try {
       const n = nextTripStatus(trip.status);
-      advanceTripStatus(trip.id, note);
+      await advanceTripStatus(trip.id, note);
       setNote('');
       setMsg(n ? `อัปเดตเป็น: ${tripStatusMeta(n.id).label}` : 'อัปเดตแล้ว');
     } catch (e) {
