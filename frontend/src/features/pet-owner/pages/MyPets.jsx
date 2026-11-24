@@ -6,10 +6,10 @@ import PetPhoto from '../components/PetPhoto.jsx';
 
 /**
  * My Pets — Role: Pet Owner (มะแอ่ว)
- * Pets are stored in localStorage per logged-in user until the backend is ready.
+ * Pets are loaded from the backend (/api/pet-owner/my-pets) for the logged-in user.
  */
 export default function MyPetsPage() {
-  const { pets } = usePets();
+  const { pets, loading, error, reload } = usePets();
   const [query, setQuery] = useState('');
 
   const q = query.trim().toLowerCase();
@@ -46,6 +46,15 @@ export default function MyPetsPage() {
           </div>
         </div>
 
+        {error && (
+          <div className="alert alert-danger d-flex align-items-center justify-content-between" role="alert">
+            <span>{error}</span>
+            <button type="button" className="btn btn-sm btn-outline-danger" onClick={reload}>ลองใหม่</button>
+          </div>
+        )}
+
+        {loading && <div className="empty-box">กำลังโหลดข้อมูลสัตว์เลี้ยง...</div>}
+
         <div className="row g-4">
           {shown.map((pet) => {
             const next = careReminders([pet])[0];
@@ -76,7 +85,7 @@ export default function MyPetsPage() {
             );
           })}
 
-          {!q && (
+          {!q && !loading && !error && (
             <div className="col-sm-6 col-lg-4 col-xl-3">
               <Link to="/pet-owner/my-pets/new" className="add-card">
                 <i className="bi bi-plus-circle-dotted" />
