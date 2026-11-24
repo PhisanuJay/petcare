@@ -62,10 +62,34 @@ import PromotionsPage from '../features/super-admin/pages/Promotions.jsx';
 import SuperAdminReportsPage from '../features/super-admin/pages/Reports.jsx';
 import SettingsPage from '../features/super-admin/pages/Settings.jsx';
 
+import AdminTransportLayout from '../features/pet-transport/admin/AdminTransportLayout.jsx';
+import TransportDashboard from '../features/pet-transport/admin/TransportDashboard.jsx';
+import BookingManagement from '../features/pet-transport/admin/BookingManagement.jsx';
+import BookingAdminDetail from '../features/pet-transport/admin/BookingAdminDetail.jsx';
+import DriversPage from '../features/pet-transport/admin/DriversPage.jsx';
+import PaymentVerification from '../features/pet-transport/admin/PaymentVerification.jsx';
+import CancellationPage from '../features/pet-transport/admin/CancellationPage.jsx';
+import TransportPricingPage from '../features/pet-transport/admin/PricingPage.jsx';
+import HotelsPage from '../features/pet-transport/admin/HotelsPage.jsx';
+
 /**
  * Route map aligned with Page 17 sitemap.
  * Keep each role under its own path prefix so teams do not overlap.
  */
+
+/** Admin Pet Transport booking — nested under `/admin` + StaffShell. */
+export const adminTransportRoutes = (
+  <Route path="transport" element={<AdminTransportLayout />}>
+    <Route index element={<TransportDashboard />} />
+    <Route path="bookings" element={<BookingManagement />} />
+    <Route path="bookings/:bookingId" element={<BookingAdminDetail />} />
+    <Route path="drivers" element={<DriversPage />} />
+    <Route path="payments" element={<PaymentVerification />} />
+    <Route path="cancellations" element={<CancellationPage />} />
+    <Route path="pricing" element={<TransportPricingPage />} />
+    <Route path="hotels" element={<HotelsPage />} />
+  </Route>
+);
 
 /** Pet Owner — มะแอ่ว. Rendered inside CustomerLayout and requires login (see App.jsx). */
 export const petOwnerRoutes = (

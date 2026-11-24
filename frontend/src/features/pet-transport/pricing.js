@@ -1,0 +1,142 @@
+import {
+  SERVICE_SUBDISTRICTS,
+  ZONES,
+  isRoundTrip,
+} from './constants.js';
+
+export function zoneIdFromSubdistrict(subdistrictId) {
+  const sub = SERVICE_SUBDISTRICTS.find((s) => s.id === subdistrictId);
+  return sub?.zoneId ?? null;
+}
+
+export function subdistrictById(subdistrictId) {
+  return SERVICE_SUBDISTRICTS.find((s) => s.id === subdistrictId) ?? null;
+}
+
+export function districtLabel(districtId) {
+  if (districtId === 'chatuchak') return 'เขตจตุจักร';
+  return districtId || '';
+}
+
+/**
+ * Fare matrix (one-way):
+ * Z1–Z1 → Zone 1 price
+ * any leg involving Z2 → Zone 2 price
+ */
+export function fareZoneId(fromZoneId, toZoneId) {
+  if (!fromZoneId || !toZoneId) return null;
+  if (fromZoneId === '1' && toZoneId === '1') return '1';
+  return '2';
+}
+
+export function fareForZones(fromZoneId, toZoneId, zones = ZONES) {
+  const fareId = fareZoneId(fromZoneId, toZoneId);
+  if (!fareId) return null;
+  const zone = zones.find((z) => z.id === fareId);
+  return zone?.price ?? null;
+}
+
+export function priceForZone(zoneId, zones = ZONES) {
+  const z = zones.find((x) => x.id === zoneId);
+  if (!z) return null;
+  return z.price;
+}
+
+/**
+ * Quote from pickup/dropoff zones.
+ * Round trip = sum of both legs, no discount.
+ * outbound / inbound / one_way = single leg.
+ */
+export function quotePrice({
+  fromZoneId,
+  toZoneId,
+  returnFromZoneId = null,
+  returnToZoneId = null,
+  serviceType,
+  zones = ZONES,
+  customPerTrip = null,
+  fareZoneOverride = null,
+}) {
+  const outboundFareZone = fareZoneOverride || fareZoneId(fromZoneId, toZoneId);
+  let outboundPerTrip = null;
+  if (customPerTrip != null && customPerTrip !== '') {
+    outboundPerTrip = Number(customPerTrip);
+  } else if (fareZoneOverride) {
+    outboundPerTrip = priceForZone(fareZoneOverride, zones);
+  } else {
+    outboundPerTrip = fareForZones(fromZoneId, toZoneId, zones);
+  }
+
+  const round = isRoundTrip(serviceType);
+  const retFrom = returnFromZoneId || toZoneId;
+  const retTo = returnToZoneId || fromZoneId;
+  const returnFareZone = round ? fareZoneId(retFrom, retTo) : null;
+  const returnPerTrip = round ? fareForZones(retFrom, retTo, zones) : null;
+
+  if (
+    outboundPerTrip == null
+    || !Number.isFinite(outboundPerTrip)
+    || (round && (returnPerTrip == null || !Number.isFinite(returnPerTrip)))
+  ) {
+    return {
+      fromZoneId,
+      toZoneId,
+      returnFromZoneId: round ? retFrom : null,
+      returnToZoneId: round ? retTo : null,
+      zoneId: outboundFareZone,
+      fareZoneId: outboundFareZone,
+      serviceType,
+      trips: round ? 2 : 1,
+      perTrip: outboundPerTrip,
+      outboundPerTrip,
+      returnPerTrip: round ? returnPerTrip : null,
+      outboundFareZone,
+      returnFareZone,
+      subtotal: null,
+      discount: 0,
+      total: null,
+      needsAdminReview: true,
+    };
+  }
+
+  const trips = round ? 2 : 1;
+  const subtotal = round ? outboundPerTrip + returnPerTrip : outboundPerTrip;
+  return {
+    fromZoneId,
+    toZoneId,
+    returnFromZoneId: round ? retFrom : null,
+    returnToZoneId: round ? retTo : null,
+    zoneId: outboundFareZone,
+    fareZoneId: outboundFareZone,
+    serviceType,
+    trips,
+    perTrip: outboundPerTrip,
+    outboundPerTrip,
+    returnPerTrip: round ? returnPerTrip : null,
+    outboundFareZone,
+    returnFareZone,
+    subtotal,
+    discount: 0,
+    total: subtotal,
+    needsAdminReview: false,
+  };
+}
+
+export function formatBaht(n) {
+  if (n == null || Number.isNaN(n)) return 'รอ Admin พิจารณา';
+  return `฿${Number(n).toLocaleString('th-TH')}`;
+}
+
+/** Preview matrix rows for admin pricing page */
+export function fareMatrixPreview(zones = ZONES) {
+  const pairs = [
+    { from: '1', to: '1', label: 'Zone 1 → Zone 1' },
+    { from: '1', to: '2', label: 'Zone 1 → Zone 2' },
+    { from: '2', to: '1', label: 'Zone 2 → Zone 1' },
+    { from: '2', to: '2', label: 'Zone 2 → Zone 2' },
+  ];
+  return pairs.map((p) => ({
+    ...p,
+    price: fareForZones(p.from, p.to, zones),
+  }));
+}
