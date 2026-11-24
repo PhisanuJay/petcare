@@ -7,6 +7,7 @@ import { findAdoptionAnimal, listAdoptionAnimals } from './adoptionAnimals.js';
 import { cancelAdoptionRequest, createAdoptionRequest, listAdoptionRequests } from './adoptionStore.js';
 import { cancelTransportRequest, createTransportRequest, listTransportRequests } from './transportStore.js';
 import { createPet, deletePet, findPet, listPets, updatePet } from './store.js';
+import { saveOwnerProfile } from './ownerStore.js';
 
 /**
  * Pet Owner API module
@@ -131,6 +132,25 @@ router.get('/adoption', (_req, res) => {
 
 /** Optional short text from the request body. */
 const optionalText = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+
+/* ---------- Owner contact details ---------- */
+
+// The clinic reaches the owner through these (shown on the veterinarian's Customers page).
+// PUT /profile  { name, phone?, email?, address?, emergencyName?, emergencyPhone? }
+router.put('/profile', requireOwner, wrap(async (req, res) => {
+  const body = req.body ?? {};
+  const profile = {
+    name: optionalText(body.name, 100),
+    phone: optionalText(body.phone, 30),
+    email: optionalText(body.email, 100),
+    address: optionalText(body.address, 300),
+    emergencyName: optionalText(body.emergencyName, 100),
+    emergencyPhone: optionalText(body.emergencyPhone, 30),
+  };
+  if (!profile.name) throw httpError(400, 'กรุณากรอกชื่อเจ้าของ');
+  await saveOwnerProfile(req.ownerId, profile);
+  res.json({ ok: true });
+}));
 
 router.use('/bookings', requireOwner);
 

@@ -7,6 +7,27 @@ import { ownerRequest } from './api.js';
 
 const request = (ownerId, path = '', options = {}) => ownerRequest(ownerId, `/my-pets${path}`, options);
 
+/**
+ * Tell the backend how to reach this owner (name, phone, ...), so the clinic can contact them from the
+ * veterinarian's Customers page. Customer accounts live in the browser, so the backend cannot read them.
+ * Sent again only when something changed; a failure is ignored (it must not block the pets pages).
+ */
+const syncedProfiles = new Map(); // ownerId -> JSON of the last profile that was sent
+function syncOwnerProfile(user) {
+  const profile = {
+    name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+    phone: user.phone ?? '',
+    email: user.email ?? '',
+    address: user.address ?? '',
+    emergencyName: user.emergencyName ?? '',
+    emergencyPhone: user.emergencyPhone ?? '',
+  };
+  const json = JSON.stringify(profile);
+  if (!profile.name || syncedProfiles.get(user.id) === json) return;
+  syncedProfiles.set(user.id, json);
+  ownerRequest(user.id, '/profile', { method: 'PUT', body: json }).catch(() => syncedProfiles.delete(user.id));
+}
+
 /* ---------- shared store (one list for the logged-in owner) ---------- */
 
 const listeners = new Set();
@@ -78,6 +99,10 @@ export function usePets() {
   useEffect(() => {
     if (ownerId && snap.ownerId !== ownerId) load(ownerId);
   }, [ownerId, snap.ownerId]);
+
+  useEffect(() => {
+    if (currentUser) syncOwnerProfile(currentUser);
+  }, [currentUser]);
 
   const mine = ownerId !== null && snap.ownerId === ownerId;
   const pets = useMemo(() => (mine ? snap.pets : []), [mine, snap.pets]);

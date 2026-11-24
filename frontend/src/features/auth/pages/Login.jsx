@@ -2,9 +2,16 @@ import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
+import { STAFF_HOME } from '../staffSession.js';
+
+/** Staff go back to the staff page they were sent from, otherwise to the start page of their role. */
+function staffDestination(staff, next) {
+  const home = STAFF_HOME[staff.role] ?? '/';
+  return next === home || next.startsWith(`${home}/`) ? next : home;
+}
 
 export default function LoginPage() {
-  const { currentUser, login } = useAuth();
+  const { currentUser, login, staffLogin } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const next = safeNext(params.get('next'));
@@ -14,6 +21,8 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Only a customer session skips this page. A staff session is shared by every tab of the browser, so
+  // redirecting on it would stop a customer from logging in on another tab while a vet is logged in.
   if (currentUser) return <Navigate to={next} replace />;
 
   const set = (key) => (e) =>
@@ -30,8 +39,14 @@ export default function LoginPage() {
     try {
       await login(form.email, form.password, form.remember);
       navigate(next, { replace: true });
-    } catch (err) {
-      setError(err.message);
+    } catch (customerError) {
+      // Not a customer account: staff (veterinarians) log in on this same page, their accounts are in the backend.
+      try {
+        const staff = await staffLogin(form.email, form.password, form.remember);
+        navigate(staffDestination(staff, next), { replace: true });
+      } catch {
+        setError(customerError.message);
+      }
     } finally {
       setSubmitting(false);
     }

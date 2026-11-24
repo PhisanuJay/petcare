@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VetLayout from '../components/VetLayout.jsx';
-import { usePatient, usePatients } from '../usePatients.js';
+import { useOwners, usePatient } from '../usePatients.js';
 import { createVaccination, updateVaccination, useDueVaccines } from '../useVaccination.js';
 import { DEFAULT_CLINIC, readVetName, saveVetName } from '../vetName.js';
 import { todayString } from '../../pet-owner/bookingOptions.js';
@@ -252,43 +252,76 @@ function VaccineHistory({ vaccines, onEdit, editingId }) {
   );
 }
 
-function PatientPicker({ patients, loading, onSelect }) {
+/** Step 1: pick the customer. Step 2: pick one of that customer's pets. */
+function PatientPicker({ owners, loading, onSelect, startOwnerId = '' }) {
   const [query, setQuery] = useState('');
+  const [ownerId, setOwnerId] = useState(startOwnerId);
   const q = query.trim().toLowerCase();
-  const shown = patients.filter(
-    (p) => !q || [p.name, p.breed, speciesOf(p.species).label].some((v) => v?.toLowerCase().includes(q)),
+  const owner = owners.find((o) => o.id === ownerId) ?? null;
+  const shown = owners.filter(
+    (o) =>
+      !q ||
+      [o.name, o.phone, ...o.pets.flatMap((p) => [p.name, p.breed, speciesOf(p.species).label])].some((v) =>
+        v?.toLowerCase().includes(q),
+      ),
   );
   return (
     <div className="card-soft">
-      <div className="section-label">
-        <i className="bi bi-search" />
-        เลือกคนไข้ที่จะบันทึกวัคซีน
-      </div>
-      <input
-        className="form-control mb-3"
-        placeholder="ค้นหาชื่อ / สายพันธุ์ / ชนิดสัตว์"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
       {loading ? (
         <div className="empty-box py-3">กำลังโหลดข้อมูล...</div>
-      ) : shown.length === 0 ? (
-        <div className="empty-box py-3">ไม่พบคนไข้</div>
+      ) : owner ? (
+        <>
+          <button type="button" className="btn btn-soft btn-sm mb-3" onClick={() => setOwnerId('')}>
+            <i className="bi bi-arrow-left me-1" />
+            ลูกค้าทั้งหมด
+          </button>
+          <div className="section-label">
+            <i className="bi bi-person-circle" />
+            {owner.name || 'ไม่ทราบชื่อลูกค้า'} · เลือกสัตว์เลี้ยงที่จะบันทึกวัคซีน
+          </div>
+          <div className="d-grid gap-2">
+            {owner.pets.map((p) => {
+              const species = speciesOf(p.species);
+              return (
+                <button type="button" key={p.id} className="btn btn-soft text-start" style={{ borderRadius: 20 }} onClick={() => onSelect(p.id)}>
+                  <span className="fw-medium">{species.emoji} {p.name}</span>
+                  <span className="small text-muted ms-2">
+                    {species.label}
+                    {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
       ) : (
-        <div className="d-grid gap-2">
-          {shown.map((p) => {
-            const species = speciesOf(p.species);
-            return (
-              <button type="button" key={p.id} className="btn btn-soft text-start" style={{ borderRadius: 20 }} onClick={() => onSelect(p.id)}>
-                <span className="fw-medium">{species.emoji} {p.name}</span>
-                <span className="small text-muted ms-2">
-                  {species.label}
-                  {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <>
+          <div className="section-label">
+            <i className="bi bi-search" />
+            เลือกลูกค้า
+          </div>
+          <input
+            className="form-control mb-3"
+            placeholder="ค้นหาชื่อลูกค้า / เบอร์โทร / ชื่อสัตว์เลี้ยง"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {shown.length === 0 ? (
+            <div className="empty-box py-3">ไม่พบลูกค้า</div>
+          ) : (
+            <div className="d-grid gap-2">
+              {shown.map((o) => (
+                <button type="button" key={o.id} className="btn btn-soft text-start" style={{ borderRadius: 20 }} onClick={() => setOwnerId(o.id)}>
+                  <div className="fw-medium">
+                    <i className="bi bi-person-circle me-1" />
+                    {o.name || 'ไม่ทราบชื่อลูกค้า'}
+                  </div>
+                  <div>{[...new Set(o.pets.map((p) => speciesOf(p.species).emoji))].join(' ')}</div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -298,7 +331,7 @@ export default function VaccinationPage() {
   const [params, setParams] = useSearchParams();
   const petId = params.get('pet') ?? '';
   const presetName = params.get('vaccine') ?? '';
-  const { patients, loading: listLoading, error: listError } = usePatients();
+  const { owners, loading: listLoading, error: listError } = useOwners();
   const dueState = useDueVaccines(30);
   const detail = usePatient(petId);
   const [editing, setEditing] = useState(null);
@@ -332,10 +365,10 @@ export default function VaccinationPage() {
               <div className="d-flex gap-2">
                 <Link to={`/veterinarian/patients?pet=${patient.id}`} className="btn btn-soft">
                   <i className="bi bi-person-vcard me-1" />
-                  ข้อมูลคนไข้
+                  ข้อมูลสัตว์เลี้ยง
                 </Link>
-                <button type="button" className="btn btn-soft" onClick={() => setParams({})}>
-                  เปลี่ยนคนไข้
+                <button type="button" className="btn btn-soft" onClick={() => setParams(patient.owner?.id ? { owner: patient.owner.id } : {})}>
+                  เปลี่ยนสัตว์เลี้ยง
                 </button>
               </div>
             )}
@@ -356,7 +389,7 @@ export default function VaccinationPage() {
 
             <div className="col-lg-7">
               {!petId ? (
-                <PatientPicker patients={patients} loading={listLoading} onSelect={(id) => choose(id)} />
+                <PatientPicker owners={owners} loading={listLoading} onSelect={(id) => choose(id)} startOwnerId={params.get('owner') ?? ''} />
               ) : detail.loading ? (
                 <div className="card-soft empty-box">กำลังโหลดข้อมูล...</div>
               ) : detail.error ? (

@@ -349,7 +349,7 @@ export default function VeterinarianDashboardPage() {
                   </Link>
                   <Link to="/veterinarian/patients" className="vet-quick">
                     <i className="bi bi-heart" />
-                    <span>ค้นหาคนไข้</span>
+                    <span>ค้นหาลูกค้า / สัตว์เลี้ยง</span>
                   </Link>
                 </div>
               </Panel>

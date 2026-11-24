@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import VetLayout from '../components/VetLayout.jsx';
-import { usePatient, usePatients } from '../usePatients.js';
+import { useOwners, usePatient } from '../usePatients.js';
 import {
   createMedicalRecord,
   createParasiteRecord,
@@ -267,42 +267,70 @@ function HistoryList({ history, onEdit, editing }) {
   );
 }
 
-function PatientPicker({ patients, loading, onSelect }) {
+/**
+ * Customers who have brought a pet to the clinic, each with only the pets that came
+ * (a customer with two pets of which one has been treated shows just that one).
+ */
+function PatientPicker({ owners, loading, onSelect, onlyOwnerId = '', onShowAll }) {
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const shown = patients.filter(
-    (p) => !q || [p.name, p.breed, speciesOf(p.species).label].some((v) => v?.toLowerCase().includes(q)),
-  );
+  const shown = owners
+    .filter((o) => !onlyOwnerId || o.id === onlyOwnerId)
+    .map((o) => ({ ...o, pets: o.pets.filter((p) => p.visited) }))
+    .filter((o) => o.pets.length > 0)
+    .filter(
+      (o) =>
+        !q ||
+        [o.name, o.phone, ...o.pets.flatMap((p) => [p.name, p.breed, speciesOf(p.species).label])].some((v) =>
+          v?.toLowerCase().includes(q),
+        ),
+    );
   return (
     <div className="card-soft">
+      {onlyOwnerId && (
+        <button type="button" className="btn btn-soft btn-sm mb-3" onClick={onShowAll}>
+          <i className="bi bi-arrow-left me-1" />
+          ลูกค้าทั้งหมด
+        </button>
+      )}
       <div className="section-label">
         <i className="bi bi-search" />
-        เลือกคนไข้
+        เลือกลูกค้าและสัตว์เลี้ยงที่มารักษา
       </div>
       <input
         className="form-control mb-3"
-        placeholder="ค้นหาชื่อ / สายพันธุ์ / ชนิดสัตว์"
+        placeholder="ค้นหาชื่อลูกค้า / เบอร์โทร / ชื่อสัตว์เลี้ยง"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
       />
       {loading ? (
         <div className="empty-box py-3">กำลังโหลดข้อมูล...</div>
       ) : shown.length === 0 ? (
-        <div className="empty-box py-3">ไม่พบคนไข้</div>
+        <div className="empty-box py-3">ไม่พบลูกค้าที่มีสัตว์เลี้ยงมารักษา</div>
       ) : (
-        <div className="d-grid gap-2">
-          {shown.map((p) => {
-            const species = speciesOf(p.species);
-            return (
-              <button type="button" key={p.id} className="btn btn-soft text-start" style={{ borderRadius: 20 }} onClick={() => onSelect(p.id)}>
-                <span className="fw-medium">{species.emoji} {p.name}</span>
-                <span className="small text-muted ms-2">
-                  {species.label}
-                  {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
-                </span>
-              </button>
-            );
-          })}
+        <div className="d-grid gap-3">
+          {shown.map((o) => (
+            <div key={o.id}>
+              <div className="fw-medium mb-1">
+                <i className="bi bi-person-circle me-1" />
+                {o.name || 'ไม่ทราบชื่อลูกค้า'}
+              </div>
+              <div className="d-grid gap-2">
+                {o.pets.map((p) => {
+                  const species = speciesOf(p.species);
+                  return (
+                    <button type="button" key={p.id} className="btn btn-soft text-start" style={{ borderRadius: 20 }} onClick={() => onSelect(p.id)}>
+                      <span className="fw-medium">{species.emoji} {p.name}</span>
+                      <span className="small text-muted ms-2">
+                        {species.label}
+                        {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -313,7 +341,7 @@ export default function MedicalRecordsPage() {
   const [params, setParams] = useSearchParams();
   const petId = params.get('pet') ?? '';
   const initialKind = params.get('kind') === 'parasite' ? 'parasite' : 'treatment';
-  const { patients, loading: listLoading, error: listError } = usePatients();
+  const { owners, loading: listLoading, error: listError } = useOwners();
   const detail = usePatient(petId);
   const [kind, setKind] = useState(initialKind);
   const [editing, setEditing] = useState(null); // { kind, row }
@@ -350,10 +378,10 @@ export default function MedicalRecordsPage() {
               <div className="d-flex gap-2">
                 <Link to={`/veterinarian/patients?pet=${patient.id}`} className="btn btn-soft">
                   <i className="bi bi-person-vcard me-1" />
-                  ข้อมูลคนไข้
+                  ข้อมูลสัตว์เลี้ยง
                 </Link>
-                <button type="button" className="btn btn-soft" onClick={() => setParams({})}>
-                  เปลี่ยนคนไข้
+                <button type="button" className="btn btn-soft" onClick={() => setParams(patient.owner?.id ? { owner: patient.owner.id } : {})}>
+                  เปลี่ยนสัตว์เลี้ยง
                 </button>
               </div>
             )}
@@ -362,7 +390,7 @@ export default function MedicalRecordsPage() {
           {listError && <div className="alert alert-danger">{listError}</div>}
 
           {!petId ? (
-            <PatientPicker patients={patients} loading={listLoading} onSelect={choose} />
+            <PatientPicker owners={owners} loading={listLoading} onSelect={choose} onlyOwnerId={params.get('owner') ?? ''} onShowAll={() => setParams({})} />
           ) : detail.loading ? (
             <div className="card-soft empty-box">กำลังโหลดข้อมูล...</div>
           ) : detail.error ? (
@@ -373,6 +401,11 @@ export default function MedicalRecordsPage() {
           ) : (
             patient && (
               <>
+                <div className="mb-3">
+                  <i className="bi bi-person-circle me-1" />
+                  <strong>เจ้าของ:</strong> {patient.owner?.name || 'ไม่ทราบชื่อลูกค้า'}
+                  {patient.owner?.phone && <span className="text-muted"> · {patient.owner.phone}</span>}
+                </div>
                 {patient.allergies && (
                   <div className="alert-soft danger mb-3">
                     <i className="bi bi-exclamation-triangle" />

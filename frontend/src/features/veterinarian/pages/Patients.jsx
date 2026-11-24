@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import VetLayout from '../components/VetLayout.jsx';
-import { usePatient, usePatients } from '../usePatients.js';
+import { useOwners, usePatient } from '../usePatients.js';
 import PetPhoto from '../../pet-owner/components/PetPhoto.jsx';
 import { BOOKING_STATUS, todayString } from '../../pet-owner/bookingOptions.js';
 import {
@@ -17,10 +17,11 @@ import {
 } from '../../pet-owner/petUtils.js';
 
 /**
- * Patients — Role: Veterinarian (มะแอ่ว)
- * Every pet registered by an owner is a patient. Pick one to see its profile, health notes,
- * vaccines, parasite prevention, treatments and appointments (read-only for now: treatments and
- * vaccines are recorded on the Medical Records / Vaccination pages).
+ * Customers — Role: Veterinarian (มะแอ่ว)
+ * The people who bring pets to the clinic. Pick a customer to see how to reach them and the pets they
+ * registered, then pick a pet to see its profile, health notes, vaccines, parasite prevention,
+ * treatments and appointments (read-only here: treatments and vaccines are recorded on the
+ * Medical Records / Vaccination pages). The URL is still /veterinarian/patients.
  */
 
 const FILTERS = [
@@ -29,9 +30,10 @@ const FILTERS = [
   { value: 'visited', label: 'เคยมาตรวจแล้ว' },
 ];
 
-const matches = (p, filter) => {
-  if (filter === 'upcoming') return Boolean(p.nextAppointment);
-  if (filter === 'visited') return p.visitCount > 0;
+/** `o` is a customer (or any object with `nextAppointment` and `visitCount`). */
+const matches = (o, filter) => {
+  if (filter === 'upcoming') return Boolean(o.nextAppointment);
+  if (filter === 'visited') return o.visitCount > 0;
   return true;
 };
 
@@ -71,12 +73,88 @@ function Info({ k, v }) {
   );
 }
 
+const ownerName = (o) => o.name || 'ไม่ทราบชื่อลูกค้า';
+
+/** One customer in the list: name, phone and the pets they registered. */
+function OwnerList({ owners, onSelect }) {
+  if (owners.length === 0) {
+    return (
+      <div className="empty-box py-4">
+        <i className="bi bi-search" />
+        ไม่พบลูกค้า
+      </div>
+    );
+  }
+  return (
+    <div className="d-grid gap-2">
+      {owners.map((o) => (
+        <button
+          type="button"
+          key={o.id}
+          className="btn btn-soft text-start p-3"
+          style={{ borderRadius: 20 }}
+          onClick={() => onSelect(o.id)}
+        >
+          <div className="fw-medium">
+            <i className="bi bi-person-circle me-1" />
+            {ownerName(o)}
+          </div>
+          {/* one emoji per kind of pet the customer has (🐶 🐱 ...), not the pets' names */}
+          <div title="สัตว์เลี้ยงของลูกค้า">
+            {[...new Set(o.pets.map((p) => speciesOf(p.species).emoji))].join(' ')}
+          </div>
+          <div className="small text-muted mt-1">
+            {o.nextAppointment
+              ? `นัดถัดไป ${formatDate(o.nextAppointment.date)} ${o.nextAppointment.time} น.`
+              : o.lastVisit
+                ? `มาล่าสุด ${formatDate(o.lastVisit)}`
+                : 'ยังไม่เคยมาตรวจ'}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const ContactRow = ({ icon, label, children }) => (
+  <div className="d-flex gap-2 small mb-1">
+    <i className={`bi ${icon} text-muted`} title={label} />
+    <span>{children || <span className="text-muted">ไม่มีข้อมูล{label}</span>}</span>
+  </div>
+);
+
+/** How to reach the owner of the pets. */
+function ContactCard({ owner }) {
+  const { phone, email, address, emergencyName, emergencyPhone } = owner;
+  return (
+    <div className="mb-3">
+      <div className="section-label">
+        <i className="bi bi-person-lines-fill" />
+        ช่องทางติดต่อเจ้าของ
+      </div>
+      <div className="fw-medium mb-1">{ownerName(owner)}</div>
+      <ContactRow icon="bi-telephone" label="เบอร์โทร">
+        {phone && <a href={`tel:${phone}`}>{phone}</a>}
+      </ContactRow>
+      <ContactRow icon="bi-envelope" label="อีเมล">
+        {email && <a href={`mailto:${email}`}>{email}</a>}
+      </ContactRow>
+      <ContactRow icon="bi-geo-alt" label="ที่อยู่">{address}</ContactRow>
+      {(emergencyName || emergencyPhone) && (
+        <ContactRow icon="bi-person-exclamation" label="ผู้ติดต่อฉุกเฉิน">
+          {[emergencyName, emergencyPhone].filter(Boolean).join(' · ')}
+        </ContactRow>
+      )}
+    </div>
+  );
+}
+
 function PatientList({ patients, selectedId, onSelect }) {
   if (patients.length === 0) {
     return (
       <div className="empty-box py-4">
         <i className="bi bi-search" />
-        ไม่พบคนไข้
+        ไม่พบสัตว์เลี้ยง
       </div>
     );
   }
@@ -265,20 +343,29 @@ function PatientDetail({ patient: p }) {
 
 export default function PatientsPage() {
   const [params, setParams] = useSearchParams();
-  const selectedId = params.get('pet') ?? '';
+  const petId = params.get('pet') ?? '';
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const { patients, loading, error, reload } = usePatients();
-  const detail = usePatient(selectedId);
+  const { owners, loading, error, reload } = useOwners();
+  const detail = usePatient(petId);
+
+  // `?owner=` opens a customer; a link that only has `?pet=` opens that pet's owner too.
+  const ownerId = params.get('owner') || detail.patient?.owner?.id || '';
+  const owner = owners.find((o) => o.id === ownerId) ?? null;
 
   const q = query.trim().toLowerCase();
-  const shown = patients.filter(
-    (p) =>
-      matches(p, filter) &&
-      (!q || [p.name, p.breed, speciesOf(p.species).label].some((v) => v?.toLowerCase().includes(q))),
+  const shown = owners.filter(
+    (o) =>
+      matches(o, filter) &&
+      (!q ||
+        [o.name, o.phone, o.email, ...o.pets.flatMap((p) => [p.name, p.breed, speciesOf(p.species).label])].some((v) =>
+          v?.toLowerCase().includes(q),
+        )),
   );
 
-  const select = (id) => setParams({ pet: id });
+  const selectOwner = (id) => setParams({ owner: id });
+  const selectPet = (id) => setParams({ owner: ownerId, pet: id });
+  const backToCustomers = () => setParams({});
 
   return (
     <VetLayout>
@@ -286,8 +373,8 @@ export default function PatientsPage() {
         <div className="container">
           <div className="page-head">
             <div>
-              <h1>คนไข้</h1>
-              <p>สัตว์เลี้ยงทั้งหมดที่ลงทะเบียนไว้ พร้อมประวัติสุขภาพ</p>
+              <h1>ลูกค้า</h1>
+              <p>เจ้าของที่ลงทะเบียนสัตว์เลี้ยงไว้ เลือกลูกค้าเพื่อดูสัตว์เลี้ยง ช่องทางติดต่อ และประวัติสุขภาพ</p>
             </div>
           </div>
 
@@ -301,40 +388,55 @@ export default function PatientsPage() {
           <div className="row g-4">
             <div className="col-lg-5">
               <div className="card-soft">
-                <div className="input-group mb-3">
-                  <span className="input-group-text"><i className="bi bi-search" /></span>
-                  <input
-                    className="form-control"
-                    placeholder="ค้นหาชื่อ / สายพันธุ์ / ชนิดสัตว์"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                  />
-                </div>
-                <div className="d-flex flex-wrap gap-2 mb-3">
-                  {FILTERS.map((f) => (
-                    <button
-                      type="button"
-                      key={f.value}
-                      className={`btn btn-sm ${filter === f.value ? 'btn-sky' : 'btn-soft'}`}
-                      onClick={() => setFilter(f.value)}
-                    >
-                      {f.label} ({patients.filter((p) => matches(p, f.value)).length})
-                    </button>
-                  ))}
-                </div>
                 {loading ? (
                   <div className="empty-box py-4">กำลังโหลดข้อมูล...</div>
+                ) : owner ? (
+                  <>
+                    <button type="button" className="btn btn-soft btn-sm mb-3" onClick={backToCustomers}>
+                      <i className="bi bi-arrow-left me-1" />
+                      ลูกค้าทั้งหมด
+                    </button>
+                    <ContactCard owner={owner} />
+                    <div className="section-label">
+                      <i className="bi bi-heart" />
+                      สัตว์เลี้ยง ({owner.pets.length})
+                    </div>
+                    <PatientList patients={owner.pets} selectedId={petId} onSelect={selectPet} />
+                  </>
                 ) : (
-                  <PatientList patients={shown} selectedId={selectedId} onSelect={select} />
+                  <>
+                    <div className="input-group mb-3">
+                      <span className="input-group-text"><i className="bi bi-search" /></span>
+                      <input
+                        className="form-control"
+                        placeholder="ค้นหาชื่อลูกค้า / เบอร์โทร / ชื่อสัตว์เลี้ยง"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                      />
+                    </div>
+                    <div className="d-flex flex-wrap gap-2 mb-3">
+                      {FILTERS.map((f) => (
+                        <button
+                          type="button"
+                          key={f.value}
+                          className={`btn btn-sm ${filter === f.value ? 'btn-sky' : 'btn-soft'}`}
+                          onClick={() => setFilter(f.value)}
+                        >
+                          {f.label} ({owners.filter((o) => matches(o, f.value)).length})
+                        </button>
+                      ))}
+                    </div>
+                    <OwnerList owners={shown} onSelect={selectOwner} />
+                  </>
                 )}
               </div>
             </div>
 
             <div className="col-lg-7">
-              {!selectedId ? (
+              {!petId ? (
                 <div className="card-soft empty-box">
                   <i className="bi bi-hand-index" />
-                  เลือกคนไข้จากรายการเพื่อดูรายละเอียด
+                  {owner ? 'เลือกสัตว์เลี้ยงเพื่อดูประวัติสุขภาพ' : 'เลือกลูกค้าจากรายการเพื่อดูสัตว์เลี้ยงและช่องทางติดต่อ'}
                 </div>
               ) : detail.loading ? (
                 <div className="card-soft empty-box">กำลังโหลดข้อมูล...</div>

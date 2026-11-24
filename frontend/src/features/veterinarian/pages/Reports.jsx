@@ -153,7 +153,7 @@ function ReportBody({ report }) {
         <Stat value={a.total} label="นัดหมายทั้งหมด" />
         <Stat value={percent(a.completionRate)} label="ตรวจเสร็จสิ้น" hint={`จากนัดที่ดำเนินการแล้ว (${a.byStatus.completed} นัด)`} />
         <Stat value={percent(a.noShowRate)} label="ไม่มาตามนัด" hint={`${a.byStatus.no_show} นัด`} />
-        <Stat value={p.seen} label="คนไข้ที่ได้รับการตรวจ" hint={`ลงทะเบียนใหม่ ${p.newInRange} ตัว`} />
+        <Stat value={p.seen} label="สัตว์เลี้ยงที่ได้รับการตรวจ" hint={`ลงทะเบียนใหม่ ${p.newInRange} ตัว`} />
       </div>
 
       <div className="row g-4 mb-4">
@@ -186,12 +186,12 @@ function ReportBody({ report }) {
         </div>
 
         <div className="col-lg-6">
-          <Card icon="bi-heart" title="คนไข้ที่ตรวจแล้ว แยกตามชนิดสัตว์" note="นับสัตว์ที่มีนัดสถานะ “เสร็จสิ้น” ในช่วงนี้">
+          <Card icon="bi-heart" title="สัตว์เลี้ยงที่ตรวจแล้ว แยกตามชนิดสัตว์" note="นับสัตว์ที่มีนัดสถานะ “เสร็จสิ้น” ในช่วงนี้">
             <BarList rows={speciesRows} />
           </Card>
         </div>
         <div className="col-lg-6">
-          <Card icon="bi-people" title="คนไข้ทั้งหมดในระบบ">
+          <Card icon="bi-people" title="สัตว์เลี้ยงทั้งหมดในระบบ">
             <div className="stat">
               <div className="num">{p.registered}</div>
               <div className="small">สัตว์เลี้ยงที่ลงทะเบียน</div>

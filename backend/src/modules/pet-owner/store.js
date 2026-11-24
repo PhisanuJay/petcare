@@ -79,7 +79,7 @@ export function listAllPets() {
 export function updatePetAsClinic(id, mutator) {
   return pets.update((all) => {
     const index = all.findIndex((pet) => pet.id === id);
-    if (index === -1) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
+    if (index === -1) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยง');
     const pet = { ...mutator(all[index]), updatedAt: new Date().toISOString() };
     const next = all.slice();
     next[index] = pet;
