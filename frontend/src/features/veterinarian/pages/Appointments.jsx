@@ -46,6 +46,50 @@ function recordLink(a) {
   return `/veterinarian/medical-records?pet=${a.pet.id}`;
 }
 
+const STAGE_LABEL = {
+  confirmed: { label: 'ยังไม่มาถึง', tone: '' },
+  checked_in: { label: 'มาถึงแล้ว รอเรียกตรวจ', tone: 'warn' },
+  in_treatment: { label: 'อยู่ในห้องตรวจ', tone: 'ok' },
+};
+const TRIAGE = {
+  urgent: { label: 'เร่งด่วน', tone: 'danger' },
+  soon: { label: 'ควรตรวจเร็ว', tone: 'warn' },
+  normal: { label: 'ปกติ', tone: '' },
+};
+const VITAL_ROWS = [
+  ['weight', 'น้ำหนัก', 'กก.'],
+  ['temp', 'อุณหภูมิ', '°C'],
+  ['heartRate', 'ชีพจร', 'ครั้ง/นาที'],
+  ['respRate', 'หายใจ', 'ครั้ง/นาที'],
+  ['bcs', 'BCS', '/9'],
+  ['pain', 'ความเจ็บปวด', '/4'],
+  ['mucous', 'เยื่อบุ', ''],
+  ['crt', 'CRT', 'วินาที'],
+];
+
+/** What the Medical Assistant recorded at the front desk: triage, chief complaint and vitals. */
+function VisitInfo({ visit }) {
+  if (!visit) return null;
+  const triage = TRIAGE[visit.triage];
+  const vitals = VITAL_ROWS.filter(([key]) => visit.vitals?.[key] !== undefined && visit.vitals[key] !== '');
+  if (!triage && !visit.chiefComplaint && vitals.length === 0) return null;
+  return (
+    <div className="small mt-2 p-2 rounded-3 border bg-light">
+      <div className="fw-medium mb-1">
+        <i className="bi bi-clipboard2-pulse me-1" />
+        ข้อมูลจากผู้ช่วยสัตวแพทย์
+        {triage && <span className={`tag ms-2 ${triage.tone}`}>{triage.label}</span>}
+      </div>
+      {visit.chiefComplaint && <div>อาการเบื้องต้น: {visit.chiefComplaint}</div>}
+      {vitals.length > 0 && (
+        <div className="text-muted">
+          {vitals.map(([key, label, unit]) => `${label} ${visit.vitals[key]}${unit ? ` ${unit}` : ''}`).join(' · ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PetInfo({ pet, fallbackName }) {
   if (!pet) {
     return <div className="fw-medium">{fallbackName} <span className="small text-muted">(ไม่พบข้อมูลสัตว์เลี้ยงแล้ว)</span></div>;
@@ -75,6 +119,8 @@ function PetInfo({ pet, fallbackName }) {
 
 function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
   const status = vetStatus(a.status);
+  const stage = a.status === 'confirmed' ? STAGE_LABEL[a.visit?.stage] : null;
+  const inRoom = a.visit?.stage === 'in_treatment';
   return (
     <div className={`card-soft vet-appt st-${a.status} mb-3`}>
       <div className="d-flex flex-wrap align-items-start gap-3">
@@ -87,6 +133,7 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
           <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
             <span className="tag">{a.serviceLabel}</span>
             <span className={`tag ${status.tone}`}>{status.label}</span>
+            {stage && <span className={`tag ${stage.tone}`}>{stage.label}</span>}
           </div>
           <PetInfo pet={a.pet} fallbackName={a.petName} />
           {a.note && (
@@ -95,6 +142,7 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
               เจ้าของแจ้ง: {a.note}
             </div>
           )}
+          <VisitInfo visit={a.visit} />
           {a.clinicNote && <div className="small text-muted">หมายเหตุคลินิก: {a.clinicNote}</div>}
         </div>
 
@@ -106,7 +154,12 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
             </Link>
           )}
           {a.status === 'confirmed' && (
-            <button type="button" className="btn btn-sky btn-sm" disabled={busy} onClick={() => onAction(a, 'completed')}>
+            <button
+              type="button"
+              className="btn btn-sky btn-sm"
+              disabled={busy || !inRoom}
+              title={inRoom ? '' : 'ปิดเคสได้หลังผู้ช่วยสัตวแพทย์ส่งเข้าห้องตรวจแล้ว'}
+              onClick={() => onAction(a, 'completed')}>
               <i className="bi bi-check2-all me-1" />
               ตรวจเสร็จสิ้น
             </button>
@@ -147,7 +200,7 @@ export default function AppointmentsPage() {
         <VetPageHeader
           icon="bi-calendar2-check"
           title="นัดหมาย"
-          subtitle="นัดที่ผู้ช่วยสัตวแพทย์ยืนยันแล้ว บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ"
+          subtitle="นัดที่ผู้ช่วยสัตวแพทย์มอบหมายให้คุณ บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ"
           stats={[
             { icon: 'bi-hourglass-split', value: count('confirmed'), label: 'รอตรวจ' },
             { icon: 'bi-check2-all', value: count('completed'), label: 'เสร็จสิ้น' },

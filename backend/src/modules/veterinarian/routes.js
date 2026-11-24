@@ -5,6 +5,7 @@ import { getPetById, listAllPets, updatePetAsClinic } from '../pet-owner/store.j
 import { dueVaccines } from './dueVaccines.js';
 import { requireStaff } from '../auth/middleware.js';
 import { OWNER_FIELDS, listOwnerProfiles } from '../pet-owner/ownerStore.js';
+import { getVisit, listVisits } from '../medical-assistant/visitStore.js';
 
 /**
  * Veterinarian API module
@@ -52,16 +53,39 @@ function petSummary(pet) {
 
 router.use('/appointments', requireVet);
 
+/**
+ * What the Medical Assistant recorded for a booking (modules/medical-assistant/visitStore.js): the vet
+ * it was assigned to, check-in, triage, chief complaint and vitals. `stage` is where the visit is now.
+ */
+function visitSummary(booking, visit) {
+  let stage = booking.status;
+  if (booking.status === 'confirmed') stage = visit?.treatmentStartedAt ? 'in_treatment' : visit?.checkedInAt ? 'checked_in' : 'confirmed';
+  return {
+    stage,
+    vet: visit?.vet ?? null,
+    durationMin: visit?.durationMin ?? null,
+    checkedInAt: visit?.checkedInAt ?? null,
+    treatmentStartedAt: visit?.treatmentStartedAt ?? null,
+    triage: visit?.triage ?? '',
+    chiefComplaint: visit?.chiefComplaint ?? '',
+    vitals: visit?.vitals ?? {},
+  };
+}
+
 // GET /appointments?date=YYYY-MM-DD&status=pending
 router.get('/appointments', wrap(async (req, res) => {
   const { date, status } = req.query;
   if (date !== undefined && !isDateString(date)) throw httpError(400, 'วันที่ไม่ถูกต้อง');
   if (status !== undefined && !BOOKING_STATUSES.includes(status)) throw httpError(400, 'สถานะไม่ถูกต้อง');
 
-  const bookings = (await listVetBookings()).filter((b) => (!date || b.date === date) && (!status || b.status === status));
+  // A vet sees only the appointments the Medical Assistant assigned to them.
+  const visits = new Map((await listVisits()).map((v) => [v.bookingId, v]));
+  const bookings = (await listVetBookings()).filter(
+    (b) => visits.get(b.id)?.vet === req.staff.name && (!date || b.date === date) && (!status || b.status === status),
+  );
   const result = [];
   for (const b of bookings) {
-    result.push({ ...b, pet: petSummary(await getPetById(b.petId)) });
+    result.push({ ...b, visit: visitSummary(b, visits.get(b.id)), pet: petSummary(await getPetById(b.petId)) });
   }
   res.json(result);
 }));
@@ -74,10 +98,13 @@ router.post('/appointments/:id/status', wrap(async (req, res) => {
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
   if (!BOOKING_STATUSES.includes(status)) throw httpError(400, 'สถานะไม่ถูกต้อง');
   if (status !== 'completed') throw httpError(403, 'ผู้ช่วยสัตวแพทย์เป็นผู้ดำเนินการ สัตวแพทย์ปิดเคสได้อย่างเดียว');
-  // updateBookingStatus only allows confirmed → completed, so a booking still waiting for the
-  // Medical Assistant (pending) is refused with 409.
+  // Only the assigned vet closes the case, and only after the Medical Assistant sent the pet into the
+  // exam room (start-treatment). updateBookingStatus then allows confirmed → completed only.
+  const visit = await getVisit(req.params.id);
+  if (visit?.vet !== req.staff.name) throw httpError(403, 'นัดนี้ไม่ได้มอบหมายให้คุณ');
+  if (!visit.treatmentStartedAt) throw httpError(409, 'ปิดเคสได้หลังผู้ช่วยสัตวแพทย์ส่งเข้าห้องตรวจแล้วเท่านั้น');
   const booking = await updateBookingStatus(req.params.id, status, note);
-  res.json({ ...booking, pet: petSummary(await getPetById(booking.petId)) });
+  res.json({ ...booking, visit: visitSummary(booking, visit), pet: petSummary(await getPetById(booking.petId)) });
 }));
 
 /* ---------- Customers (owners) and their pets ---------- */
