@@ -6,7 +6,8 @@
   "description": "PetCare API — role-based modules (Page 17)",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "db:path": "node -e \"import('./src/db/sqlite.js').then(m=>console.log(m.dbPath()))\""
   },
   "dependencies": {
     "cors": "^2.8.5",

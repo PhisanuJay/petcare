@@ -32,7 +32,13 @@ export default function PaymentVerification() {
               </div>
             </div>
             <div className="tp-actions" style={{ marginTop: 0 }}>
-              <button type="button" className="btn btn-sky" onClick={() => adminMarkPaid(b.id)}>
+              <button
+                type="button"
+                className="btn btn-sky"
+                onClick={() => {
+                  adminMarkPaid(b.id).catch(() => {});
+                }}
+              >
                 ยืนยันชำระแล้ว
               </button>
               <Link className="btn btn-soft" to={`/admin/transport/bookings/${b.id}`}>รายละเอียด</Link>

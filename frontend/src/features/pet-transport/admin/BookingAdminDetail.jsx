@@ -116,23 +116,23 @@ export default function BookingAdminDetail() {
     });
   }
 
-  function runConfirm() {
+  async function runConfirm() {
     if (!confirm) return;
     try {
       if (confirm.type === 'price') {
-        confirmPrice(booking.id, {
+        await confirmPrice(booking.id, {
           fareZoneId,
           customPerTrip: customPrice !== '' ? customPrice : null,
         });
         setMsg('ยืนยันราคาแล้ว');
       } else if (confirm.type === 'assign') {
-        assignDriver(confirm.tripId, confirm.driverId);
+        await assignDriver(confirm.tripId, confirm.driverId);
         setMsg('มอบหมายคนขับแล้ว');
       } else if (confirm.type === 'paid') {
-        adminMarkPaid(booking.id);
+        await adminMarkPaid(booking.id);
         setMsg('ยืนยันชำระแล้ว — คนขับเริ่มงานได้');
       } else if (confirm.type === 'schedule') {
-        updateTripSchedule(confirm.tripId, { pickupTime: confirm.pickupTime });
+        await updateTripSchedule(confirm.tripId, { pickupTime: confirm.pickupTime });
         setMsg('เปลี่ยนเวลานัดรับแล้ว — แจ้งคนขับแล้ว');
       }
       setConfirm(null);

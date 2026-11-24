@@ -106,10 +106,10 @@ export default function BookingManagement() {
     setMsg(text);
   }
 
-  function confirmPriceNow(b) {
+  async function confirmPriceNow(b) {
     setErr('');
     try {
-      confirmPrice(b.id, {
+      await confirmPrice(b.id, {
         fareZoneId: b.fareZoneId || b.zoneId || b.estimatedQuote?.fareZoneId || '1',
         customPerTrip: null,
       });
@@ -132,7 +132,7 @@ export default function BookingManagement() {
     setModal(null);
   }
 
-  function submitAssign() {
+  async function submitAssign() {
     if (!modal?.booking) return;
     try {
       const entries = Object.entries(modal.picks || {}).filter(([, id]) => id);
@@ -140,7 +140,9 @@ export default function BookingManagement() {
         setErr('เลือกคนขับอย่างน้อย 1 ทริป');
         return;
       }
-      entries.forEach(([tripId, driverId]) => assignDriver(tripId, driverId));
+      for (const [tripId, driverId] of entries) {
+        await assignDriver(tripId, driverId);
+      }
       flashOk(`มอบหมายคนขับแล้ว · ${modal.booking.petName}`);
       closeModal();
     } catch (e) {
@@ -148,10 +150,10 @@ export default function BookingManagement() {
     }
   }
 
-  function submitPaid() {
+  async function submitPaid() {
     if (!modal?.booking) return;
     try {
-      adminMarkPaid(modal.booking.id);
+      await adminMarkPaid(modal.booking.id);
       flashOk(`ยืนยันชำระแล้ว · ${modal.booking.petName} — คนขับเริ่มงานได้`);
       closeModal();
     } catch (e) {
