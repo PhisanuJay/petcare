@@ -10,6 +10,9 @@ function staffDestination(staff, next) {
   return next === home || next.startsWith(`${home}/`) ? next : home;
 }
 
+/** True when `next` is a staff page (vet, medical assistant, clinic admin). */
+const isStaffPath = (next) => Object.values(STAFF_HOME).some((home) => next === home || next.startsWith(`${home}/`));
+
 export default function LoginPage() {
   const { currentUser, login, staffLogin } = useAuth();
   const navigate = useNavigate();
@@ -23,7 +26,9 @@ export default function LoginPage() {
 
   // Only a customer session skips this page. A staff session is shared by every tab of the browser, so
   // redirecting on it would stop a customer from logging in on another tab while a vet is logged in.
-  if (currentUser) return <Navigate to={next} replace />;
+  // A customer sent here from a staff page stays on the form (to log in as staff); redirecting back
+  // would loop, since RequireStaff sends them straight back to this page.
+  if (currentUser && !isStaffPath(next)) return <Navigate to={next} replace />;
 
   const set = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
@@ -38,7 +43,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       await login(form.email, form.password, form.remember);
-      navigate(next, { replace: true });
+      navigate(isStaffPath(next) ? '/' : next, { replace: true });
     } catch (customerError) {
       // Not a customer account: staff (veterinarians) log in on this same page, their accounts are in the backend.
       try {

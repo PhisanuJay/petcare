@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CLINIC_PHONE, OPENING_HOURS } from '../bookingOptions.js';
+import { CLINIC_PHONE, hoursSummary, useClinicInfo } from '../bookingOptions.js';
 
 /**
  * Services — Role: Pet Owner (มะแอ่ว)
@@ -103,6 +103,8 @@ function ServiceCard({ s }) {
 }
 
 export default function ServicesPage() {
+  // Opening hours set by the clinic admin (falls back to the default hours if they cannot be loaded).
+  const { info } = useClinicInfo();
   return (
     <div className="page-wrap">
       <div className="container">
@@ -136,8 +138,7 @@ export default function ServicesPage() {
         <div className="card-soft small">
           <div className="mb-1">
             <i className="bi bi-clock me-1" />
-            {OPENING_HOURS.weekday.label} {OPENING_HOURS.weekday.open} - {OPENING_HOURS.weekday.close} น. ·{' '}
-            {OPENING_HOURS.weekend.label} {OPENING_HOURS.weekend.open} - {OPENING_HOURS.weekend.close} น.
+            {hoursSummary(info).join(' · ')}
           </div>
           <div>
             <i className="bi bi-telephone me-1" />

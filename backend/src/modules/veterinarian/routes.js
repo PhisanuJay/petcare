@@ -81,7 +81,7 @@ router.get('/appointments', wrap(async (req, res) => {
   // A vet sees only the appointments the Medical Assistant assigned to them.
   const visits = new Map((await listVisits()).map((v) => [v.bookingId, v]));
   const bookings = (await listVetBookings()).filter(
-    (b) => visits.get(b.id)?.vet === req.staff.name && (!date || b.date === date) && (!status || b.status === status),
+    (b) => visits.get(b.id)?.vetId === req.staff.id && (!date || b.date === date) && (!status || b.status === status),
   );
   const result = [];
   for (const b of bookings) {
@@ -101,7 +101,7 @@ router.post('/appointments/:id/status', wrap(async (req, res) => {
   // Only the assigned vet closes the case, and only after the Medical Assistant sent the pet into the
   // exam room (start-treatment). updateBookingStatus then allows confirmed → completed only.
   const visit = await getVisit(req.params.id);
-  if (visit?.vet !== req.staff.name) throw httpError(403, 'นัดนี้ไม่ได้มอบหมายให้คุณ');
+  if (visit?.vetId !== req.staff.id) throw httpError(403, 'นัดนี้ไม่ได้มอบหมายให้คุณ');
   if (!visit.treatmentStartedAt) throw httpError(409, 'ปิดเคสได้หลังผู้ช่วยสัตวแพทย์ส่งเข้าห้องตรวจแล้วเท่านั้น');
   const booking = await updateBookingStatus(req.params.id, status, note);
   res.json({ ...booking, visit: visitSummary(booking, visit), pet: petSummary(await getPetById(booking.petId)) });
