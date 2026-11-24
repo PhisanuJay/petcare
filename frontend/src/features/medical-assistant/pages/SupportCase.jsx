@@ -1,29 +1,24 @@
-import { useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import PetPhoto from '../../pet-owner/components/PetPhoto.jsx';
-import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
-import { newId } from '../../../shared/utils/storage.js';
+import { PARASITE_TYPES, ageText, formatDate, labelOf, speciesOf } from '../../pet-owner/petUtils.js';
 import { useToast } from '../../../shared/components/Toast.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import MaDataState from '../components/MaDataState.jsx';
 import PatientNameLink from '../components/PatientNameLink.jsx';
 import {
-  APPOINTMENT_STATUS,
   BCS_SCALE,
   CAUTION_FLAGS,
   CRT_OPTIONS,
-  FINAL_STATUSES,
-  MED_ROUTES,
   MUCOUS_OPTIONS,
-  OWNER_INSTRUCTION_TEMPLATES,
   PAIN_SCALE,
-  SERVICE_TYPES,
+  STAGE_META,
   TRIAGE_LEVELS,
   TRIAGE_LEVEL_LIST,
-  VETS,
   getPrepChecklist,
-  offsetDateKey,
+  todayString,
 } from '../data/constants.js';
-import { findConflict, suggestSlots } from '../data/schedule.js';
+import { maRequest } from '../data/maApi.js';
 import { useAppointments } from '../data/useAppointments.js';
 import { usePatients } from '../data/usePatients.js';
 import {
@@ -34,16 +29,20 @@ import {
   vitalRangeFor,
 } from '../data/useVisits.js';
 
-function formatSavedTime(iso) {
+const AUTOSAVE_DELAY_MS = 800;
+
+function formatSavedClock(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return `${d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`;
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
 }
 
 function formatWaitSince(appt) {
-  const ref = appt.checkedInAt ?? appt.updatedAt;
-  if (!ref || appt.status === 'completed') return '';
+  const ref = appt.visit?.checkedInAt ?? appt.updatedAt;
+  if (!ref || appt.stage === 'completed') return '';
   const mins = Math.max(0, Math.floor((Date.now() - new Date(ref).getTime()) / 60000));
   if (mins < 1) return 'เพิ่งเช็คอิน';
   if (mins < 60) return `รอแล้ว ${mins} นาที`;
@@ -69,45 +68,199 @@ function createDraft(visit, appt, checklistItems) {
       mucous: visit?.vitals?.mucous ?? '',
       crt: visit?.vitals?.crt ?? '',
     },
-    chiefComplaint: visit?.chiefComplaint ?? appt.reason ?? '',
+    chiefComplaint: visit?.chiefComplaint || appt.note || '',
     checklist,
-    vetOrders: visit?.vetOrders ?? '',
-    medications: visit?.medications ?? [],
-    ownerInstructions: visit?.ownerInstructions ?? '',
   };
 }
 
-function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
-  const { appointments, setStatus, addAppointment } = useAppointments();
-  const { saveVisit } = useVisits();
-  const { show, toast } = useToast();
-  const navigate = useNavigate();
+function VetRecordsSection({ appt, vetRecords, vaccinesGiven, parasitesGiven }) {
+  const hasAny =
+    vetRecords.length > 0 || vaccinesGiven.length > 0 || parasitesGiven.length > 0;
+  const followUps = vetRecords.filter((r) => r.followUp);
 
-  const readOnly = appt.status === 'completed';
+  return (
+    <div className="card-soft mt-4">
+      <div className="section-label">
+        <i className="bi bi-journal-medical" />
+        บันทึกของสัตวแพทย์ (อ่านอย่างเดียว)
+      </div>
+
+      {!hasAny ? (
+        <div className="empty-box py-4">
+          <i className="bi bi-hourglass-split" />
+          <div>รอสัตวแพทย์บันทึกผลการตรวจ</div>
+        </div>
+      ) : (
+        <div className="d-grid gap-3">
+          {followUps.map((rec, idx) => (
+            <div
+              key={rec.id ?? idx}
+              className="alert-soft info d-flex flex-wrap justify-content-between align-items-center gap-2 mb-0"
+            >
+              <div className="d-flex align-items-start gap-2">
+                <i className="bi bi-calendar-check mt-1" />
+                <div>
+                  <div className="fw-medium">
+                    นัดติดตาม {formatDate(rec.followUp)}
+                    {rec.vet ? ` · ${rec.vet}` : ''}
+                  </div>
+                  <div className="small">แจ้งเจ้าของให้จองนัดติดตามผ่านระบบออนไลน์</div>
+                </div>
+              </div>
+              {appt.ownerPhone && (
+                <a href={`tel:${appt.ownerPhone}`} className="btn btn-soft btn-sm ma-no-print">
+                  <i className="bi bi-telephone me-1" />
+                  โทร {appt.ownerPhone}
+                </a>
+              )}
+            </div>
+          ))}
+
+          {vetRecords.length > 0 && (
+            <div className="d-grid gap-2">
+              <div className="small fw-medium text-muted">ผลการตรวจและการรักษา</div>
+              {vetRecords.map((rec, idx) => (
+                <div className="record-row mb-0 pb-2" key={rec.id ?? idx}>
+                  <div className="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                    <span className="small fw-medium">
+                      {rec.vet || 'สัตวแพทย์'}
+                      {rec.clinic ? ` · ${rec.clinic}` : ''}
+                    </span>
+                    <span className="tag sky m-0">สัตวแพทย์</span>
+                  </div>
+                  <div className="info-grid">
+                    <div className="info-item bg-white">
+                      <div className="k">อาการ</div>
+                      <div className="v">{rec.symptoms || '—'}</div>
+                    </div>
+                    <div className="info-item bg-white">
+                      <div className="k">ผลการวินิจฉัย</div>
+                      <div className="v">{rec.diagnosis || '—'}</div>
+                    </div>
+                    <div className="info-item bg-white" style={{ gridColumn: '1 / -1' }}>
+                      <div className="k">การรักษา / ยา</div>
+                      <div className="v" style={{ whiteSpace: 'pre-line' }}>
+                        {rec.treatment || '—'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {vaccinesGiven.length > 0 && (
+            <div className="d-grid gap-2">
+              <div className="small fw-medium text-muted">วัคซีนที่ฉีดวันนี้</div>
+              {vaccinesGiven.map((v, idx) => (
+                <div className="record-row mb-0 pb-2" key={v.id ?? idx}>
+                  <div className="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                    <span className="fw-medium">{v.name}</span>
+                    <span className="tag sky m-0">สัตวแพทย์</span>
+                  </div>
+                  <div className="info-grid">
+                    <div className="info-item bg-white">
+                      <div className="k">ผู้ให้วัคซีน</div>
+                      <div className="v">{v.vet || '—'}</div>
+                    </div>
+                    <div className="info-item bg-white">
+                      <div className="k">Lot / หมายเหตุ</div>
+                      <div className="v">{v.lot || '—'}</div>
+                    </div>
+                    <div className="info-item bg-white">
+                      <div className="k">นัดครั้งถัดไป</div>
+                      <div className="v">{v.nextDate ? formatDate(v.nextDate) : '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {parasitesGiven.length > 0 && (
+            <div className="d-grid gap-2">
+              <div className="small fw-medium text-muted">การป้องกันปรสิตวันนี้</div>
+              {parasitesGiven.map((p, idx) => (
+                <div className="record-row mb-0 pb-2" key={p.id ?? idx}>
+                  <div className="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                    <span className="fw-medium">{labelOf(PARASITE_TYPES, p.type)}</span>
+                    <span className="tag sky m-0">สัตวแพทย์</span>
+                  </div>
+                  <div className="info-grid">
+                    <div className="info-item bg-white">
+                      <div className="k">ผลิตภัณฑ์ / ยา</div>
+                      <div className="v">{p.product || '—'}</div>
+                    </div>
+                    <div className="info-item bg-white">
+                      <div className="k">ผู้ดำเนินการ</div>
+                      <div className="v">{p.vet || '—'}</div>
+                    </div>
+                    <div className="info-item bg-white">
+                      <div className="k">ครั้งถัดไป</div>
+                      <div className="v">{p.nextDate ? formatDate(p.nextDate) : '—'}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SupportCaseInner({ caseData, patient, meta, startTreatment, saveVisit, onAfterSave }) {
+  const { show, toast } = useToast();
+  const appt = caseData;
+  const existingVisit = appt.visit ?? null;
+  const vetRecords = appt.vetRecords ?? [];
+  const vaccinesGiven = appt.vaccinesGiven ?? [];
+  const parasitesGiven = appt.parasitesGiven ?? [];
+
+  const isToday = appt.date === todayString();
+  const isCheckedIn = Boolean(existingVisit?.checkedInAt);
+  const readOnly = appt.stage === 'completed' || !isToday || !isCheckedIn;
+
   const checklistItems = useMemo(() => getPrepChecklist(appt.service), [appt.service]);
+  const vitalLimits = meta?.VITAL_LIMITS ?? {};
 
   const [step, setStep] = useState(() => {
-    if (readOnly) return 'summary';
-    if (appt.status === 'in_treatment') return 'treatment';
+    if (readOnly || appt.stage === 'in_treatment') return 'summary';
     if (isTriaged(existingVisit)) return 'prep';
     return 'triage';
   });
 
   const [draft, setDraft] = useState(() => createDraft(existingVisit, appt, checklistItems));
-  const [triageLocked, setTriageLocked] = useState(() => Boolean(existingVisit?.triage));
+  const [saveState, setSaveState] = useState(() =>
+    existingVisit?.updatedAt ? 'saved' : 'idle',
+  );
+  const [saveError, setSaveError] = useState('');
   const [lastSavedIso, setLastSavedIso] = useState(() => existingVisit?.updatedAt ?? '');
+
   const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
 
-  const [followUp, setFollowUp] = useState(() => ({
-    enabled: Boolean(existingVisit?.followUp),
-    date: existingVisit?.followUp?.date ?? offsetDateKey(7),
-    time: existingVisit?.followUp?.time ?? '10:00',
-    service: existingVisit?.followUp?.service ?? 'ติดตามอาการ',
-    vet: existingVisit?.followUp?.vet ?? appt.vet ?? VETS[0]?.name ?? '',
-  }));
+  const debounceRef = useRef(null);
+  const latestDraftRef = useRef(draft);
+  const dirtyRef = useRef(false);
 
-  const ranges = vitalRangeFor(appt.species);
-  const vFlags = useMemo(() => vitalFlags(appt.species, draft.vitals), [appt.species, draft.vitals]);
+  useEffect(() => {
+    latestDraftRef.current = draft;
+  }, [draft]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const ranges = vitalRangeFor(appt.petSpecies);
+  const vFlags = useMemo(
+    () => vitalFlags(appt.petSpecies, draft.vitals),
+    [appt.petSpecies, draft.vitals],
+  );
   const flagByKey = useMemo(() => {
     const map = {};
     for (const f of vFlags) map[f.key] = f;
@@ -115,67 +268,78 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
   }, [vFlags]);
 
   const recommendedTriage = useMemo(
-    () => suggestTriage(appt.species, draft.vitals),
-    [appt.species, draft.vitals],
+    () => suggestTriage(appt.petSpecies, draft.vitals),
+    [appt.petSpecies, draft.vitals],
   );
 
-  const effectiveTriage = draft.triage || recommendedTriage;
   const triagedDone = isTriaged(draft);
   const checkedCount = checklistItems.filter((item) => draft.checklist[item]).length;
   const prepDone =
     (checkedCount === checklistItems.length && checklistItems.length > 0) ||
-    appt.status === 'in_treatment' ||
-    appt.status === 'completed';
-  const treatmentDone = Boolean(
-    draft.vetOrders.trim() || draft.medications.length > 0 || draft.ownerInstructions.trim(),
+    appt.stage === 'in_treatment' ||
+    appt.stage === 'completed';
+
+  const persistNow = useCallback(
+    async (targetDraft = latestDraftRef.current, showToastOnSuccess = false) => {
+      if (readOnly) return null;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      setSaveState('saving');
+      setSaveError('');
+      try {
+        const saved = await saveVisit(appt.id, targetDraft);
+        dirtyRef.current = false;
+        setSaveState('saved');
+        if (saved?.updatedAt) setLastSavedIso(saved.updatedAt);
+        if (onAfterSave) onAfterSave(saved);
+        if (showToastOnSuccess) show('บันทึกข้อมูลคัดกรองแล้ว');
+        return saved;
+      } catch (err) {
+        setSaveState('error');
+        setSaveError(err?.message || 'ไม่สามารถบันทึกข้อมูลได้');
+        return null;
+      }
+    },
+    [readOnly, saveVisit, appt.id, onAfterSave, show],
   );
 
-  const followUpConflict = useMemo(() => {
-    if (!followUp.enabled) return null;
-    return findConflict(appointments, {
-      vet: followUp.vet,
-      date: followUp.date,
-      time: followUp.time,
-      durationMin: 30,
-    });
-  }, [followUp, appointments]);
-
-  const followUpSlots = useMemo(() => {
-    if (!followUp.enabled) return [];
-    return suggestSlots(
-      appointments,
-      { vet: followUp.vet, date: followUp.date, durationMin: 30 },
-      6,
-    );
-  }, [followUp.enabled, followUp.vet, followUp.date, appointments]);
-
-  function persist(nextDraft = draft, showToast = false) {
-    if (readOnly) return null;
-    const saved = saveVisit(appt.id, {
-      patientId: patient?.patientId ?? null,
-      ...nextDraft,
-      triage:
-        nextDraft.triage ||
-        (isTriaged(nextDraft) ? suggestTriage(appt.species, nextDraft.vitals) : ''),
-      startedAt: existingVisit?.startedAt ?? appt.treatmentStartedAt ?? null,
-    });
-    if (saved) {
-      setLastSavedIso(saved.updatedAt);
-      if (showToast) show('บันทึกข้อมูลเคสแล้ว');
-    }
-    return saved;
-  }
+  const scheduleAutosave = useCallback(
+    (nextDraft) => {
+      if (readOnly) return;
+      latestDraftRef.current = nextDraft;
+      dirtyRef.current = true;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      setSaveState('saving');
+      setSaveError('');
+      debounceRef.current = setTimeout(() => {
+        persistNow(latestDraftRef.current, false);
+      }, AUTOSAVE_DELAY_MS);
+    },
+    [readOnly, persistNow],
+  );
 
   function updateVital(key, value) {
-    setDraft((prev) => {
-      const nextVitals = { ...prev.vitals, [key]: value };
-      const nextTriage = triageLocked ? prev.triage : suggestTriage(appt.species, nextVitals);
-      return { ...prev, vitals: nextVitals, triage: nextTriage };
-    });
+    const next = {
+      ...draft,
+      vitals: { ...draft.vitals, [key]: value },
+    };
+    setDraft(next);
+    scheduleAutosave(next);
   }
 
-  function updateField(key, value) {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+  function updateComplaint(value) {
+    const next = { ...draft, chiefComplaint: value };
+    setDraft(next);
+    scheduleAutosave(next);
+  }
+
+  function selectTriage(value) {
+    if (readOnly) return;
+    const next = { ...draft, triage: value };
+    setDraft(next);
+    persistNow(next, false);
   }
 
   function toggleChecklist(item) {
@@ -185,148 +349,75 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
       checklist: { ...draft.checklist, [item]: !draft.checklist[item] },
     };
     setDraft(next);
-    persist(next, false);
+    scheduleAutosave(next);
   }
 
-  function addMedication() {
-    if (readOnly) return;
-    const next = {
-      ...draft,
-      medications: [
-        ...draft.medications,
-        { id: newId(), name: '', dose: '', route: MED_ROUTES[0], frequency: '', days: '' },
-      ],
-    };
-    setDraft(next);
-  }
-
-  function updateMedication(idx, key, val) {
-    setDraft((prev) => ({
-      ...prev,
-      medications: prev.medications.map((m, i) => (i === idx ? { ...m, [key]: val } : m)),
-    }));
-  }
-
-  function removeMedication(idx) {
-    if (readOnly) return;
-    const next = {
-      ...draft,
-      medications: draft.medications.filter((_, i) => i !== idx),
-    };
-    setDraft(next);
-    persist(next, false);
-  }
-
-  function appendInstructionTemplate(text) {
-    if (readOnly) return;
-    const existing = draft.ownerInstructions.trim();
-    const lines = existing ? existing.split('\n').map((s) => s.trim()) : [];
-    if (lines.includes(text)) return;
-    const nextText = existing ? `${existing}\n${text}` : text;
-    const next = { ...draft, ownerInstructions: nextText };
-    setDraft(next);
-    persist(next, false);
-  }
-
-  function doSendToVet() {
-    persist(draft, false);
-    if (setStatus(appt.id, 'in_treatment')) {
+  async function doSendToVet() {
+    setSending(true);
+    setSendError('');
+    try {
+      if (dirtyRef.current || debounceRef.current) {
+        const saved = await persistNow(latestDraftRef.current, false);
+        if (!saved) {
+          setSendError('ไม่สามารถบันทึกข้อมูลคัดกรองก่อนส่งเข้าห้องตรวจได้');
+          return;
+        }
+      }
+      const updated = await startTreatment(appt.id);
       setSendConfirmOpen(false);
-      setStep('treatment');
+      setStep('summary');
+      if (onAfterSave && updated?.visit) onAfterSave(updated.visit);
       show(`ส่งน้อง ${appt.petName} เข้าห้องตรวจแล้ว`);
+    } catch (err) {
+      setSendError(err?.message || 'ไม่สามารถส่งเข้าห้องตรวจได้');
+    } finally {
+      setSending(false);
     }
   }
 
-  function handleRequestSendToVet() {
-    if (!triagedDone || appt.status !== 'checked_in') return;
+  async function handleRequestSendToVet() {
+    if (!triagedDone || appt.stage !== 'checked_in' || readOnly || sending) return;
     if (checkedCount < checklistItems.length) {
+      setSendError('');
       setSendConfirmOpen(true);
     } else {
-      doSendToVet();
+      await doSendToVet();
     }
   }
 
-  function handleCloseCase() {
-    if (readOnly || appt.status !== 'in_treatment') return;
-    if (followUp.enabled && followUpConflict) return;
-
-    const now = new Date().toISOString();
-    const followUpData = followUp.enabled
-      ? {
-          date: followUp.date,
-          time: followUp.time,
-          service: followUp.service,
-          vet: followUp.vet,
-        }
-      : null;
-
-    saveVisit(appt.id, {
-      patientId: patient?.patientId ?? null,
-      ...draft,
-      triage: effectiveTriage,
-      followUp: followUpData,
-      completedAt: now,
-    });
-
-    if (setStatus(appt.id, 'completed')) {
-      if (followUp.enabled) {
-        addAppointment({
-          petId: appt.petId ?? (patient?.registered ? patient.pet.id : null),
-          petName: appt.petName,
-          species: appt.species,
-          ownerName: appt.ownerName,
-          ownerPhone: appt.ownerPhone,
-          vet: followUp.vet,
-          service: followUp.service,
-          date: followUp.date,
-          time: followUp.time,
-          durationMin: 30,
-          status: 'confirmed',
-          source: 'walk_in',
-          handledAt: now,
-          reason: `นัดติดตามอาการจากการตรวจวันที่ ${formatDate(appt.date)}`,
-          notes: '',
-        });
-      }
-      navigate('/medical-assistant/medical-support', {
-        state: {
-          toastMessage: followUp.enabled
-            ? `ปิดเคส ${appt.petName} และสร้างนัดติดตามอาการแล้ว`
-            : `ปิดเคส ${appt.petName} เรียบร้อยแล้ว`,
-        },
-      });
-    }
-  }
-
-  const sp = speciesOf(appt.species);
-  const st = APPOINTMENT_STATUS[appt.status] ?? APPOINTMENT_STATUS.checked_in;
+  const sp = speciesOf(appt.petSpecies);
+  const st = STAGE_META[appt.stage] ?? STAGE_META.checked_in;
   const patientFlags = patient?.flags ?? [];
+  const allergies = appt.pet?.allergies || patient?.allergies || '';
+  const chronicDiseases = appt.pet?.chronicDiseases || patient?.chronicDiseases || '';
+  const medications = appt.pet?.medications || patient?.medications || '';
+  const prevWeight = appt.pet?.weight || patient?.weight || '';
+
   const weightVal = Number(draft.vitals.weight);
-  const prevWeightNum = previousWeight ? Number(previousWeight) : NaN;
+  const prevWeightNum = prevWeight ? Number(prevWeight) : NaN;
   const weightDelta =
     draft.vitals.weight && !Number.isNaN(weightVal) && !Number.isNaN(prevWeightNum)
       ? Math.round((weightVal - prevWeightNum) * 10) / 10
       : null;
 
-  const displayWeight = draft.vitals.weight || previousWeight || patient?.pet?.weight;
+  const displayWeight = draft.vitals.weight || prevWeight;
   const waitText = formatWaitSince(appt);
-  const savedTimeText = formatSavedTime(lastSavedIso);
+  const savedClock = formatSavedClock(lastSavedIso);
 
   const stepTabs = [
-    { id: 'triage', label: '1. คัดกรอง', done: triagedDone, disabled: false },
-    { id: 'prep', label: '2. เตรียมความพร้อม', done: prepDone, disabled: false },
-    {
-      id: 'treatment',
-      label: '3. บันทึกการรักษา',
-      done: treatmentDone,
-      disabled: appt.status !== 'in_treatment' && appt.status !== 'completed',
-      title:
-        appt.status !== 'in_treatment' && appt.status !== 'completed'
-          ? 'กรุณาส่งเข้าห้องตรวจก่อนบันทึกการรักษา'
-          : '',
-    },
-    { id: 'summary', label: '4. สรุปและปิดเคส', done: appt.status === 'completed', disabled: false },
+    { id: 'triage', label: '1. คัดกรองและสัญญาณชีพ', done: triagedDone },
+    { id: 'prep', label: '2. เตรียมความพร้อม', done: prepDone },
+    { id: 'summary', label: '3. สรุปและส่งต่อหมอ', done: appt.stage === 'completed' },
   ];
+
+  const readOnlyReason =
+    appt.stage === 'completed'
+      ? 'เคสนี้สัตวแพทย์ปิดการรักษาแล้ว แสดงในโหมดอ่านอย่างเดียว'
+      : !isToday
+        ? `นัดหมายนี้เป็นของวันที่ ${formatDate(appt.date)} (ไม่ใช่วันนี้) แสดงในโหมดอ่านอย่างเดียว`
+        : !isCheckedIn
+          ? 'ผู้ป่วยยังไม่ได้เช็คอิน แสดงในโหมดอ่านอย่างเดียว'
+          : '';
 
   return (
     <section>
@@ -335,33 +426,83 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
           <i className="bi bi-arrow-left me-1" />
           กลับไปหน้าคิวสนับสนุนการรักษา
         </Link>
-        {savedTimeText && (
-          <span className="small text-muted">
-            <i className="bi bi-cloud-check me-1 text-sky" />
-            บันทึกล่าสุด {savedTimeText}
-          </span>
+
+        {!readOnly && (
+          <div className="d-flex align-items-center gap-2 small">
+            {saveState === 'saving' && (
+              <span className="text-muted">
+                <span className="spinner-border spinner-border-sm me-1" aria-hidden="true" />
+                กำลังบันทึก…
+              </span>
+            )}
+            {saveState === 'saved' && savedClock && (
+              <span className="text-muted">
+                <i className="bi bi-cloud-check me-1 text-sky" />
+                บันทึกแล้ว {savedClock}
+              </span>
+            )}
+            {saveState === 'error' && (
+              <span className="text-danger d-inline-flex align-items-center gap-2">
+                <span>
+                  <i className="bi bi-exclamation-circle me-1" />
+                  บันทึกไม่สำเร็จ{saveError ? `: ${saveError}` : ''}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-soft btn-sm py-0 px-2"
+                  onClick={() => persistNow(latestDraftRef.current, true)}
+                >
+                  ลองบันทึกใหม่
+                </button>
+              </span>
+            )}
+          </div>
         )}
       </div>
 
       {readOnly && (
         <div className="alert-soft info mb-3 ma-no-print">
           <i className="bi bi-lock" />
-          <span>เคสนี้ปิดการรักษาแล้ว แสดงในโหมดอ่านอย่างเดียว</span>
+          <span>{readOnlyReason}</span>
         </div>
       )}
 
-      {(patientFlags.length > 0 || patient?.pet?.allergies || patient?.pet?.chronicDiseases) && (
+      {appt.stage === 'in_treatment' && isToday && (
+        <div className="alert-soft warn mb-3 ma-no-print">
+          <i className="bi bi-heart-pulse" />
+          <span>ผู้ป่วยอยู่ในห้องตรวจ — รอหมอปิดเคส</span>
+        </div>
+      )}
+
+      {(patientFlags.length > 0 || allergies || chronicDiseases || medications) && (
         <div className="alert-soft danger mb-3">
           <i className="bi bi-exclamation-triangle-fill" />
-          <div className="d-flex flex-wrap align-items-center gap-2">
-            <strong>ข้อควรระวังผู้ป่วย:</strong>
-            {patientFlags.map((f) => (
-              <span key={f} className={`tag ${CAUTION_FLAGS[f]?.tag ?? 'danger'} m-0`}>
-                {CAUTION_FLAGS[f]?.label ?? f}
-              </span>
-            ))}
-            {patient?.pet?.allergies && <span>แพ้: {patient.pet.allergies}</span>}
-            {patient?.pet?.chronicDiseases && <span>โรคประจำตัว: {patient.pet.chronicDiseases}</span>}
+          <div className="d-grid gap-1">
+            <div className="d-flex flex-wrap align-items-center gap-2">
+              <strong>ข้อมูลสำคัญทางการแพทย์และข้อควรระวัง:</strong>
+              {patientFlags.map((f) => (
+                <span key={f} className={`tag ${CAUTION_FLAGS[f]?.tag ?? 'danger'} m-0`}>
+                  {CAUTION_FLAGS[f]?.label ?? f}
+                </span>
+              ))}
+            </div>
+            <div className="small d-flex flex-wrap gap-3">
+              {allergies && (
+                <span>
+                  <strong>แพ้ยา / อาหาร:</strong> {allergies}
+                </span>
+              )}
+              {chronicDiseases && (
+                <span>
+                  <strong>โรคประจำตัว:</strong> {chronicDiseases}
+                </span>
+              )}
+              {medications && (
+                <span>
+                  <strong>ยาที่ใช้อยู่:</strong> {medications}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -370,7 +511,7 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
         <div className="alert-soft warn mb-3">
           <i className="bi bi-heart-pulse" />
           <span>
-            <strong>ค่าสัญญาณชีพอยู่นอกเกณฑ์อ้างอิง:</strong>{' '}
+            <strong>ค่าสัญญาณชีพอยู่นอกเกณฑ์อ้างอิง ({sp.label}):</strong>{' '}
             {vFlags
               .map(
                 (vf) =>
@@ -383,48 +524,56 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
 
       <div className="card-soft mb-4 ma-no-print">
         <div className="d-flex flex-wrap align-items-center gap-3 gap-md-4">
-          <PetPhoto
-            pet={{ name: appt.petName, species: appt.species, photo: patient?.pet?.photo }}
-            size="lg"
-          />
+          <PetPhoto pet={{ name: appt.petName, species: appt.petSpecies }} size="lg" />
           <div className="flex-grow-1" style={{ minWidth: 0 }}>
             <div className="d-flex flex-wrap align-items-center gap-2 mb-1">
               <h1 className="h2 mb-0">
-                {patient ? (
-                  <PatientNameLink
-                    patientId={patient.patientId}
-                    petName={appt.petName}
-                    species={appt.species}
-                    flags={patientFlags}
-                    allergies={patient?.pet?.allergies}
-                    showEmoji={false}
-                  />
-                ) : (
-                  appt.petName
-                )}
+                <PatientNameLink
+                  petId={appt.petId}
+                  petName={appt.petName}
+                  petSpecies={appt.petSpecies}
+                  flags={patientFlags}
+                  allergies={allergies}
+                  showEmoji={false}
+                />
               </h1>
               <span className={`tag ${st.tag} m-0`}>{st.label}</span>
-              {effectiveTriage && TRIAGE_LEVELS[effectiveTriage] && (
-                <span className={`tag ${TRIAGE_LEVELS[effectiveTriage].tag} m-0`}>
-                  เร่งด่วน: {TRIAGE_LEVELS[effectiveTriage].label}
+              {appt.stage === 'in_treatment' && (
+                <span className="tag warn m-0">รอหมอปิดเคส</span>
+              )}
+              {draft.triage && TRIAGE_LEVELS[draft.triage] ? (
+                <span className={`tag ${TRIAGE_LEVELS[draft.triage].tag} m-0`}>
+                  เร่งด่วน: {TRIAGE_LEVELS[draft.triage].label}
                 </span>
+              ) : (
+                <span className="tag warn m-0">ยังไม่คัดกรอง</span>
               )}
               {waitText && <span className="tag sky m-0">{waitText}</span>}
             </div>
 
             <div className="text-muted mb-2">
               {sp.emoji} {sp.label}
-              {patient?.breed ? ` · ${patient.breed}` : ''}
-              {patient?.pet?.birthDate ? ` · ${ageText(patient.pet.birthDate)}` : ''}
+              {(appt.pet?.breed ?? patient?.breed) ? ` · ${appt.pet?.breed ?? patient.breed}` : ''}
+              {(appt.pet?.birthDate ?? patient?.birthDate)
+                ? ` · ${ageText(appt.pet?.birthDate ?? patient.birthDate)}`
+                : ''}
               {displayWeight ? ` · น้ำหนัก ${displayWeight} กก.` : ''}
             </div>
 
             <div className="small">
               <i className="bi bi-person me-1 text-sky" />
-              {appt.ownerName} · {appt.ownerPhone}
+              {appt.ownerName || '—'} ·{' '}
+              {appt.ownerPhone ? (
+                <a href={`tel:${appt.ownerPhone}`} className="text-decoration-none">
+                  {appt.ownerPhone}
+                </a>
+              ) : (
+                '—'
+              )}
               {' · '}
               <i className="bi bi-clipboard2-pulse me-1 text-sky" />
-              <strong>{appt.service}</strong> · {appt.vet}
+              <strong>{appt.serviceLabel || appt.service}</strong> ·{' '}
+              {appt.visit?.vet || 'ยังไม่ระบุหมอ'}
             </div>
           </div>
         </div>
@@ -436,8 +585,6 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
             key={t.id}
             type="button"
             role="tab"
-            disabled={t.disabled}
-            title={t.title || undefined}
             aria-selected={step === t.id}
             className={step === t.id ? 'active' : ''}
             onClick={() => setStep(t.id)}
@@ -468,12 +615,13 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
               <textarea
                 id="sc-complaint"
                 rows={2}
+                maxLength={1000}
                 className="form-control"
                 disabled={readOnly}
                 placeholder="อาการที่เจ้าของแจ้งหรืออาการที่สังเกตพบแรกรับ"
                 value={draft.chiefComplaint}
-                onChange={(e) => updateField('chiefComplaint', e.target.value)}
-                onBlur={() => persist(draft, false)}
+                onChange={(e) => updateComplaint(e.target.value)}
+                onBlur={() => dirtyRef.current && persistNow(latestDraftRef.current, false)}
               />
             </div>
 
@@ -485,25 +633,26 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
                 id="sc-weight"
                 type="number"
                 step="0.1"
-                min="0"
+                min={vitalLimits.weight?.min ?? 0}
+                max={vitalLimits.weight?.max ?? 150}
                 className="form-control"
                 disabled={readOnly}
                 placeholder="เช่น 8.5"
                 value={draft.vitals.weight}
                 onChange={(e) => updateVital('weight', e.target.value)}
-                onBlur={() => persist(draft, false)}
+                onBlur={() => dirtyRef.current && persistNow(latestDraftRef.current, false)}
               />
               {weightDelta !== null && (
                 <div className="ma-vital-hint">
                   {weightDelta > 0
-                    ? `+${weightDelta} กก. จากครั้งก่อน (${previousWeight} กก.)`
+                    ? `+${weightDelta} กก. จากข้อมูลสัตว์ (${prevWeight} กก.)`
                     : weightDelta < 0
-                      ? `${weightDelta} กก. จากครั้งก่อน (${previousWeight} กก.)`
-                      : `เท่าเดิมกับครั้งก่อน (${previousWeight} กก.)`}
+                      ? `${weightDelta} กก. จากข้อมูลสัตว์ (${prevWeight} กก.)`
+                      : `เท่าเดิมกับข้อมูลสัตว์ (${prevWeight} กก.)`}
                 </div>
               )}
-              {weightDelta === null && previousWeight && (
-                <div className="ma-vital-hint">ครั้งก่อน: {previousWeight} กก.</div>
+              {weightDelta === null && prevWeight && (
+                <div className="ma-vital-hint">น้ำหนักเดิม: {prevWeight} กก.</div>
               )}
             </div>
 
@@ -515,12 +664,14 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
                 id="sc-temp"
                 type="number"
                 step="0.1"
+                min={vitalLimits.temp?.min ?? 30}
+                max={vitalLimits.temp?.max ?? 45}
                 className={`form-control${flagByKey.temp ? ' is-invalid' : ''}`}
                 disabled={readOnly}
                 placeholder={`${ranges.temp.min}–${ranges.temp.max}`}
                 value={draft.vitals.temp}
                 onChange={(e) => updateVital('temp', e.target.value)}
-                onBlur={() => persist(draft, false)}
+                onBlur={() => dirtyRef.current && persistNow(latestDraftRef.current, false)}
               />
               {flagByKey.temp ? (
                 <div className="invalid-feedback">
@@ -540,12 +691,14 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
               <input
                 id="sc-hr"
                 type="number"
+                min={vitalLimits.heartRate?.min ?? 20}
+                max={vitalLimits.heartRate?.max ?? 400}
                 className={`form-control${flagByKey.heartRate ? ' is-invalid' : ''}`}
                 disabled={readOnly}
                 placeholder={`${ranges.heartRate.min}–${ranges.heartRate.max}`}
                 value={draft.vitals.heartRate}
                 onChange={(e) => updateVital('heartRate', e.target.value)}
-                onBlur={() => persist(draft, false)}
+                onBlur={() => dirtyRef.current && persistNow(latestDraftRef.current, false)}
               />
               {flagByKey.heartRate ? (
                 <div className="invalid-feedback">
@@ -565,12 +718,14 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
               <input
                 id="sc-rr"
                 type="number"
+                min={vitalLimits.respRate?.min ?? 5}
+                max={vitalLimits.respRate?.max ?? 150}
                 className={`form-control${flagByKey.respRate ? ' is-invalid' : ''}`}
                 disabled={readOnly}
                 placeholder={`${ranges.respRate.min}–${ranges.respRate.max}`}
                 value={draft.vitals.respRate}
                 onChange={(e) => updateVital('respRate', e.target.value)}
-                onBlur={() => persist(draft, false)}
+                onBlur={() => dirtyRef.current && persistNow(latestDraftRef.current, false)}
               />
               {flagByKey.respRate ? (
                 <div className="invalid-feedback">
@@ -592,11 +747,7 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
                 className="form-select"
                 disabled={readOnly}
                 value={draft.vitals.bcs}
-                onChange={(e) => {
-                  const next = { ...draft, vitals: { ...draft.vitals, bcs: e.target.value } };
-                  setDraft(next);
-                  persist(next, false);
-                }}
+                onChange={(e) => updateVital('bcs', e.target.value)}
               >
                 <option value="">-- เลือก 1–9 --</option>
                 {BCS_SCALE.map((b) => (
@@ -616,16 +767,7 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
                 className="form-select"
                 disabled={readOnly}
                 value={draft.vitals.pain}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  const nextVitals = { ...draft.vitals, pain: val };
-                  const nextTriage = triageLocked
-                    ? draft.triage
-                    : suggestTriage(appt.species, nextVitals);
-                  const next = { ...draft, vitals: nextVitals, triage: nextTriage };
-                  setDraft(next);
-                  persist(next, false);
-                }}
+                onChange={(e) => updateVital('pain', e.target.value)}
               >
                 <option value="">-- เลือก 0–4 --</option>
                 {PAIN_SCALE.map((p) => (
@@ -645,11 +787,7 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
                 className="form-select"
                 disabled={readOnly}
                 value={draft.vitals.mucous}
-                onChange={(e) => {
-                  const next = { ...draft, vitals: { ...draft.vitals, mucous: e.target.value } };
-                  setDraft(next);
-                  persist(next, false);
-                }}
+                onChange={(e) => updateVital('mucous', e.target.value)}
               >
                 <option value="">-- เลือก --</option>
                 {MUCOUS_OPTIONS.map((m) => (
@@ -669,11 +807,7 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
                 className="form-select"
                 disabled={readOnly}
                 value={draft.vitals.crt}
-                onChange={(e) => {
-                  const next = { ...draft, vitals: { ...draft.vitals, crt: e.target.value } };
-                  setDraft(next);
-                  persist(next, false);
-                }}
+                onChange={(e) => updateVital('crt', e.target.value)}
               >
                 <option value="">-- เลือก --</option>
                 {CRT_OPTIONS.map((c) => (
@@ -690,10 +824,19 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
                 <span className={`tag ${TRIAGE_LEVELS[recommendedTriage].tag} m-0`}>
                   ระบบแนะนำ: {TRIAGE_LEVELS[recommendedTriage].label}
                 </span>
+                {!readOnly && draft.triage !== recommendedTriage && (
+                  <button
+                    type="button"
+                    className="btn btn-soft btn-sm py-0 px-2"
+                    onClick={() => selectTriage(recommendedTriage)}
+                  >
+                    ใช้ค่าแนะนำ ({TRIAGE_LEVELS[recommendedTriage].label})
+                  </button>
+                )}
               </div>
               <div className="d-flex flex-wrap gap-2">
                 {TRIAGE_LEVEL_LIST.map((lvl) => {
-                  const selected = effectiveTriage === lvl.value;
+                  const selected = draft.triage === lvl.value;
                   return (
                     <button
                       key={lvl.value}
@@ -704,12 +847,7 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
                           ? `tag ${lvl.tag} ma-flag-toggle`
                           : 'btn btn-soft btn-sm ma-flag-toggle'
                       }
-                      onClick={() => {
-                        setTriageLocked(true);
-                        const next = { ...draft, triage: lvl.value };
-                        setDraft(next);
-                        persist(next, false);
-                      }}
+                      onClick={() => selectTriage(lvl.value)}
                     >
                       {selected && <i className="bi bi-check2" />}
                       {lvl.label}
@@ -722,15 +860,22 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
 
           {!readOnly && (
             <div className="d-flex flex-wrap justify-content-end gap-2 mt-4">
-              <button type="button" className="btn btn-soft" onClick={() => persist(draft, true)}>
+              <button
+                type="button"
+                className="btn btn-soft"
+                disabled={saveState === 'saving'}
+                onClick={() => persistNow(latestDraftRef.current, true)}
+              >
                 <i className="bi bi-save me-1" />
                 บันทึก
               </button>
               <button
                 type="button"
                 className="btn btn-sky"
-                onClick={() => {
-                  persist(draft, false);
+                onClick={async () => {
+                  if (dirtyRef.current || debounceRef.current) {
+                    await persistNow(latestDraftRef.current, false);
+                  }
                   setStep('prep');
                 }}
               >
@@ -747,7 +892,7 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
           <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
             <div className="section-label mb-0">
               <i className="bi bi-list-check" />
-              เตรียมความพร้อม ({appt.service})
+              เตรียมความพร้อม ({appt.serviceLabel || appt.service})
             </div>
             <span className="tag sky m-0">
               {checkedCount}/{checklistItems.length} รายการ
@@ -784,211 +929,26 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
 
           {!readOnly && (
             <div className="d-flex flex-wrap justify-content-end gap-2">
-              <button type="button" className="btn btn-soft" onClick={() => persist(draft, true)}>
-                <i className="bi bi-save me-1" />
-                บันทึก
-              </button>
-              {appt.status === 'checked_in' ? (
-                <button
-                  type="button"
-                  className="btn btn-sky"
-                  disabled={!triagedDone}
-                  title={!triagedDone ? 'กรุณาคัดกรองก่อนส่งเข้าห้องตรวจ' : undefined}
-                  onClick={handleRequestSendToVet}
-                >
-                  <i className="bi bi-box-arrow-in-right me-1" />
-                  ส่งเข้าห้องตรวจ
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-sky"
-                  onClick={() => setStep('treatment')}
-                >
-                  ถัดไป: บันทึกการรักษา
-                  <i className="bi bi-arrow-right ms-1" />
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {step === 'treatment' && (
-        <div className="card-soft">
-          <div className="section-label">
-            <i className="bi bi-journal-medical" />
-            ผู้ช่วยบันทึกตามคำสั่งสัตวแพทย์
-          </div>
-
-          <div className="mb-4">
-            <label className="form-label" htmlFor="sc-orders">
-              คำสั่ง / ผลวินิจฉัยของสัตวแพทย์
-            </label>
-            <textarea
-              id="sc-orders"
-              rows={3}
-              className="form-control"
-              disabled={readOnly}
-              placeholder="บันทึกการตรวจรักษา หัตถการ หรือคำสั่งของสัตวแพทย์"
-              value={draft.vetOrders}
-              onChange={(e) => updateField('vetOrders', e.target.value)}
-              onBlur={() => persist(draft, false)}
-            />
-          </div>
-
-          <div className="mb-4">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <div className="form-label mb-0">รายการยา ({draft.medications.length})</div>
-              {!readOnly && (
-                <button type="button" className="btn btn-soft btn-sm" onClick={addMedication}>
-                  <i className="bi bi-plus-lg me-1" />
-                  เพิ่มรายการยา
-                </button>
-              )}
-            </div>
-
-            {draft.medications.length === 0 ? (
-              <div className="empty-box py-3">
-                <i className="bi bi-capsule" />
-                ยังไม่มีรายการยา
-              </div>
-            ) : (
-              draft.medications.map((med, idx) => (
-                <div className="record-row" key={med.id ?? idx}>
-                  {!readOnly && (
-                    <button
-                      type="button"
-                      className="btn btn-soft-danger btn-sm remove"
-                      aria-label="ลบรายการยา"
-                      onClick={() => removeMedication(idx)}
-                    >
-                      <i className="bi bi-trash3" />
-                    </button>
-                  )}
-                  <div className="row g-2 pb-2 pe-5">
-                    <div className="col-md-4">
-                      <label className="form-label small">ชื่อยา</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        disabled={readOnly}
-                        placeholder="เช่น Amoxicillin"
-                        value={med.name}
-                        onChange={(e) => updateMedication(idx, 'name', e.target.value)}
-                        onBlur={() => persist(draft, false)}
-                      />
-                    </div>
-                    <div className="col-6 col-md-2">
-                      <label className="form-label small">ขนาด</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        disabled={readOnly}
-                        placeholder="เช่น 1 เม็ด"
-                        value={med.dose}
-                        onChange={(e) => updateMedication(idx, 'dose', e.target.value)}
-                        onBlur={() => persist(draft, false)}
-                      />
-                    </div>
-                    <div className="col-6 col-md-2">
-                      <label className="form-label small">วิธีให้</label>
-                      <select
-                        className="form-select form-select-sm"
-                        disabled={readOnly}
-                        value={med.route}
-                        onChange={(e) => {
-                          const nextMeds = draft.medications.map((m, i) =>
-                            i === idx ? { ...m, route: e.target.value } : m,
-                          );
-                          const next = { ...draft, medications: nextMeds };
-                          setDraft(next);
-                          persist(next, false);
-                        }}
-                      >
-                        {MED_ROUTES.map((r) => (
-                          <option key={r} value={r}>
-                            {r}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-8 col-md-3">
-                      <label className="form-label small">ความถี่</label>
-                      <input
-                        type="text"
-                        className="form-control form-control-sm"
-                        disabled={readOnly}
-                        placeholder="เช่น เช้า-เย็น หลังอาหาร"
-                        value={med.frequency}
-                        onChange={(e) => updateMedication(idx, 'frequency', e.target.value)}
-                        onBlur={() => persist(draft, false)}
-                      />
-                    </div>
-                    <div className="col-4 col-md-1">
-                      <label className="form-label small">วัน</label>
-                      <input
-                        type="number"
-                        min="1"
-                        className="form-control form-control-sm"
-                        disabled={readOnly}
-                        placeholder="7"
-                        value={med.days}
-                        onChange={(e) => updateMedication(idx, 'days', e.target.value)}
-                        onBlur={() => persist(draft, false)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="mb-3">
-            <label className="form-label" htmlFor="sc-instructions">
-              คำแนะนำสำหรับเจ้าของ
-            </label>
-            {!readOnly && (
-              <div className="ma-template-pills mb-2">
-                {OWNER_INSTRUCTION_TEMPLATES.map((tpl) => (
-                  <button
-                    key={tpl}
-                    type="button"
-                    className="btn btn-soft btn-sm"
-                    onClick={() => appendInstructionTemplate(tpl)}
-                  >
-                    + {tpl}
-                  </button>
-                ))}
-              </div>
-            )}
-            <textarea
-              id="sc-instructions"
-              rows={3}
-              className="form-control"
-              disabled={readOnly}
-              placeholder="คำแนะนำการดูแลที่บ้าน การป้อนยา หรืออาการที่ต้องรีบพามาพบแพทย์"
-              value={draft.ownerInstructions}
-              onChange={(e) => updateField('ownerInstructions', e.target.value)}
-              onBlur={() => persist(draft, false)}
-            />
-          </div>
-
-          {!readOnly && (
-            <div className="d-flex flex-wrap justify-content-end gap-2 mt-4">
-              <button type="button" className="btn btn-soft" onClick={() => persist(draft, true)}>
+              <button
+                type="button"
+                className="btn btn-soft"
+                disabled={saveState === 'saving'}
+                onClick={() => persistNow(latestDraftRef.current, true)}
+              >
                 <i className="bi bi-save me-1" />
                 บันทึก
               </button>
               <button
                 type="button"
                 className="btn btn-sky"
-                onClick={() => {
-                  persist(draft, false);
+                onClick={async () => {
+                  if (dirtyRef.current || debounceRef.current) {
+                    await persistNow(latestDraftRef.current, false);
+                  }
                   setStep('summary');
                 }}
               >
-                ถัดไป: สรุปและปิดเคส
+                ถัดไป: สรุปและส่งต่อหมอ
                 <i className="bi bi-arrow-right ms-1" />
               </button>
             </div>
@@ -997,282 +957,133 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
       )}
 
       {step === 'summary' && (
-        <div className="d-grid gap-4">
-          <div className="card-soft ma-print-summary">
-            <div className="ma-print-only mb-3 pb-2" style={{ borderBottom: '1.5px solid var(--baby)' }}>
-              <div className="mitr fs-4">ใบสรุปการตรวจรักษา · PetCare Clinic</div>
-              <div className="small text-muted">
-                วันที่ {formatDate(appt.date)} · เวลา {appt.time} น. · สัตวแพทย์ {appt.vet}
-              </div>
-            </div>
-
-            <div className="section-label">
-              <i className="bi bi-file-earmark-medical" />
-              สรุปผลการตรวจและคำแนะนำ
-            </div>
-
-            <div className="info-grid mb-3">
-              <div className="info-item">
-                <div className="k">สัตว์เลี้ยง</div>
-                <div className="v">
-                  {sp.emoji} {appt.petName} ({sp.label})
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="k">เจ้าของ</div>
-                <div className="v">
-                  {appt.ownerName} · {appt.ownerPhone}
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="k">บริการ / สัตวแพทย์</div>
-                <div className="v">
-                  {appt.service} · {appt.vet}
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="k">น้ำหนัก / อุณหภูมิ</div>
-                <div className="v">
-                  {draft.vitals.weight ? `${draft.vitals.weight} กก.` : '-'} /{' '}
-                  {draft.vitals.temp ? `${draft.vitals.temp} °C` : '-'}
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="k">ชีพจร / หายใจ</div>
-                <div className="v">
-                  {draft.vitals.heartRate ? `${draft.vitals.heartRate} ครั้ง/นาที` : '-'} /{' '}
-                  {draft.vitals.respRate ? `${draft.vitals.respRate} ครั้ง/นาที` : '-'}
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="k">BCS / Pain / เยื่อเมือก</div>
-                <div className="v">
-                  {draft.vitals.bcs ? `${draft.vitals.bcs}/9` : '-'} ·{' '}
-                  {draft.vitals.pain !== '' ? `Pain ${draft.vitals.pain}/4` : '-'} ·{' '}
-                  {draft.vitals.mucous || '-'}
-                </div>
-              </div>
-            </div>
-
-            <div className="d-grid gap-2 mb-3">
-              <div className="info-item">
-                <div className="k">อาการสำคัญ</div>
-                <div className="v">{draft.chiefComplaint || '-'}</div>
-              </div>
-              <div className="info-item">
-                <div className="k">คำสั่ง / ผลวินิจฉัยของสัตวแพทย์</div>
-                <div className="v">{draft.vetOrders || '-'}</div>
-              </div>
-              <div className="info-item">
-                <div className="k">รายการยา ({draft.medications.length})</div>
-                {draft.medications.length > 0 ? (
-                  <ul className="mb-0 ps-3 mt-1">
-                    {draft.medications.map((m, idx) => (
-                      <li key={m.id ?? idx} className="small">
-                        <strong>{m.name || 'ไม่ระบุชื่อยา'}</strong>
-                        {m.dose ? ` · ${m.dose}` : ''}
-                        {m.route ? ` · ${m.route}` : ''}
-                        {m.frequency ? ` · ${m.frequency}` : ''}
-                        {m.days ? ` (${m.days} วัน)` : ''}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="v">-</div>
-                )}
-              </div>
-              <div className="info-item">
-                <div className="k">คำแนะนำสำหรับเจ้าของ</div>
-                <div className="v" style={{ whiteSpace: 'pre-line' }}>
-                  {draft.ownerInstructions || '-'}
-                </div>
-              </div>
-              {existingVisit?.followUp && (
-                <div className="info-item">
-                  <div className="k">นัดติดตามอาการ</div>
-                  <div className="v">
-                    {formatDate(existingVisit.followUp.date)} เวลา {existingVisit.followUp.time} น. ·{' '}
-                    {existingVisit.followUp.service} ({existingVisit.followUp.vet})
-                  </div>
-                </div>
-              )}
+        <div className="card-soft ma-print-summary">
+          <div className="ma-print-only mb-3 pb-2" style={{ borderBottom: '1.5px solid var(--baby)' }}>
+            <div className="mitr fs-4">ใบสรุปการคัดกรองเบื้องต้น · PetCare Clinic</div>
+            <div className="small text-muted">
+              วันที่ {formatDate(appt.date)} · เวลา {appt.time} น. · สัตวแพทย์{' '}
+              {appt.visit?.vet || 'ยังไม่ระบุ'}
             </div>
           </div>
 
-          {!readOnly && (
-            <div className="card-soft ma-no-print">
-              <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <div className="section-label mb-0">
-                  <i className="bi bi-calendar-plus" />
-                  นัดติดตามอาการ (ถ้ามี)
-                </div>
-                <label className="d-inline-flex align-items-center gap-2" style={{ cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    className="form-check-input mt-0"
-                    checked={followUp.enabled}
-                    onChange={(e) =>
-                      setFollowUp((prev) => ({ ...prev, enabled: e.target.checked }))
-                    }
-                  />
-                  <span>สร้างนัดติดตามอาการ</span>
-                </label>
-              </div>
+          <div className="section-label">
+            <i className="bi bi-file-earmark-medical" />
+            สรุปข้อมูลคัดกรองและสัญญาณชีพ
+          </div>
 
-              {followUp.enabled && (
-                <div className="mb-3">
-                  {followUpConflict && (
-                    <div className="alert-soft warn mb-3">
-                      <i className="bi bi-exclamation-triangle" />
-                      <span>
-                        {followUp.vet} มีนัดซ้อนในช่วงเวลา {followUpConflict.rangeText} (
-                        {followUpConflict.petName} · {followUpConflict.ownerName})
-                      </span>
-                    </div>
-                  )}
-
-                  <div className="row g-3">
-                    <div className="col-12 col-sm-6 col-md-3">
-                      <label className="form-label" htmlFor="fu-date">
-                        วันที่นัด
-                      </label>
-                      <input
-                        id="fu-date"
-                        type="date"
-                        className="form-control"
-                        value={followUp.date}
-                        onChange={(e) =>
-                          setFollowUp((prev) => ({ ...prev, date: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="col-12 col-sm-6 col-md-3">
-                      <label className="form-label" htmlFor="fu-time">
-                        เวลา
-                      </label>
-                      <input
-                        id="fu-time"
-                        type="time"
-                        className="form-control"
-                        value={followUp.time}
-                        onChange={(e) =>
-                          setFollowUp((prev) => ({ ...prev, time: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="col-md-3">
-                      <label className="form-label" htmlFor="fu-service">
-                        บริการ
-                      </label>
-                      <select
-                        id="fu-service"
-                        className="form-select"
-                        value={followUp.service}
-                        onChange={(e) =>
-                          setFollowUp((prev) => ({ ...prev, service: e.target.value }))
-                        }
-                      >
-                        {SERVICE_TYPES.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-3">
-                      <label className="form-label" htmlFor="fu-vet">
-                        สัตวแพทย์
-                      </label>
-                      <select
-                        id="fu-vet"
-                        className="form-select"
-                        value={followUp.vet}
-                        onChange={(e) =>
-                          setFollowUp((prev) => ({ ...prev, vet: e.target.value }))
-                        }
-                      >
-                        {VETS.map((v) => (
-                          <option key={v.name} value={v.name}>
-                            {v.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="mt-3">
-                    <div className="form-label small mb-1">เวลาว่างที่แนะนำ</div>
-                    {followUpSlots.length > 0 ? (
-                      <div className="ma-slot-list">
-                        {followUpSlots.map((slot) => (
-                          <button
-                            key={slot}
-                            type="button"
-                            className={`btn btn-sm ${
-                              followUp.time === slot ? 'btn-sky' : 'btn-soft'
-                            }`}
-                            onClick={() => setFollowUp((prev) => ({ ...prev, time: slot }))}
-                          >
-                            {slot} น.
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="small text-muted">ไม่มีเวลาว่างที่แนะนำในวันที่เลือก</div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {appt.status !== 'in_treatment' && (
-                <div className="alert-soft warn mb-3">
-                  <i className="bi bi-info-circle" />
-                  <span>
-                    เคสนี้ยังไม่ได้ส่งเข้าห้องตรวจ กรุณากด "ส่งเข้าห้องตรวจ" ในขั้นที่ 2 ก่อนปิดเคส
-                  </span>
-                </div>
-              )}
-
-              <div className="d-flex flex-wrap justify-content-end gap-2">
-                <button type="button" className="btn btn-soft" onClick={() => window.print()}>
-                  <i className="bi bi-printer me-1" />
-                  พิมพ์ใบสรุป
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sky"
-                  disabled={
-                    appt.status !== 'in_treatment' || Boolean(followUp.enabled && followUpConflict)
-                  }
-                  onClick={handleCloseCase}
-                >
-                  <i className="bi bi-check2-circle me-1" />
-                  ปิดเคส
-                </button>
+          <div className="info-grid mb-3">
+            <div className="info-item">
+              <div className="k">สัตว์เลี้ยง</div>
+              <div className="v">
+                {sp.emoji} {appt.petName} ({sp.label})
               </div>
             </div>
-          )}
+            <div className="info-item">
+              <div className="k">เจ้าของ</div>
+              <div className="v">
+                {appt.ownerName || '—'} · {appt.ownerPhone || '—'}
+              </div>
+            </div>
+            <div className="info-item">
+              <div className="k">บริการ / สัตวแพทย์</div>
+              <div className="v">
+                {appt.serviceLabel || appt.service} · {appt.visit?.vet || 'ยังไม่ระบุ'}
+              </div>
+            </div>
+            <div className="info-item">
+              <div className="k">น้ำหนัก / อุณหภูมิ</div>
+              <div className="v">
+                {draft.vitals.weight ? `${draft.vitals.weight} กก.` : '-'} /{' '}
+                {draft.vitals.temp ? `${draft.vitals.temp} °C` : '-'}
+              </div>
+            </div>
+            <div className="info-item">
+              <div className="k">ชีพจร / หายใจ</div>
+              <div className="v">
+                {draft.vitals.heartRate ? `${draft.vitals.heartRate} ครั้ง/นาที` : '-'} /{' '}
+                {draft.vitals.respRate ? `${draft.vitals.respRate} ครั้ง/นาที` : '-'}
+              </div>
+            </div>
+            <div className="info-item">
+              <div className="k">BCS / Pain / เยื่อเมือก / CRT</div>
+              <div className="v">
+                {draft.vitals.bcs ? `${draft.vitals.bcs}/9` : '-'} ·{' '}
+                {draft.vitals.pain !== '' ? `Pain ${draft.vitals.pain}/4` : '-'} ·{' '}
+                {draft.vitals.mucous || '-'} · {draft.vitals.crt || '-'}
+              </div>
+            </div>
+          </div>
 
-          {readOnly && (
-            <div className="d-flex justify-content-end ma-no-print">
+          <div className="info-grid mb-3">
+            <div className="info-item">
+              <div className="k">ความเร่งด่วน (Triage)</div>
+              <div className="v">
+                {draft.triage && TRIAGE_LEVELS[draft.triage]
+                  ? TRIAGE_LEVELS[draft.triage].label
+                  : 'ยังไม่คัดกรอง'}
+              </div>
+            </div>
+            <div className="info-item">
+              <div className="k">การเตรียมความพร้อม</div>
+              <div className="v">
+                {checkedCount}/{checklistItems.length} รายการ
+              </div>
+            </div>
+            <div className="info-item" style={{ gridColumn: '1 / -1' }}>
+              <div className="k">อาการสำคัญ</div>
+              <div className="v">{draft.chiefComplaint || '-'}</div>
+            </div>
+          </div>
+
+          <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 ma-no-print">
+            <div>
+              {appt.stage === 'in_treatment' && (
+                <span className="tag warn m-0">รอหมอปิดเคส</span>
+              )}
+            </div>
+            <div className="d-flex flex-wrap gap-2">
               <button type="button" className="btn btn-soft" onClick={() => window.print()}>
                 <i className="bi bi-printer me-1" />
                 พิมพ์ใบสรุป
               </button>
+              {appt.stage === 'checked_in' && !readOnly && (
+                <button
+                  type="button"
+                  className="btn btn-sky"
+                  disabled={!triagedDone || sending}
+                  title={!triagedDone ? 'กรุณาคัดกรองก่อนส่งเข้าห้องตรวจ' : undefined}
+                  onClick={handleRequestSendToVet}
+                >
+                  {sending && (
+                    <span className="spinner-border spinner-border-sm me-1" aria-hidden="true" />
+                  )}
+                  <i className="bi bi-box-arrow-in-right me-1" />
+                  ส่งเข้าห้องตรวจ
+                </button>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
 
+      <VetRecordsSection
+        appt={appt}
+        vetRecords={vetRecords}
+        vaccinesGiven={vaccinesGiven}
+        parasitesGiven={parasitesGiven}
+      />
+
       <ConfirmModal
         open={sendConfirmOpen}
-        title="รายการเตรียมความพร้อมยังไม่ครบ"
+        title="ส่งผู้ป่วยเข้าห้องตรวจ"
         icon="bi-exclamation-triangle"
         message={`ทำรายการเตรียมความพร้อมแล้ว ${checkedCount}/${checklistItems.length} รายการ ต้องการส่งน้องเข้าห้องตรวจเลยหรือไม่?`}
         confirmLabel="ส่งเข้าห้องตรวจ"
         cancelLabel="กลับไปเช็คต่อ"
         confirmVariant="sky"
-        onClose={() => setSendConfirmOpen(false)}
+        submitting={sending}
+        error={sendError}
+        onClose={() => !sending && setSendConfirmOpen(false)}
         onConfirm={doSendToVet}
       />
 
@@ -1287,44 +1098,108 @@ function SupportCaseInner({ appt, patient, existingVisit, previousWeight }) {
  */
 export default function SupportCasePage() {
   const { appointmentId } = useParams();
-  const { getAppointment } = useAppointments();
-  const { getPatient, patientIdForAppt } = usePatients();
-  const { getVisit, visitsByPatient } = useVisits();
+  const { meta, lastLoadedAt, startTreatment } = useAppointments();
+  const { patients } = usePatients();
+  const { saveVisit } = useVisits();
 
-  const appt = getAppointment(appointmentId);
+  const [caseData, setCaseData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  if (!appt || (FINAL_STATUSES.includes(appt.status) && appt.status !== 'completed')) {
+  const loadCase = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!appointmentId) {
+        setCaseData(null);
+        setLoading(false);
+        setError('ไม่พบรหัสนัดหมาย');
+        return;
+      }
+      if (!silent) {
+        setLoading(true);
+        setError('');
+      }
+      try {
+        const data = await maRequest(`/appointments/${encodeURIComponent(appointmentId)}`);
+        setCaseData(data);
+        setError('');
+      } catch (err) {
+        if (!silent) {
+          setError(err?.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+        }
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [appointmentId],
+  );
+
+  useEffect(() => {
+    loadCase({ silent: false });
+  }, [loadCase]);
+
+  useEffect(() => {
+    if (lastLoadedAt) {
+      loadCase({ silent: true });
+    }
+  }, [lastLoadedAt, loadCase]);
+
+  const handleAfterSave = useCallback((savedVisit) => {
+    if (!savedVisit) return;
+    setCaseData((prev) => (prev ? { ...prev, visit: savedVisit } : prev));
+  }, []);
+
+  const handleStartTreatment = useCallback(
+    async (id) => {
+      const updated = await startTreatment(id);
+      setCaseData((prev) => (prev ? { ...prev, ...updated } : updated));
+      return updated;
+    },
+    [startTreatment],
+  );
+
+  if (loading || error || !caseData) {
     return (
       <section>
-        <div className="card-soft empty-box">
-          <i className="bi bi-calendar-x" />
-          <div>ไม่พบเคสที่ต้องการ หรือนัดหมายถูกยกเลิกไปแล้ว</div>
-          <div className="mt-3">
-            <Link to="/medical-assistant/medical-support" className="btn btn-sky">
-              กลับไปหน้าสนับสนุนการรักษา
-            </Link>
-          </div>
+        <div className="mb-3">
+          <Link to="/medical-assistant/medical-support" className="small text-decoration-none">
+            <i className="bi bi-arrow-left me-1" />
+            กลับไปหน้าคิวสนับสนุนการรักษา
+          </Link>
         </div>
+
+        <MaDataState
+          loading={loading}
+          error={error}
+          hasData={Boolean(caseData)}
+          onRetry={() => loadCase({ silent: false })}
+        />
+
+        {!loading && !error && !caseData && (
+          <div className="card-soft empty-box">
+            <i className="bi bi-calendar-x" />
+            <div>ไม่พบเคสที่ต้องการ</div>
+            <div className="mt-3">
+              <Link to="/medical-assistant/medical-support" className="btn btn-sky">
+                กลับไปหน้าสนับสนุนการรักษา
+              </Link>
+            </div>
+          </div>
+        )}
       </section>
     );
   }
 
-  const pid = patientIdForAppt(appt);
-  const patient = getPatient(pid);
-  const existingVisit = getVisit(appt.id);
-
-  const patientVisits = visitsByPatient(pid).filter(
-    (v) => v.appointmentId !== appt.id && v.vitals?.weight,
-  );
-  const previousWeight = patientVisits[0]?.vitals?.weight || patient?.pet?.weight || '';
+  const patient = patients.find((p) => p.id === caseData.petId) ?? null;
 
   return (
     <SupportCaseInner
-      key={appt.id}
-      appt={appt}
+      key={caseData.id}
+      caseData={caseData}
       patient={patient}
-      existingVisit={existingVisit}
-      previousWeight={previousWeight}
+      meta={meta}
+      startTreatment={handleStartTreatment}
+      saveVisit={saveVisit}
+      onAfterSave={handleAfterSave}
     />
   );
 }

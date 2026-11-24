@@ -1,339 +1,241 @@
 import { useEffect, useMemo, useState } from 'react';
-import { SPECIES } from '../../pet-owner/petUtils.js';
-import {
-  DURATION_OPTIONS,
-  SERVICE_TYPES,
-  VETS,
-} from '../data/constants.js';
-import { findConflict } from '../data/schedule.js';
+import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
+import { availableSlots, slotsForDate, todayString } from '../data/constants.js';
+import { findConflict, suggestSlots } from '../data/schedule.js';
 
-function createInitialForm(initialData, defaultDate, prefill) {
-  if (initialData) {
-    return {
-      petName: initialData.petName ?? '',
-      species: initialData.species ?? 'dog',
-      ownerName: initialData.ownerName ?? '',
-      ownerPhone: initialData.ownerPhone ?? '',
-      date: initialData.date ?? defaultDate,
-      time: initialData.time ?? '09:00',
-      durationMin: String(initialData.durationMin ?? 30),
-      service: initialData.service ?? SERVICE_TYPES[0],
-      vet: initialData.vet ?? VETS[0]?.name ?? '',
-      reason: initialData.reason ?? '',
-      notes: initialData.notes ?? '',
-    };
-  }
-  return {
-    petName: prefill?.petName ?? '',
-    species: prefill?.species ?? 'dog',
-    ownerName: prefill?.ownerName ?? '',
-    ownerPhone: prefill?.ownerPhone ?? '',
-    date: prefill?.date ?? defaultDate,
-    time: prefill?.time ?? '09:00',
-    durationMin: String(prefill?.durationMin ?? 30),
-    service: prefill?.service ?? SERVICE_TYPES[0],
-    vet: prefill?.vet ?? VETS[0]?.name ?? '',
-    reason: prefill?.reason ?? '',
-    notes: prefill?.notes ?? '',
-  };
-}
-
-function validateForm(form) {
-  const nextErrors = {};
-  if (!form.petName.trim()) nextErrors.petName = 'กรุณากรอกชื่อสัตว์เลี้ยง';
-  if (!form.ownerName.trim()) nextErrors.ownerName = 'กรุณากรอกชื่อเจ้าของ';
-
-  const digits = form.ownerPhone.replace(/[\s-]/g, '');
-  if (!/^\d{9,10}$/.test(digits)) {
-    nextErrors.ownerPhone = 'กรุณากรอกเบอร์โทร 9–10 หลัก';
-  }
-
-  if (!form.date) nextErrors.date = 'กรุณาเลือกวันที่';
-  if (!form.time) nextErrors.time = 'กรุณาระบุเวลา';
-  if (!form.service) nextErrors.service = 'กรุณาเลือกบริการ';
-  if (!form.vet) nextErrors.vet = 'กรุณาเลือกสัตวแพทย์';
-
-  return nextErrors;
-}
-
-function AppointmentModalInner({ initialData, prefill, appointments, defaultDate, onClose, onSave }) {
-  const [form, setForm] = useState(() => createInitialForm(initialData, defaultDate, prefill));
-  const [errors, setErrors] = useState({});
+function RescheduleModalInner({ appointment, appointments, onClose, onReschedule }) {
+  const todayKey = todayString();
+  const [date, setDate] = useState(() => appointment.date || todayKey);
+  const [time, setTime] = useState(() => appointment.time || '');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !submitting) onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [submitting, onClose]);
 
-  const conflict = useMemo(
+  const vetName = appointment.visit?.vet || '';
+  const durationMin = appointment.visit?.durationMin || 30;
+
+  const slotOptions = useMemo(() => {
+    const futureOrAll = date === todayKey ? availableSlots(date) : slotsForDate(date);
+    if (date === appointment.date && appointment.time && !futureOrAll.includes(appointment.time)) {
+      return slotsForDate(date);
+    }
+    return futureOrAll;
+  }, [date, todayKey, appointment.date, appointment.time]);
+
+  const conflict = useMemo(() => {
+    if (!vetName || !date || !time) return null;
+    return findConflict(
+      appointments,
+      { vet: vetName, date, time, durationMin },
+      appointment.id,
+    );
+  }, [appointments, vetName, date, time, durationMin, appointment.id]);
+
+  const suggested = useMemo(
     () =>
-      findConflict(
+      suggestSlots(
         appointments,
-        {
-          vet: form.vet,
-          date: form.date,
-          time: form.time,
-          durationMin: form.durationMin,
-        },
-        initialData?.id,
+        { vet: vetName, date, durationMin, excludeId: appointment.id },
+        6,
       ),
-    [appointments, initialData?.id, form.vet, form.date, form.time, form.durationMin],
+    [appointments, vetName, date, durationMin, appointment.id],
   );
 
-  const setField = (key) => (e) => {
-    const value = e.target.value;
-    setForm((prev) => ({ ...prev, [key]: value }));
-    if (errors[key]) {
-      setErrors((prev) => {
-        const copy = { ...prev };
-        delete copy[key];
-        return copy;
-      });
+  function handleDateChange(e) {
+    const nextDate = e.target.value;
+    setDate(nextDate);
+    setError('');
+    const nextSlots = nextDate === todayKey ? availableSlots(nextDate) : slotsForDate(nextDate);
+    if (!nextSlots.includes(time)) {
+      setTime(nextSlots[0] ?? '');
     }
-  };
+  }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const nextErrors = validateForm(form);
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
+    if (!date || !time) {
+      setError('กรุณาเลือกวันที่และเวลาใหม่');
       return;
     }
-
-    onSave({
-      petId: initialData?.petId ?? prefill?.petId ?? null,
-      petName: form.petName.trim(),
-      species: form.species,
-      ownerName: form.ownerName.trim(),
-      ownerPhone: form.ownerPhone.replace(/[\s-]/g, ''),
-      date: form.date,
-      time: form.time,
-      durationMin: Number(form.durationMin) || 30,
-      service: form.service,
-      vet: form.vet,
-      reason: form.reason.trim(),
-      notes: form.notes.trim(),
-    });
+    setSubmitting(true);
+    setError('');
+    try {
+      await onReschedule({ date, time });
+    } catch (err) {
+      setError(err?.message || 'ไม่สามารถเปลี่ยนวันเวลานัดได้');
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+  const sp = speciesOf(appointment.petSpecies);
 
   return (
     <>
-      <div className="modal d-block ma-modal" tabIndex={-1} role="dialog" aria-modal="true" onClick={onClose}>
+      <div
+        className="modal d-block ma-modal"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        onClick={() => !submitting && onClose()}
+      >
         <div className="modal-dialog modal-lg modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
           <div className="modal-content ma-modal-card">
             <div className="d-flex justify-content-between align-items-start mb-3">
               <div className="section-label mb-0">
-                <i className={`bi ${initialData ? 'bi-pencil-square' : 'bi-calendar-plus'}`} />
-                {initialData ? 'แก้ไขนัดหมาย' : 'เพิ่มนัดหมายใหม่'}
+                <i className="bi bi-calendar-event" />
+                เปลี่ยนวันเวลานัด
               </div>
               <button
                 type="button"
                 className="btn-close"
                 aria-label="ปิด"
+                disabled={submitting}
                 onClick={onClose}
               />
             </div>
+
+            <div className="info-grid mb-3">
+              <div className="info-item">
+                <div className="k">สัตว์เลี้ยง</div>
+                <div className="v">
+                  <span className="me-1" aria-hidden="true">{sp.emoji}</span>
+                  {appointment.petName} ({sp.label})
+                </div>
+              </div>
+              <div className="info-item">
+                <div className="k">เจ้าของ / เบอร์โทร</div>
+                <div className="v">
+                  {appointment.ownerName || '—'} · {appointment.ownerPhone || '—'}
+                </div>
+              </div>
+              <div className="info-item">
+                <div className="k">บริการ</div>
+                <div className="v">{appointment.serviceLabel || appointment.service}</div>
+              </div>
+              <div className="info-item">
+                <div className="k">วันเวลาเดิม</div>
+                <div className="v">
+                  {formatDate(appointment.date)} · {appointment.time} น.
+                </div>
+              </div>
+              <div className="info-item">
+                <div className="k">สัตวแพทย์</div>
+                <div className="v">
+                  {vetName ? `${vetName} (${durationMin} นาที)` : 'ยังไม่ระบุ'}
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div className="alert-soft danger mb-3" role="alert">
+                <i className="bi bi-exclamation-circle" />
+                <span>{error}</span>
+              </div>
+            )}
 
             {conflict && (
               <div className="alert-soft warn mb-3">
                 <i className="bi bi-exclamation-triangle" />
                 <span>
-                  {form.vet} มีนัดซ้อนในช่วงเวลา {conflict.rangeText} ({conflict.petName} · {conflict.ownerName})
+                  {vetName} มีนัดซ้อนในช่วงเวลา {conflict.rangeText} ({conflict.petName})
                 </span>
               </div>
             )}
 
             <form onSubmit={handleSubmit} noValidate>
               <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="form-label" htmlFor="appt-petName">
-                    ชื่อสัตว์เลี้ยง <span className="text-danger">*</span>
+                <div className="col-12 col-sm-6">
+                  <label className="form-label" htmlFor="resched-date">
+                    วันที่ใหม่ <span className="text-danger">*</span>
                   </label>
                   <input
-                    id="appt-petName"
-                    type="text"
-                    className={`form-control${errors.petName ? ' is-invalid' : ''}`}
-                    placeholder="เช่น โกโก้"
-                    value={form.petName}
-                    onChange={setField('petName')}
-                  />
-                  {errors.petName && <div className="invalid-feedback">{errors.petName}</div>}
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label" htmlFor="appt-species">
-                    ชนิดสัตว์
-                  </label>
-                  <select
-                    id="appt-species"
-                    className="form-select"
-                    value={form.species}
-                    onChange={setField('species')}
-                  >
-                    {SPECIES.map((s) => (
-                      <option key={s.value} value={s.value}>
-                        {s.emoji} {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label" htmlFor="appt-ownerName">
-                    ชื่อเจ้าของ <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    id="appt-ownerName"
-                    type="text"
-                    className={`form-control${errors.ownerName ? ' is-invalid' : ''}`}
-                    placeholder="เช่น คุณมายด์"
-                    value={form.ownerName}
-                    onChange={setField('ownerName')}
-                  />
-                  {errors.ownerName && <div className="invalid-feedback">{errors.ownerName}</div>}
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label" htmlFor="appt-ownerPhone">
-                    เบอร์โทรศัพท์ <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    id="appt-ownerPhone"
-                    type="tel"
-                    inputMode="numeric"
-                    className={`form-control${errors.ownerPhone ? ' is-invalid' : ''}`}
-                    placeholder="เช่น 0812345678"
-                    value={form.ownerPhone}
-                    onChange={setField('ownerPhone')}
-                  />
-                  {errors.ownerPhone && <div className="invalid-feedback">{errors.ownerPhone}</div>}
-                </div>
-
-                <div className="col-12 col-sm-6 col-md-4">
-                  <label className="form-label" htmlFor="appt-date">
-                    วันที่ <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    id="appt-date"
+                    id="resched-date"
                     type="date"
-                    className={`form-control${errors.date ? ' is-invalid' : ''}`}
-                    value={form.date}
-                    onChange={setField('date')}
+                    className="form-control"
+                    min={todayKey}
+                    disabled={submitting}
+                    value={date}
+                    onChange={handleDateChange}
                   />
-                  {errors.date && <div className="invalid-feedback">{errors.date}</div>}
                 </div>
 
-                <div className="col-12 col-sm-6 col-md-4">
-                  <label className="form-label" htmlFor="appt-time">
-                    เวลา <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    id="appt-time"
-                    type="time"
-                    className={`form-control${errors.time ? ' is-invalid' : ''}`}
-                    value={form.time}
-                    onChange={setField('time')}
-                  />
-                  {errors.time && <div className="invalid-feedback">{errors.time}</div>}
-                </div>
-
-                <div className="col-md-4">
-                  <label className="form-label" htmlFor="appt-duration">
-                    ระยะเวลา (นาที)
+                <div className="col-12 col-sm-6">
+                  <label className="form-label" htmlFor="resched-time">
+                    เวลาใหม่ <span className="text-danger">*</span>
                   </label>
                   <select
-                    id="appt-duration"
+                    id="resched-time"
                     className="form-select"
-                    value={form.durationMin}
-                    onChange={setField('durationMin')}
+                    disabled={submitting || slotOptions.length === 0}
+                    value={time}
+                    onChange={(e) => {
+                      setTime(e.target.value);
+                      setError('');
+                    }}
                   >
-                    {DURATION_OPTIONS.map((m) => (
-                      <option key={m} value={m}>
-                        {m} นาที
-                      </option>
-                    ))}
+                    {slotOptions.length === 0 ? (
+                      <option value="">ไม่มีช่วงเวลาว่างในวันนี้</option>
+                    ) : (
+                      slotOptions.map((slot) => (
+                        <option key={slot} value={slot}>
+                          {slot} น.
+                        </option>
+                      ))
+                    )}
                   </select>
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label" htmlFor="appt-service">
-                    บริการ <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    id="appt-service"
-                    className={`form-select${errors.service ? ' is-invalid' : ''}`}
-                    value={form.service}
-                    onChange={setField('service')}
-                  >
-                    <option value="">-- เลือกบริการ --</option>
-                    {SERVICE_TYPES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.service && <div className="invalid-feedback">{errors.service}</div>}
-                </div>
-
-                <div className="col-md-6">
-                  <label className="form-label" htmlFor="appt-vet">
-                    สัตวแพทย์ <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    id="appt-vet"
-                    className={`form-select${errors.vet ? ' is-invalid' : ''}`}
-                    value={form.vet}
-                    onChange={setField('vet')}
-                  >
-                    <option value="">-- เลือกสัตวแพทย์ --</option>
-                    {VETS.map((v) => (
-                      <option key={v.name} value={v.name}>
-                        {v.name} ({v.spec})
-                      </option>
-                    ))}
-                  </select>
-                  {errors.vet && <div className="invalid-feedback">{errors.vet}</div>}
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label" htmlFor="appt-reason">
-                    อาการ / เหตุผลที่นัด
-                  </label>
-                  <textarea
-                    id="appt-reason"
-                    className="form-control"
-                    rows={2}
-                    placeholder="เช่น ซึม ไม่ทานอาหาร 1 วัน"
-                    value={form.reason}
-                    onChange={setField('reason')}
-                  />
-                </div>
-
-                <div className="col-12">
-                  <label className="form-label" htmlFor="appt-notes">
-                    หมายเหตุเพิ่มเติม
-                  </label>
-                  <textarea
-                    id="appt-notes"
-                    className="form-control"
-                    rows={2}
-                    placeholder="เช่น แพ้ยา, งดน้ำงดอาหารก่อนเข้าตรวจ"
-                    value={form.notes}
-                    onChange={setField('notes')}
-                  />
                 </div>
               </div>
 
+              <div className="mt-3">
+                <div className="form-label mb-2">เวลาว่างที่แนะนำ</div>
+                {suggested.length > 0 ? (
+                  <div className="ma-slot-list">
+                    {suggested.map((slot) => (
+                      <button
+                        key={slot}
+                        type="button"
+                        disabled={submitting}
+                        className={`btn btn-sm ${time === slot ? 'btn-sky' : 'btn-soft'}`}
+                        onClick={() => {
+                          setTime(slot);
+                          setError('');
+                        }}
+                      >
+                        {slot} น.
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="small text-muted">
+                    {date < todayKey
+                      ? 'วันที่เลือกผ่านมาแล้ว กรุณาเลือกวันนี้หรือวันถัดไป'
+                      : 'ไม่มีเวลาว่างแนะนำในวันที่เลือก'}
+                  </div>
+                )}
+              </div>
+
               <div className="d-flex justify-content-end gap-2 mt-4">
-                <button type="button" className="btn btn-soft" onClick={onClose}>
+                <button type="button" className="btn btn-soft" disabled={submitting} onClick={onClose}>
                   ยกเลิก
                 </button>
-                <button type="submit" className="btn btn-sky">
+                <button
+                  type="submit"
+                  className="btn btn-sky"
+                  disabled={submitting || !date || !time || Boolean(conflict)}
+                >
+                  {submitting && (
+                    <span className="spinner-border spinner-border-sm me-1" aria-hidden="true" />
+                  )}
                   <i className="bi bi-check2 me-1" />
-                  บันทึก
+                  บันทึกวันเวลาใหม่
                 </button>
               </div>
             </form>
@@ -345,28 +247,15 @@ function AppointmentModalInner({ initialData, prefill, appointments, defaultDate
   );
 }
 
-export default function AppointmentModal({
-  open,
-  initialData,
-  prefill = null,
-  appointments,
-  defaultDate,
-  onClose,
-  onSave,
-}) {
-  if (!open) return null;
-  const key = initialData
-    ? `edit-${initialData.id}`
-    : `new-${prefill?.petId ?? prefill?.petName ?? 'blank'}-${defaultDate}`;
+export default function AppointmentModal({ open, appointment, appointments, onClose, onReschedule }) {
+  if (!open || !appointment) return null;
   return (
-    <AppointmentModalInner
-      key={key}
-      initialData={initialData}
-      prefill={prefill}
+    <RescheduleModalInner
+      key={`resched-${appointment.id}`}
+      appointment={appointment}
       appointments={appointments}
-      defaultDate={defaultDate}
       onClose={onClose}
-      onSave={onSave}
+      onReschedule={onReschedule}
     />
   );
 }

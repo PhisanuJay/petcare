@@ -13,30 +13,41 @@ export function buildCautionSummary(flags = [], allergies = '') {
 }
 
 export default function PatientNameLink({
-  patientId,
+  petId,
   petName,
-  species,
+  petSpecies,
   flags = [],
   allergies = '',
   showEmoji = true,
   className = '',
 }) {
-  const sp = speciesOf(species);
+  const sp = speciesOf(petSpecies);
   const cautionText = buildCautionSummary(flags, allergies);
 
   return (
     <span className={`d-inline-flex align-items-center gap-1 ${className}`.trim()}>
-      <Link
-        to={`/medical-assistant/patients/${encodeURIComponent(patientId)}`}
-        className="ma-patient-link"
-      >
-        {showEmoji && (
-          <span className="me-1" aria-hidden="true">
-            {sp.emoji}
-          </span>
-        )}
-        {petName}
-      </Link>
+      {petId ? (
+        <Link
+          to={`/medical-assistant/patients/${encodeURIComponent(petId)}`}
+          className="ma-patient-link"
+        >
+          {showEmoji && (
+            <span className="me-1" aria-hidden="true">
+              {sp.emoji}
+            </span>
+          )}
+          {petName}
+        </Link>
+      ) : (
+        <span className="fw-medium">
+          {showEmoji && (
+            <span className="me-1" aria-hidden="true">
+              {sp.emoji}
+            </span>
+          )}
+          {petName}
+        </span>
+      )}
       {cautionText && (
         <span
           className="ma-caution-icon"

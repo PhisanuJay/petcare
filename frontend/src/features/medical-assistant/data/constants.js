@@ -1,8 +1,26 @@
 export { VETS } from '../../../shared/data/homeContent.js';
+export {
+  BOOKING_SERVICES,
+  OPENING_HOURS,
+  availableSlots,
+  slotsForDate,
+  todayString,
+} from '../../pet-owner/bookingOptions.js';
 
-export const STORAGE_KEY = 'petcare_ma_appointments';
-export const PATIENT_NOTES_KEY = 'petcare_ma_patient_notes';
-export const VISITS_KEY = 'petcare_ma_visits';
+export const STAGE_META = {
+  pending: { value: 'pending', label: 'รอยืนยัน', tag: 'warn', icon: 'bi-hourglass-split' },
+  confirmed: { value: 'confirmed', label: 'ยืนยันแล้ว', tag: 'sky', icon: 'bi-calendar2-check' },
+  checked_in: { value: 'checked_in', label: 'มาถึงแล้ว', tag: 'sky', icon: 'bi-geo-alt' },
+  in_treatment: { value: 'in_treatment', label: 'กำลังตรวจ', tag: 'warn', icon: 'bi-heart-pulse' },
+  completed: { value: 'completed', label: 'เสร็จสิ้น', tag: 'ok', icon: 'bi-check2-circle' },
+  no_show: { value: 'no_show', label: 'ไม่มาตามนัด', tag: 'danger', icon: 'bi-person-x' },
+  rejected: { value: 'rejected', label: 'ปฏิเสธแล้ว', tag: 'danger', icon: 'bi-x-circle' },
+  cancelled: { value: 'cancelled', label: 'เจ้าของยกเลิก', tag: '', icon: 'bi-slash-circle' },
+};
+
+export const STAGE_LIST = Object.values(STAGE_META);
+
+export const FINAL_STAGES = ['completed', 'no_show', 'rejected', 'cancelled'];
 
 export const TRIAGE_LEVELS = {
   urgent: { value: 'urgent', label: 'ด่วน', tag: 'danger', priority: 1 },
@@ -39,44 +57,33 @@ export const VITAL_RANGES = {
 const DEFAULT_PREP_CHECKLIST = ['ชั่งน้ำหนัก', 'วัดไข้', 'ตรวจประวัติแพ้ยา'];
 
 export const PREP_CHECKLISTS = {
-  ตรวจสุขภาพทั่วไป: DEFAULT_PREP_CHECKLIST,
-  ฉีดวัคซีน: [
-    'ตรวจสมุดวัคซีน/ประวัติแพ้วัคซีน',
-    'วัดไข้ก่อนฉีด',
-    'แจ้งเฝ้าดูอาการหลังฉีด 15–30 นาที',
+  checkup: [
+    'ชั่งน้ำหนักและบันทึกน้ำหนักเทียบครั้งก่อน',
+    'วัดอุณหภูมิ ชีพจร และอัตราการหายใจ',
+    'ซักประวัติอาการและตรวจประวัติแพ้ยา',
   ],
-  ถ่ายพยาธิ: DEFAULT_PREP_CHECKLIST,
-  ทำหมัน: [
-    'งดน้ำงดอาหารตามกำหนด',
-    'เจ้าของเซ็นใบยินยอม',
-    'ตรวจเลือดก่อนผ่าตัด',
-    'ชั่งน้ำหนักเพื่อคำนวณยาสลบ',
-    'เตรียมปลอกคอกันเลีย',
+  vaccine: [
+    'ตรวจสมุดวัคซีนและประวัติการฉีดครั้งก่อน',
+    'วัดไข้และตรวจสุขภาพเบื้องต้นก่อนรับวัคซีน',
+    'ตรวจประวัติแพ้วัคซีนหรือยาที่เคยได้รับ',
+    'เตรียมข้อมูลแจ้งเจ้าของเฝ้าดูอาการหลังฉีด 15–30 นาที',
   ],
-  ผ่าตัด: [
-    'งดน้ำงดอาหารตามกำหนด',
-    'เจ้าของเซ็นใบยินยอม',
-    'ตรวจเลือดก่อนผ่าตัด',
-    'ชั่งน้ำหนักเพื่อคำนวณยาสลบ',
-    'เตรียมปลอกคอกันเลีย',
+  parasite: [
+    'ชั่งน้ำหนักเพื่อใช้อ้างอิงขนาดยา',
+    'ตรวจประวัติการให้ยาถ่ายพยาธิ/ป้องกันเห็บหมัดครั้งล่าสุด',
+    'ตรวจประวัติแพ้ยา',
   ],
-  ตรวจผิวหนัง: DEFAULT_PREP_CHECKLIST,
-  ทำฟัน: ['ตรวจเลือดก่อนวางยาสลบ', 'งดอาหาร', 'เซ็นใบยินยอม'],
-  ติดตามอาการ: DEFAULT_PREP_CHECKLIST,
+  followup: [
+    'ชั่งน้ำหนักและวัดสัญญาณชีพเปรียบเทียบกับครั้งก่อน',
+    'ซักถามอาการเปลี่ยนแปลงและยาที่ป้อนไปล่าสุด',
+    'ทบทวนบันทึกการรักษาก่อนหน้าของสัตวแพทย์',
+  ],
+  other: DEFAULT_PREP_CHECKLIST,
 };
 
 export function getPrepChecklist(service) {
   return PREP_CHECKLISTS[service] ?? DEFAULT_PREP_CHECKLIST;
 }
-
-export const MED_ROUTES = [
-  'รับประทาน',
-  'ฉีดใต้ผิวหนัง',
-  'ฉีดเข้ากล้าม',
-  'ฉีดเข้าเส้น',
-  'หยอดตา/หู',
-  'ทาภายนอก',
-];
 
 export const BCS_SCALE = [
   { value: 1, label: '1/9 - ผอมมากจนเห็นกระดูกชัดเจน' },
@@ -100,13 +107,6 @@ export const PAIN_SCALE = [
 
 export const MUCOUS_OPTIONS = ['ชมพู (ปกติ)', 'ซีด', 'เหลือง', 'ม่วงคล้ำ', 'แดงจัด'];
 export const CRT_OPTIONS = ['< 2 วินาที (ปกติ)', '≥ 2 วินาที (ช้า)'];
-
-export const OWNER_INSTRUCTION_TEMPLATES = [
-  'งดอาบน้ำ 7 วัน',
-  'สังเกตอาการแพ้ 24 ชม.',
-  'ใส่ปลอกคอกันเลียจนตัดไหม',
-  'ป้อนยาหลังอาหารและดื่มน้ำให้เพียงพอ',
-];
 
 export const CAUTION_FLAGS = {
   aggressive: {
@@ -143,66 +143,15 @@ export const CAUTION_FLAGS = {
 
 export const CAUTION_FLAG_LIST = Object.values(CAUTION_FLAGS);
 
-export const NOTE_CATEGORIES = ['ทั่วไป', 'พฤติกรรม', 'อาการ', 'การติดต่อเจ้าของ'];
-
-export const APPOINTMENT_STATUS = {
-  pending: { value: 'pending', label: 'รอยืนยัน', tag: 'warn' },
-  confirmed: { value: 'confirmed', label: 'ยืนยันแล้ว', tag: 'sky' },
-  checked_in: { value: 'checked_in', label: 'มาถึงแล้ว', tag: 'sky' },
-  in_treatment: { value: 'in_treatment', label: 'กำลังตรวจ', tag: 'warn' },
-  completed: { value: 'completed', label: 'เสร็จสิ้น', tag: 'ok' },
-  cancelled: { value: 'cancelled', label: 'ยกเลิก', tag: 'danger' },
-  no_show: { value: 'no_show', label: 'ไม่มาตามนัด', tag: 'danger' },
-  rejected: { value: 'rejected', label: 'ปฏิเสธ', tag: 'danger' },
-};
-
-export const STATUS_LIST = Object.values(APPOINTMENT_STATUS);
-
-export const STATUS_TRANSITIONS = {
-  pending: ['confirmed', 'cancelled', 'rejected'],
-  confirmed: ['checked_in', 'no_show', 'cancelled'],
-  checked_in: ['in_treatment'],
-  in_treatment: ['completed'],
-  completed: [],
-  cancelled: [],
-  no_show: [],
-  rejected: [],
-};
-
-export const FINAL_STATUSES = ['completed', 'cancelled', 'no_show', 'rejected'];
-
-export const BOOKING_SOURCES = {
-  online: { value: 'online', label: 'จองออนไลน์', icon: 'bi-globe2', tag: 'sky' },
-  phone: { value: 'phone', label: 'โทรศัพท์', icon: 'bi-telephone', tag: 'ok' },
-  walk_in: { value: 'walk_in', label: 'Walk-in', icon: 'bi-door-open', tag: '' },
-};
-
-export const BOOKING_SOURCE_LIST = Object.values(BOOKING_SOURCES);
-
-export const sourceOf = (value) => BOOKING_SOURCES[value] ?? BOOKING_SOURCES.walk_in;
-
-export const REJECT_REASONS = [
+export const FALLBACK_NOTE_CATEGORIES = ['ทั่วไป', 'พฤติกรรม', 'อาการ', 'การติดต่อเจ้าของ'];
+export const FALLBACK_DURATIONS = [15, 30, 45, 60, 90];
+export const FALLBACK_REJECT_REASONS = [
   'คิวเต็ม',
   'สัตวแพทย์ไม่ว่าง',
   'บริการไม่เปิดให้จองออนไลน์',
   'ข้อมูลไม่ครบ/ติดต่อไม่ได้',
   'อื่นๆ',
 ];
-
-export const CLINIC_HOURS = { open: '09:00', close: '18:00', slotMin: 30 };
-
-export const SERVICE_TYPES = [
-  'ตรวจสุขภาพทั่วไป',
-  'ฉีดวัคซีน',
-  'ถ่ายพยาธิ',
-  'ทำหมัน',
-  'ผ่าตัด',
-  'ตรวจผิวหนัง',
-  'ทำฟัน',
-  'ติดตามอาการ',
-];
-
-export const DURATION_OPTIONS = [15, 30, 45, 60, 90];
 
 export function toDateKey(date = new Date()) {
   const y = date.getFullYear();

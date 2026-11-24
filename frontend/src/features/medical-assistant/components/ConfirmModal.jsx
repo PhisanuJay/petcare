@@ -8,17 +8,20 @@ export default function ConfirmModal({
   confirmLabel = 'ยืนยัน',
   cancelLabel = 'ปิด',
   confirmVariant = 'danger',
+  submitting = false,
+  error = '',
+  children = null,
   onClose,
   onConfirm,
 }) {
   useEffect(() => {
     if (!open) return undefined;
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !submitting) onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open, onClose]);
+  }, [open, submitting, onClose]);
 
   if (!open) return null;
 
@@ -26,7 +29,13 @@ export default function ConfirmModal({
 
   return (
     <>
-      <div className="modal d-block ma-modal" tabIndex={-1} role="dialog" aria-modal="true" onClick={onClose}>
+      <div
+        className="modal d-block ma-modal"
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        onClick={() => !submitting && onClose()}
+      >
         <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
           <div className="modal-content ma-modal-card">
             <div className="d-flex justify-content-between align-items-start mb-2">
@@ -34,14 +43,33 @@ export default function ConfirmModal({
                 <i className={`bi ${icon}`} />
                 {title}
               </div>
-              <button type="button" className="btn-close" aria-label="ปิด" onClick={onClose} />
+              <button
+                type="button"
+                className="btn-close"
+                aria-label="ปิด"
+                disabled={submitting}
+                onClick={onClose}
+              />
             </div>
-            <p className="text-muted mb-4">{message}</p>
-            <div className="d-flex justify-content-end gap-2">
-              <button type="button" className="btn btn-soft" onClick={onClose}>
+
+            {error && (
+              <div className="alert-soft danger mb-3" role="alert">
+                <i className="bi bi-exclamation-circle" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <p className="text-muted mb-3">{message}</p>
+            {children && <div className="mb-3">{children}</div>}
+
+            <div className="d-flex justify-content-end gap-2 mt-2">
+              <button type="button" className="btn btn-soft" disabled={submitting} onClick={onClose}>
                 {cancelLabel}
               </button>
-              <button type="button" className={confirmClass} onClick={onConfirm}>
+              <button type="button" className={confirmClass} disabled={submitting} onClick={onConfirm}>
+                {submitting && (
+                  <span className="spinner-border spinner-border-sm me-1" aria-hidden="true" />
+                )}
                 {confirmLabel}
               </button>
             </div>

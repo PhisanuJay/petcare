@@ -1,39 +1,7 @@
-import { useCallback, useSyncExternalStore } from 'react';
-import { readJSON, writeJSON } from '../../../shared/utils/storage.js';
-import { VISITS_KEY, VITAL_RANGES } from './constants.js';
-import { resetSeedVisits, seedVisitsIfEmpty } from './seed.js';
-
-const listeners = new Set();
-let cache = null;
-
-function getAll() {
-  if (cache === null) {
-    seedVisitsIfEmpty();
-    cache = readJSON(VISITS_KEY, {});
-  }
-  return cache;
-}
-
-function setAll(next) {
-  writeJSON(VISITS_KEY, next);
-  cache = next;
-  listeners.forEach((l) => l());
-}
-
-function subscribe(listener) {
-  listeners.add(listener);
-  const onStorage = (e) => {
-    if (e.key === VISITS_KEY) {
-      cache = null;
-      listener();
-    }
-  };
-  window.addEventListener('storage', onStorage);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener('storage', onStorage);
-  };
-}
+import { useCallback } from 'react';
+import { VITAL_RANGES } from './constants.js';
+import { maRequest } from './maApi.js';
+import { updateVisitInStore, useMaStore } from './maStore.js';
 
 export function vitalRangeFor(species) {
   return VITAL_RANGES[species] ?? VITAL_RANGES.default;
@@ -99,102 +67,33 @@ export function isTriaged(visit) {
   );
 }
 
-export function resetVisitsStore() {
-  const fresh = resetSeedVisits();
-  cache = fresh;
-  listeners.forEach((l) => l());
-  return fresh;
-}
-
-/** Medical support visit records store keyed by appointmentId. */
+/** Medical support visit records read from appointment.visit in store and persisted via API. */
 export function useVisits() {
-  const visitsMap = useSyncExternalStore(subscribe, getAll);
+  const { appointments } = useMaStore();
 
   const getVisit = useCallback(
-    (appointmentId) => visitsMap[appointmentId] ?? null,
-    [visitsMap],
+    (bookingId) => appointments.find((a) => a.id === bookingId)?.visit ?? null,
+    [appointments],
   );
 
-  const saveVisit = useCallback((appointmentId, patch) => {
-    if (!appointmentId) return null;
-    const all = getAll();
-    const existing = all[appointmentId] ?? {};
-    const now = new Date().toISOString();
-    const nextVisit = {
-      appointmentId,
-      patientId: existing.patientId ?? null,
-      triage: existing.triage ?? '',
-      vitals: {
-        weight: '',
-        temp: '',
-        heartRate: '',
-        respRate: '',
-        bcs: '',
-        pain: '',
-        mucous: '',
-        crt: '',
-        ...existing.vitals,
-        ...patch.vitals,
-      },
-      chiefComplaint: existing.chiefComplaint ?? '',
-      checklist: {
-        ...existing.checklist,
-        ...patch.checklist,
-      },
-      vetOrders: existing.vetOrders ?? '',
-      medications: existing.medications ?? [],
-      ownerInstructions: existing.ownerInstructions ?? '',
-      followUp: existing.followUp ?? null,
-      startedAt: existing.startedAt ?? null,
-      completedAt: existing.completedAt ?? null,
-      ...patch,
-      updatedAt: now,
-    };
+  const saveVisit = useCallback(async (bookingId, patch = {}) => {
+    if (!bookingId) return null;
+    const body = {};
+    if (patch.triage !== undefined) body.triage = patch.triage;
+    if (patch.chiefComplaint !== undefined) body.chiefComplaint = patch.chiefComplaint;
+    if (patch.vitals !== undefined) body.vitals = patch.vitals;
+    if (patch.checklist !== undefined) body.checklist = patch.checklist;
 
-    // Re-apply merged vitals & checklist if patch included nested objects
-    if (patch.vitals) {
-      nextVisit.vitals = {
-        weight: '',
-        temp: '',
-        heartRate: '',
-        respRate: '',
-        bcs: '',
-        pain: '',
-        mucous: '',
-        crt: '',
-        ...existing.vitals,
-        ...patch.vitals,
-      };
-    }
-    if (patch.checklist) {
-      nextVisit.checklist = {
-        ...existing.checklist,
-        ...patch.checklist,
-      };
-    }
-
-    setAll({
-      ...all,
-      [appointmentId]: nextVisit,
+    const updated = await maRequest(`/visits/${encodeURIComponent(bookingId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
     });
-    return nextVisit;
+    updateVisitInStore(bookingId, updated);
+    return updated;
   }, []);
 
-  const visitsByPatient = useCallback(
-    (patientId) =>
-      Object.values(visitsMap)
-        .filter((v) => v.patientId === patientId)
-        .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')),
-    [visitsMap],
-  );
-
-  const resetVisits = useCallback(() => resetVisitsStore(), []);
-
   return {
-    visitsMap,
     getVisit,
     saveVisit,
-    visitsByPatient,
-    resetVisits,
   };
 }

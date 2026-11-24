@@ -4,109 +4,132 @@ import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 import { useToast } from '../../../shared/components/Toast.jsx';
 import AppointmentModal from '../components/AppointmentModal.jsx';
 import ConfirmModal from '../components/ConfirmModal.jsx';
+import MaDataState from '../components/MaDataState.jsx';
 import PatientNameLink from '../components/PatientNameLink.jsx';
 import {
-  APPOINTMENT_STATUS,
-  FINAL_STATUSES,
-  STATUS_LIST,
+  STAGE_LIST,
+  STAGE_META,
   VETS,
   offsetDateKey,
 } from '../data/constants.js';
 import { useAppointments } from '../data/useAppointments.js';
 import { usePatients } from '../data/usePatients.js';
 
-function StatusActions({ appt, onChangeStatus, onRequestCancel, onEdit }) {
-  return (
-    <div className="ma-actions">
-      {appt.status === 'pending' && (
-        <>
-          <button
-            type="button"
-            className="btn btn-sky btn-sm"
-            onClick={() => onChangeStatus(appt, 'confirmed')}
-          >
-            ยืนยัน
-          </button>
-          <button
-            type="button"
-            className="btn btn-soft-danger btn-sm"
-            onClick={() => onRequestCancel(appt)}
-          >
-            ยกเลิก
-          </button>
-        </>
-      )}
+function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
+  const stage = appt.stage;
 
-      {appt.status === 'confirmed' && (
-        <>
+  if (stage === 'pending') {
+    return (
+      <div className="ma-actions">
+        <Link to="/medical-assistant/booking-management" className="btn btn-soft btn-sm">
+          <i className="bi bi-journal-bookmark me-1" />
+          ไปหน้าจัดการการจอง
+        </Link>
+      </div>
+    );
+  }
+
+  if (stage === 'confirmed') {
+    const isToday = appt.date === todayKey;
+    const isPast = appt.date < todayKey;
+    return (
+      <div className="ma-actions">
+        {isToday && (
           <button
             type="button"
             className="btn btn-sky btn-sm"
-            onClick={() => onChangeStatus(appt, 'checked_in')}
+            onClick={() => onRequestAction('check_in', appt)}
           >
             เช็คอิน
           </button>
-          <button
-            type="button"
-            className="btn btn-soft btn-sm"
-            onClick={() => onChangeStatus(appt, 'no_show')}
-          >
-            ไม่มา
-          </button>
+        )}
+        {(isToday || isPast) && (
           <button
             type="button"
             className="btn btn-soft-danger btn-sm"
-            onClick={() => onRequestCancel(appt)}
+            onClick={() => onRequestAction('no_show', appt)}
           >
-            ยกเลิก
+            ไม่มาตามนัด
           </button>
-        </>
-      )}
+        )}
+        <button
+          type="button"
+          className="btn btn-soft btn-sm"
+          onClick={() => onReschedule(appt)}
+        >
+          เปลี่ยนวันเวลา
+        </button>
+      </div>
+    );
+  }
 
-      {appt.status === 'checked_in' && (
+  if (stage === 'checked_in') {
+    return (
+      <div className="ma-actions">
         <button
           type="button"
           className="btn btn-sky btn-sm"
-          onClick={() => onChangeStatus(appt, 'in_treatment')}
+          onClick={() => onRequestAction('start_treatment', appt)}
         >
-          เริ่มตรวจ
+          ส่งเข้าห้องตรวจ
         </button>
-      )}
-
-      {appt.status === 'in_treatment' && (
-        <button
-          type="button"
-          className="btn btn-sky btn-sm"
-          onClick={() => onChangeStatus(appt, 'completed')}
-        >
-          เสร็จสิ้น
-        </button>
-      )}
-
-      {(appt.status === 'checked_in' || appt.status === 'in_treatment') && (
         <Link
           to={`/medical-assistant/medical-support/${appt.id}`}
           className="btn btn-soft btn-sm"
-          title="สนับสนุนการรักษา"
-          aria-label={`เปิดเคสสนับสนุนการรักษา ${appt.petName}`}
+        >
+          <i className="bi bi-thermometer-half me-1" />
+          หน้าคัดกรอง
+        </Link>
+      </div>
+    );
+  }
+
+  if (stage === 'in_treatment') {
+    return (
+      <div className="ma-actions">
+        <span className="tag warn m-0">รอหมอปิดเคส</span>
+        <Link
+          to={`/medical-assistant/medical-support/${appt.id}`}
+          className="btn btn-soft btn-sm"
+          title="เปิดหน้าสนับสนุนการรักษา"
         >
           <i className="bi bi-bandaid" />
         </Link>
-      )}
+      </div>
+    );
+  }
 
-      {!FINAL_STATUSES.includes(appt.status) && (
-        <button
-          type="button"
-          className="btn btn-soft btn-sm"
-          title="แก้ไขนัดหมาย"
-          aria-label={`แก้ไขนัดหมาย ${appt.petName}`}
-          onClick={() => onEdit(appt)}
-        >
-          <i className="bi bi-pencil" />
-        </button>
-      )}
-    </div>
-  );
+  return <span className="small text-muted">—</span>;
+}
+
+function buildConfirmConfig(confirmAction) {
+  if (!confirmAction) return null;
+  const { type, appt } = confirmAction;
+  if (type === 'check_in') {
+    return {
+      title: 'ยืนยันการเช็คอิน',
+      icon: 'bi-geo-alt',
+      message: `ยืนยันเช็คอิน "${appt.petName}" (เวลานัด ${appt.time} น.) ใช่หรือไม่?`,
+      confirmLabel: 'เช็คอิน',
+      confirmVariant: 'sky',
+    };
+  }
+  if (type === 'no_show') {
+    return {
+      title: 'บันทึกไม่มาตามนัด',
+      icon: 'bi-person-x',
+      message: `ยืนยันบันทึกว่า "${appt.petName}" ไม่มาตามนัดวันที่ ${formatDate(appt.date)} เวลา ${appt.time} น. ใช่หรือไม่?`,
+      confirmLabel: 'ไม่มาตามนัด',
+      confirmVariant: 'danger',
+    };
+  }
+  return {
+    title: 'ส่งผู้ป่วยเข้าห้องตรวจ',
+    icon: 'bi-heart-pulse',
+    message: `ยืนยันส่ง "${appt.petName}" เข้าห้องตรวจกับ ${appt.visit?.vet || 'สัตวแพทย์'} ใช่หรือไม่?`,
+    confirmLabel: 'ส่งเข้าห้องตรวจ',
+    confirmVariant: 'sky',
+  };
 }
 
 /**
@@ -116,12 +139,16 @@ function StatusActions({ appt, onChangeStatus, onRequestCancel, onEdit }) {
 export default function AppointmentsPage() {
   const {
     appointments,
-    addAppointment,
-    updateAppointment,
-    setStatus,
-    resetAppointments,
+    loading,
+    error,
+    reload,
+    meta,
+    markNoShow,
+    reschedule,
+    checkIn,
+    startTreatment,
   } = useAppointments();
-  const { getPatient, patientIdForAppt } = usePatients();
+  const { patients } = usePatients();
   const { show, toast } = useToast();
 
   const yesterdayKey = offsetDateKey(-1);
@@ -140,14 +167,24 @@ export default function AppointmentsPage() {
     [todayKey, setSearchParams],
   );
 
-  const [statusFilter, setStatusFilter] = useState('all');
+  const [stageFilter, setStageFilter] = useState('all');
   const [vetFilter, setVetFilter] = useState('all');
   const [query, setQuery] = useState('');
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [cancelTarget, setCancelTarget] = useState(null);
-  const [resetOpen, setResetOpen] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmSubmitting, setConfirmSubmitting] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
+
+  const patientsById = useMemo(
+    () => new Map(patients.map((p) => [p.id, p])),
+    [patients],
+  );
+
+  const vetNames = useMemo(
+    () => (meta?.VET_NAMES?.length ? meta.VET_NAMES : VETS.map((v) => v.name)),
+    [meta],
+  );
 
   const dayAppointments = useMemo(
     () =>
@@ -157,11 +194,11 @@ export default function AppointmentsPage() {
     [appointments, selectedDate],
   );
 
-  const statusCounts = useMemo(() => {
+  const stageCounts = useMemo(() => {
     const counts = { all: dayAppointments.length };
-    for (const s of STATUS_LIST) counts[s.value] = 0;
+    for (const s of STAGE_LIST) counts[s.value] = 0;
     for (const a of dayAppointments) {
-      counts[a.status] = (counts[a.status] ?? 0) + 1;
+      counts[a.stage] = (counts[a.stage] ?? 0) + 1;
     }
     return counts;
   }, [dayAppointments]);
@@ -169,70 +206,61 @@ export default function AppointmentsPage() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return dayAppointments.filter((a) => {
-      if (statusFilter !== 'all' && a.status !== statusFilter) return false;
-      if (vetFilter !== 'all' && a.vet !== vetFilter) return false;
+      if (stageFilter !== 'all' && a.stage !== stageFilter) return false;
+      if (vetFilter !== 'all' && (a.visit?.vet ?? '') !== vetFilter) return false;
       if (q) {
-        const hit = [a.petName, a.ownerName, a.ownerPhone].some((v) =>
+        const hit = [a.petName, a.ownerName, a.ownerPhone, a.serviceLabel].some((v) =>
           v?.toLowerCase().includes(q),
         );
         if (!hit) return false;
       }
       return true;
     });
-  }, [dayAppointments, statusFilter, vetFilter, query]);
+  }, [dayAppointments, stageFilter, vetFilter, query]);
 
-  const hasActiveFilter = statusFilter !== 'all' || vetFilter !== 'all' || query.trim() !== '';
+  const hasActiveFilter = stageFilter !== 'all' || vetFilter !== 'all' || query.trim() !== '';
+  const hasData = Boolean(meta) || appointments.length > 0;
+  const blockedByState = !hasData && (loading || Boolean(error));
 
-  function openCreate() {
-    setEditing(null);
-    setModalOpen(true);
+  function openConfirm(type, appt) {
+    setConfirmError('');
+    setConfirmAction({ type, appt });
   }
 
-  function openEdit(appt) {
-    setEditing(appt);
-    setModalOpen(true);
-  }
-
-  function handleSave(data) {
-    if (editing) {
-      updateAppointment(editing.id, data);
-      show('บันทึกการแก้ไขนัดหมายแล้ว');
-    } else {
-      addAppointment(data);
-      show('เพิ่มนัดหมายใหม่แล้ว');
+  async function handleConfirmSubmit() {
+    if (!confirmAction) return;
+    const { type, appt } = confirmAction;
+    setConfirmSubmitting(true);
+    setConfirmError('');
+    try {
+      if (type === 'check_in') {
+        await checkIn(appt.id);
+        show(`เช็คอิน "${appt.petName}" แล้ว`);
+      } else if (type === 'no_show') {
+        await markNoShow(appt.id);
+        show(`บันทึก "${appt.petName}" เป็นไม่มาตามนัดแล้ว`);
+      } else if (type === 'start_treatment') {
+        await startTreatment(appt.id);
+        show(`ส่ง "${appt.petName}" เข้าห้องตรวจแล้ว`);
+      }
+      setConfirmAction(null);
+    } catch (err) {
+      setConfirmError(err?.message || 'ไม่สามารถดำเนินการได้');
+    } finally {
+      setConfirmSubmitting(false);
     }
-    setSelectedDate(data.date);
-    setModalOpen(false);
-    setEditing(null);
   }
 
-  function handleChangeStatus(appt, nextStatus) {
-    if (setStatus(appt.id, nextStatus)) {
-      const label = APPOINTMENT_STATUS[nextStatus]?.label ?? nextStatus;
-      show(`เปลี่ยนสถานะ ${appt.petName} เป็น "${label}" แล้ว`);
-    }
-  }
-
-  function handleConfirmCancel() {
-    if (!cancelTarget) return;
-    if (setStatus(cancelTarget.id, 'cancelled')) {
-      show(`ยกเลิกนัดของ ${cancelTarget.petName} แล้ว`);
-    }
-    setCancelTarget(null);
-  }
-
-  function handleConfirmReset() {
-    resetAppointments();
-    setSelectedDate(todayKey);
-    setStatusFilter('all');
-    setVetFilter('all');
-    setQuery('');
-    setResetOpen(false);
-    show('รีเซ็ตข้อมูลตัวอย่างแล้ว');
+  async function handleRescheduleSave(values) {
+    if (!rescheduleTarget) return;
+    const updated = await reschedule(rescheduleTarget.id, values);
+    setSelectedDate(updated.date);
+    setRescheduleTarget(null);
+    show(`เปลี่ยนวันเวลานัด "${updated.petName}" ไป ${formatDate(updated.date)} ${updated.time} น. แล้ว`);
   }
 
   function clearFilters() {
-    setStatusFilter('all');
+    setStageFilter('all');
     setVetFilter('all');
     setQuery('');
   }
@@ -242,6 +270,8 @@ export default function AppointmentsPage() {
     { label: 'วันนี้', value: todayKey },
     { label: 'พรุ่งนี้', value: tomorrowKey },
   ];
+
+  const confirmCfg = buildConfirmConfig(confirmAction);
 
   return (
     <section>
@@ -254,338 +284,375 @@ export default function AppointmentsPage() {
           <button
             type="button"
             className="btn btn-soft"
-            onClick={() => setResetOpen(true)}
+            disabled={loading}
+            onClick={reload}
           >
-            <i className="bi bi-arrow-counterclockwise me-1" />
-            รีเซ็ตข้อมูลตัวอย่าง
+            <i className="bi bi-arrow-clockwise me-1" />
+            รีเฟรช
           </button>
-          <button type="button" className="btn btn-sky" onClick={openCreate}>
-            <i className="bi bi-plus-lg me-1" />
-            เพิ่มนัดหมาย
-          </button>
+          <Link to="/medical-assistant/booking-management" className="btn btn-sky">
+            <i className="bi bi-journal-bookmark me-1" />
+            จัดการการจอง
+          </Link>
         </div>
       </div>
 
-      <div className="row g-2 g-md-3 mb-4">
-        <div className="col-6 col-md-3">
-          <div className="stat">
-            <span className="tag sky ma-stat-icon" aria-hidden="true">
-              <i className="bi bi-calendar2-week" />
-            </span>
-            <div className="num">{statusCounts.all}</div>
-            <div className="small text-muted">ทั้งหมด</div>
-          </div>
-        </div>
-        <div className="col-6 col-md-3">
-          <div className="stat">
-            <span className="tag warn ma-stat-icon" aria-hidden="true">
-              <i className="bi bi-hourglass-split" />
-            </span>
-            <div className="num">{statusCounts.pending}</div>
-            <div className="small text-muted">รอยืนยัน</div>
-          </div>
-        </div>
-        <div className="col-6 col-md-3">
-          <div className="stat">
-            <span className="tag sky ma-stat-icon" aria-hidden="true">
-              <i className="bi bi-hospital" />
-            </span>
-            <div className="num">
-              {(statusCounts.checked_in ?? 0) + (statusCounts.in_treatment ?? 0)}
+      <MaDataState loading={loading} error={error} hasData={hasData} onRetry={reload} />
+
+      {!blockedByState && (
+        <>
+          <div className="row g-2 g-md-3 mb-4">
+            <div className="col-6 col-md-3">
+              <div className="stat">
+                <span className="tag sky ma-stat-icon" aria-hidden="true">
+                  <i className="bi bi-calendar2-week" />
+                </span>
+                <div className="num">{stageCounts.all}</div>
+                <div className="small text-muted">ทั้งหมด</div>
+              </div>
             </div>
-            <div className="small text-muted">อยู่ในคลินิก</div>
+            <div className="col-6 col-md-3">
+              <div className="stat">
+                <span className="tag warn ma-stat-icon" aria-hidden="true">
+                  <i className="bi bi-hourglass-split" />
+                </span>
+                <div className="num">{stageCounts.pending}</div>
+                <div className="small text-muted">รอยืนยัน</div>
+              </div>
+            </div>
+            <div className="col-6 col-md-3">
+              <div className="stat">
+                <span className="tag sky ma-stat-icon" aria-hidden="true">
+                  <i className="bi bi-hospital" />
+                </span>
+                <div className="num">
+                  {(stageCounts.checked_in ?? 0) + (stageCounts.in_treatment ?? 0)}
+                </div>
+                <div className="small text-muted">อยู่ในคลินิก</div>
+              </div>
+            </div>
+            <div className="col-6 col-md-3">
+              <div className="stat">
+                <span className="tag ok ma-stat-icon" aria-hidden="true">
+                  <i className="bi bi-check2-circle" />
+                </span>
+                <div className="num">{stageCounts.completed}</div>
+                <div className="small text-muted">เสร็จสิ้น</div>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="col-6 col-md-3">
-          <div className="stat">
-            <span className="tag ok ma-stat-icon" aria-hidden="true">
-              <i className="bi bi-check2-circle" />
-            </span>
-            <div className="num">{statusCounts.completed}</div>
-            <div className="small text-muted">เสร็จสิ้น</div>
-          </div>
-        </div>
-      </div>
 
-      <div className="card-soft mb-4">
-        <div className="ma-filter-bar mb-3">
-          <div className="pill-tabs mb-0" role="group" aria-label="เลือกวัน">
-            {dateTabs.map((d) => (
-              <button
-                key={d.value}
-                type="button"
-                className={selectedDate === d.value ? 'active' : ''}
-                onClick={() => setSelectedDate(d.value)}
+          <div className="card-soft mb-4">
+            <div className="ma-filter-bar mb-3">
+              <div className="pill-tabs mb-0" role="group" aria-label="เลือกวัน">
+                {dateTabs.map((d) => (
+                  <button
+                    key={d.value}
+                    type="button"
+                    className={selectedDate === d.value ? 'active' : ''}
+                    onClick={() => setSelectedDate(d.value)}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+
+              <input
+                type="date"
+                className="form-control w-auto"
+                aria-label="เลือกวันที่"
+                value={selectedDate}
+                onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+              />
+
+              <select
+                className="form-select w-auto"
+                aria-label="กรองตามสัตวแพทย์"
+                value={vetFilter}
+                onChange={(e) => setVetFilter(e.target.value)}
               >
-                {d.label}
-              </button>
-            ))}
-          </div>
+                <option value="all">สัตวแพทย์ทั้งหมด</option>
+                {vetNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
 
-          <input
-            type="date"
-            className="form-control w-auto"
-            aria-label="เลือกวันที่"
-            value={selectedDate}
-            onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-          />
-
-          <select
-            className="form-select w-auto"
-            aria-label="กรองตามสัตวแพทย์"
-            value={vetFilter}
-            onChange={(e) => setVetFilter(e.target.value)}
-          >
-            <option value="all">สัตวแพทย์ทั้งหมด</option>
-            {VETS.map((v) => (
-              <option key={v.name} value={v.name}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-
-          <div className="input-group ma-search-group">
-            <span className="input-group-text">
-              <i className="bi bi-search" />
-            </span>
-            <input
-              type="search"
-              className="form-control"
-              placeholder="ค้นหาชื่อสัตว์ / เจ้าของ / เบอร์"
-              aria-label="ค้นหานัดหมาย"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="pill-tabs ma-status-tabs mb-0" role="group" aria-label="กรองตามสถานะ">
-          <button
-            type="button"
-            className={statusFilter === 'all' ? 'active' : ''}
-            onClick={() => setStatusFilter('all')}
-          >
-            ทั้งหมด
-            <span className="count">{statusCounts.all}</span>
-          </button>
-          {STATUS_LIST.map((s) => (
-            <button
-              key={s.value}
-              type="button"
-              className={statusFilter === s.value ? 'active' : ''}
-              onClick={() => setStatusFilter(s.value)}
-            >
-              {s.label}
-              <span className="count">{statusCounts[s.value]}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="card-soft">
-        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-          <div className="section-label mb-0">
-            <i className="bi bi-calendar2-week" />
-            ตารางนัดวันที่ {formatDate(selectedDate)} ({filtered.length} รายการ)
-          </div>
-          {hasActiveFilter && (
-            <button type="button" className="btn btn-soft btn-sm" onClick={clearFilters}>
-              ล้างตัวกรอง
-            </button>
-          )}
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="empty-box">
-            <i className="bi bi-calendar-x" />
-            <div>
-              {dayAppointments.length === 0
-                ? `ยังไม่มีนัดหมายในวันที่ ${formatDate(selectedDate)}`
-                : 'ไม่พบนัดหมายที่ตรงกับตัวกรอง'}
+              <div className="input-group ma-search-group">
+                <span className="input-group-text">
+                  <i className="bi bi-search" />
+                </span>
+                <input
+                  type="search"
+                  className="form-control"
+                  placeholder="ค้นหาชื่อสัตว์ / เจ้าของ / เบอร์"
+                  aria-label="ค้นหานัดหมาย"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="d-flex justify-content-center gap-2 flex-wrap mt-3">
-              {dayAppointments.length > 0 && hasActiveFilter && (
-                <button type="button" className="btn btn-soft" onClick={clearFilters}>
+
+            <div className="pill-tabs ma-status-tabs mb-0" role="group" aria-label="กรองตามสถานะ">
+              <button
+                type="button"
+                className={stageFilter === 'all' ? 'active' : ''}
+                onClick={() => setStageFilter('all')}
+              >
+                ทั้งหมด
+                <span className="count">{stageCounts.all}</span>
+              </button>
+              {STAGE_LIST.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  className={stageFilter === s.value ? 'active' : ''}
+                  onClick={() => setStageFilter(s.value)}
+                >
+                  {s.label}
+                  <span className="count">{stageCounts[s.value]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="card-soft">
+            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div className="section-label mb-0">
+                <i className="bi bi-calendar2-week" />
+                ตารางนัดวันที่ {formatDate(selectedDate)} ({filtered.length} รายการ)
+              </div>
+              {hasActiveFilter && (
+                <button type="button" className="btn btn-soft btn-sm" onClick={clearFilters}>
                   ล้างตัวกรอง
                 </button>
               )}
-              <button type="button" className="btn btn-sky" onClick={openCreate}>
-                <i className="bi bi-plus-lg me-1" />
-                เพิ่มนัดหมาย
-              </button>
             </div>
-          </div>
-        ) : (
-          <>
-            <div className="d-none d-md-block table-responsive">
-              <table className="ma-table">
-                <thead>
-                  <tr>
-                    <th>เวลา</th>
-                    <th>สัตว์</th>
-                    <th>เจ้าของ</th>
-                    <th>บริการ</th>
-                    <th>สัตวแพทย์</th>
-                    <th>สถานะ</th>
-                    <th>จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody>
+
+            {filtered.length === 0 ? (
+              <div className="empty-box">
+                <i className="bi bi-calendar-x" />
+                <div>
+                  {dayAppointments.length === 0
+                    ? `ยังไม่มีนัดหมายในวันที่ ${formatDate(selectedDate)}`
+                    : 'ไม่พบนัดหมายที่ตรงกับตัวกรอง'}
+                </div>
+                {dayAppointments.length > 0 && hasActiveFilter && (
+                  <div className="mt-3">
+                    <button type="button" className="btn btn-soft" onClick={clearFilters}>
+                      ล้างตัวกรอง
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="d-none d-md-block table-responsive">
+                  <table className="ma-table">
+                    <thead>
+                      <tr>
+                        <th>เวลา</th>
+                        <th>สัตว์</th>
+                        <th>เจ้าของ</th>
+                        <th>บริการ</th>
+                        <th>สัตวแพทย์</th>
+                        <th>สถานะ</th>
+                        <th>จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map((appt) => {
+                        const sp = speciesOf(appt.petSpecies);
+                        const st = STAGE_META[appt.stage] ?? STAGE_META.pending;
+                        const pat = patientsById.get(appt.petId);
+                        const vetName = appt.visit?.vet;
+                        const durationMin = appt.visit?.durationMin;
+
+                        return (
+                          <tr key={appt.id}>
+                            <td className="text-nowrap">
+                              <div className="fw-medium">{appt.time} น.</div>
+                              <div className="small text-muted">
+                                {durationMin ? `${durationMin} นาที` : '—'}
+                              </div>
+                            </td>
+                            <td className="text-nowrap">
+                              <div className="fw-medium text-nowrap">
+                                <PatientNameLink
+                                  petId={appt.petId}
+                                  petName={appt.petName}
+                                  petSpecies={appt.petSpecies}
+                                  flags={pat?.flags}
+                                  allergies={appt.pet?.allergies ?? pat?.allergies}
+                                />
+                              </div>
+                              <div className="small text-muted text-nowrap">{sp.label}</div>
+                            </td>
+                            <td>
+                              <div>{appt.ownerName || '—'}</div>
+                              <div className="small text-muted text-nowrap">
+                                {appt.ownerPhone ? (
+                                  <a href={`tel:${appt.ownerPhone}`} className="text-decoration-none">
+                                    {appt.ownerPhone}
+                                  </a>
+                                ) : (
+                                  '—'
+                                )}
+                              </div>
+                            </td>
+                            <td className="ma-service-cell">
+                              <div>{appt.serviceLabel || appt.service}</div>
+                              {(appt.note || appt.clinicNote) && (
+                                <div
+                                  className="small text-muted text-truncate d-none d-xl-block"
+                                  style={{ maxWidth: 220 }}
+                                  title={appt.note || appt.clinicNote}
+                                >
+                                  {appt.note || appt.clinicNote}
+                                </div>
+                              )}
+                            </td>
+                            <td className="text-nowrap">
+                              <div className="d-flex align-items-center gap-1">
+                                <span
+                                  className={`ma-vet-vis ${appt.visibleToVet ? 'text-sky' : 'text-muted'}`}
+                                  title={
+                                    appt.visibleToVet
+                                      ? 'แสดงในหน้าสัตวแพทย์แล้ว'
+                                      : 'ยังไม่แสดงในหน้าสัตวแพทย์'
+                                  }
+                                  aria-label={
+                                    appt.visibleToVet
+                                      ? 'แสดงในหน้าสัตวแพทย์แล้ว'
+                                      : 'ยังไม่แสดงในหน้าสัตวแพทย์'
+                                  }
+                                >
+                                  <i className={`bi ${appt.visibleToVet ? 'bi-eye' : 'bi-eye-slash'}`} />
+                                </span>
+                                <span className="small ma-vet-cell" title={vetName || 'ยังไม่ระบุ'}>
+                                  {vetName || 'ยังไม่ระบุ'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="text-nowrap">
+                              <span className={`tag ${st.tag} m-0`}>{st.label}</span>
+                            </td>
+                            <td className="text-nowrap">
+                              <StatusActions
+                                appt={appt}
+                                todayKey={todayKey}
+                                onRequestAction={openConfirm}
+                                onReschedule={setRescheduleTarget}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="d-md-none d-grid gap-3">
                   {filtered.map((appt) => {
-                    const sp = speciesOf(appt.species);
-                    const st = APPOINTMENT_STATUS[appt.status] ?? APPOINTMENT_STATUS.pending;
-                    const pid = patientIdForAppt(appt);
-                    const pat = getPatient(pid);
+                    const sp = speciesOf(appt.petSpecies);
+                    const st = STAGE_META[appt.stage] ?? STAGE_META.pending;
+                    const pat = patientsById.get(appt.petId);
+                    const vetName = appt.visit?.vet;
+                    const durationMin = appt.visit?.durationMin;
+
                     return (
-                      <tr key={appt.id}>
-                        <td className="text-nowrap">
-                          <div className="fw-medium">{appt.time} น.</div>
-                          <div className="small text-muted">{appt.durationMin} นาที</div>
-                        </td>
-                        <td className="text-nowrap">
-                          <div className="fw-medium text-nowrap">
-                            <PatientNameLink
-                              patientId={pid}
-                              petName={appt.petName}
-                              species={appt.species}
-                              flags={pat?.flags}
-                              allergies={pat?.pet?.allergies}
-                            />
+                      <div className="record-row mb-0 pb-3" key={appt.id}>
+                        <div className="d-flex justify-content-between align-items-center gap-2 mb-2">
+                          <div className="mitr">
+                            {appt.time} น.{' '}
+                            {durationMin && (
+                              <span className="small text-muted fw-normal">({durationMin} นาที)</span>
+                            )}
                           </div>
-                          <div className="small text-muted text-nowrap">{sp.label}</div>
-                        </td>
-                        <td>
-                          <div>{appt.ownerName}</div>
-                          <div className="small text-muted text-nowrap">{appt.ownerPhone}</div>
-                        </td>
-                        <td className="ma-service-cell">
-                          <div>{appt.service}</div>
-                          {appt.reason && (
-                            <div
-                              className="small text-muted text-truncate d-none d-xl-block"
-                              style={{ maxWidth: 210 }}
-                              title={appt.reason}
-                            >
-                              {appt.reason}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          <div className="small ma-vet-cell" title={appt.vet}>
-                            {appt.vet}
-                          </div>
-                        </td>
-                        <td className="text-nowrap">
                           <span className={`tag ${st.tag} m-0`}>{st.label}</span>
-                        </td>
-                        <td className="text-nowrap">
+                        </div>
+
+                        <div className="fw-medium mb-1">
+                          <PatientNameLink
+                            petId={appt.petId}
+                            petName={appt.petName}
+                            petSpecies={appt.petSpecies}
+                            flags={pat?.flags}
+                            allergies={appt.pet?.allergies ?? pat?.allergies}
+                          />{' '}
+                          <span className="small text-muted fw-normal">· {sp.label}</span>
+                        </div>
+
+                        <div className="small text-muted mb-1">
+                          <i className="bi bi-person me-1" />
+                          {appt.ownerName || '—'} ·{' '}
+                          {appt.ownerPhone ? (
+                            <a href={`tel:${appt.ownerPhone}`} className="text-decoration-none">
+                              {appt.ownerPhone}
+                            </a>
+                          ) : (
+                            '—'
+                          )}
+                        </div>
+                        <div className="small mb-1 d-flex align-items-center flex-wrap gap-1">
+                          <i className="bi bi-clipboard2-pulse text-sky" />
+                          <span>
+                            {appt.serviceLabel || appt.service} · {vetName || 'ยังไม่ระบุหมอ'}
+                          </span>
+                          <span
+                            className={`ma-vet-vis ms-1 ${appt.visibleToVet ? 'text-sky' : 'text-muted'}`}
+                            title={
+                              appt.visibleToVet
+                                ? 'แสดงในหน้าสัตวแพทย์แล้ว'
+                                : 'ยังไม่แสดงในหน้าสัตวแพทย์'
+                            }
+                          >
+                            <i className={`bi ${appt.visibleToVet ? 'bi-eye' : 'bi-eye-slash'}`} />
+                          </span>
+                        </div>
+                        {appt.note && (
+                          <div className="small text-muted mb-2">อาการ/หมายเหตุ: {appt.note}</div>
+                        )}
+
+                        <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--baby)' }}>
                           <StatusActions
                             appt={appt}
-                            onChangeStatus={handleChangeStatus}
-                            onRequestCancel={setCancelTarget}
-                            onEdit={openEdit}
+                            todayKey={todayKey}
+                            onRequestAction={openConfirm}
+                            onReschedule={setRescheduleTarget}
                           />
-                        </td>
-                      </tr>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="d-md-none d-grid gap-3">
-              {filtered.map((appt) => {
-                const sp = speciesOf(appt.species);
-                const st = APPOINTMENT_STATUS[appt.status] ?? APPOINTMENT_STATUS.pending;
-                const pid = patientIdForAppt(appt);
-                const pat = getPatient(pid);
-                return (
-                  <div className="record-row mb-0 pb-3" key={appt.id}>
-                    <div className="d-flex justify-content-between align-items-center gap-2 mb-2">
-                      <div className="mitr">
-                        {appt.time} น.{' '}
-                        <span className="small text-muted fw-normal">({appt.durationMin} นาที)</span>
-                      </div>
-                      <span className={`tag ${st.tag} m-0`}>{st.label}</span>
-                    </div>
-
-                    <div className="fw-medium mb-1">
-                      <PatientNameLink
-                        patientId={pid}
-                        petName={appt.petName}
-                        species={appt.species}
-                        flags={pat?.flags}
-                        allergies={pat?.pet?.allergies}
-                      />{' '}
-                      <span className="small text-muted fw-normal">· {sp.label}</span>
-                    </div>
-
-                    <div className="small text-muted mb-1">
-                      <i className="bi bi-person me-1" />
-                      {appt.ownerName} · {appt.ownerPhone}
-                    </div>
-                    <div className="small mb-1">
-                      <i className="bi bi-clipboard2-pulse me-1 text-sky" />
-                      {appt.service} · {appt.vet}
-                    </div>
-                    {appt.reason && (
-                      <div className="small text-muted mb-2">อาการ: {appt.reason}</div>
-                    )}
-
-                    <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--baby)' }}>
-                      <StatusActions
-                        appt={appt}
-                        onChangeStatus={handleChangeStatus}
-                        onRequestCancel={setCancelTarget}
-                        onEdit={openEdit}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       <AppointmentModal
-        open={modalOpen}
-        initialData={editing}
+        open={Boolean(rescheduleTarget)}
+        appointment={rescheduleTarget}
         appointments={appointments}
-        defaultDate={selectedDate}
-        onClose={() => {
-          setModalOpen(false);
-          setEditing(null);
-        }}
-        onSave={handleSave}
+        onClose={() => setRescheduleTarget(null)}
+        onReschedule={handleRescheduleSave}
       />
 
       <ConfirmModal
-        open={Boolean(cancelTarget)}
-        title="ยืนยันการยกเลิกนัดหมาย"
-        icon="bi-x-circle"
-        message={
-          cancelTarget
-            ? `ต้องการยกเลิกนัดของ "${cancelTarget.petName}" เวลา ${cancelTarget.time} น. (${cancelTarget.ownerName}) ใช่หรือไม่?`
-            : ''
-        }
-        confirmLabel="ยืนยันยกเลิกนัด"
-        cancelLabel="เก็บไว้"
-        confirmVariant="danger"
-        onClose={() => setCancelTarget(null)}
-        onConfirm={handleConfirmCancel}
-      />
-
-      <ConfirmModal
-        open={resetOpen}
-        title="รีเซ็ตข้อมูลตัวอย่าง"
-        icon="bi-arrow-counterclockwise"
-        message="ข้อมูลนัดหมายปัจจุบันทั้งหมดจะถูกแทนที่ด้วยข้อมูลตัวอย่างเริ่มต้น ต้องการดำเนินการต่อหรือไม่?"
-        confirmLabel="รีเซ็ตข้อมูล"
+        open={Boolean(confirmAction)}
+        title={confirmCfg?.title}
+        icon={confirmCfg?.icon}
+        message={confirmCfg?.message}
+        confirmLabel={confirmCfg?.confirmLabel}
         cancelLabel="ยกเลิก"
-        confirmVariant="sky"
-        onClose={() => setResetOpen(false)}
-        onConfirm={handleConfirmReset}
+        confirmVariant={confirmCfg?.confirmVariant}
+        submitting={confirmSubmitting}
+        error={confirmError}
+        onClose={() => !confirmSubmitting && setConfirmAction(null)}
+        onConfirm={handleConfirmSubmit}
       />
 
       {toast}
