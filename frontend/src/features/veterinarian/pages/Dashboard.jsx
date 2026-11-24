@@ -77,14 +77,8 @@ function PetAvatar({ pet, fallback }) {
 }
 
 function SlotAction({ a, busy, onAction }) {
-  if (a.status === 'pending') {
-    return (
-      <button type="button" className="btn btn-sky btn-sm" disabled={busy} onClick={() => onAction(a, 'confirmed')}>
-        <i className="bi bi-check2 me-1" />
-        ยืนยันนัด
-      </button>
-    );
-  }
+  // Confirming is the Medical Assistant's job; the vet only closes confirmed cases.
+  if (a.status === 'pending') return <span className="tag warn">รอผู้ช่วยฯ ยืนยัน</span>;
   if (a.status === 'confirmed') {
     return (
       <button type="button" className="btn btn-sky btn-sm" disabled={busy} onClick={() => onAction(a, 'completed')}>
@@ -198,7 +192,7 @@ export default function VeterinarianDashboardPage() {
               fg="#c48f00"
               value={pending.length}
               label="รอยืนยัน"
-              sub={pending.length ? 'รอคุณหมอยืนยัน' : 'ไม่มีนัดค้าง'}
+              sub={pending.length ? 'รอผู้ช่วยฯ ยืนยัน' : 'ไม่มีนัดค้าง'}
             />
             <Tile
               to="/veterinarian/vaccination"
@@ -330,9 +324,7 @@ export default function VeterinarianDashboardPage() {
                             {formatDate(a.date)} · {a.time} น. · {a.serviceLabel}
                           </span>
                         </span>
-                        <button type="button" className="btn btn-sky btn-sm" disabled={busyId === a.id} onClick={() => handleAction(a, 'confirmed')}>
-                          ยืนยัน
-                        </button>
+                        <span className="tag warn">รอผู้ช่วยฯ ยืนยัน</span>
                       </div>
                     ))}
                     {pending.length > 5 && <div className="small text-muted">และอีก {pending.length - 5} รายการ</div>}

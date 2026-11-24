@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { BOOKING_STATUSES, listAllBookings, updateBookingStatus } from '../pet-owner/bookingStore.js';
 import { getPetById, listAllPets, updatePetAsClinic } from '../pet-owner/store.js';
+import { dueVaccines } from './dueVaccines.js';
 
 /**
  * Veterinarian API module
@@ -65,11 +66,14 @@ router.get('/appointments', wrap(async (req, res) => {
   res.json(result);
 }));
 
-// POST /appointments/:id/status  { status: 'confirmed'|'rejected'|'completed'|'no_show', note? }
+// POST /appointments/:id/status  { status: 'completed', note? }
+// The vet only closes the case. Confirming, declining, no-show and rescheduling are done by the
+// Medical Assistant (backend/src/modules/medical-assistant) through the same bookingStore.js.
 router.post('/appointments/:id/status', wrap(async (req, res) => {
   const { status } = req.body ?? {};
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : '';
   if (!BOOKING_STATUSES.includes(status)) throw httpError(400, 'สถานะไม่ถูกต้อง');
+  if (status !== 'completed') throw httpError(403, 'ผู้ช่วยสัตวแพทย์เป็นผู้ดำเนินการ สัตวแพทย์ปิดเคสได้อย่างเดียว');
   const booking = await updateBookingStatus(req.params.id, status, note);
   res.json({ ...booking, pet: petSummary(await getPetById(booking.petId)) });
 }));
@@ -238,48 +242,7 @@ function parseDose(body, { isVaccine }) {
 const parseVaccination = (body) => parseDose(body, { isVaccine: true });
 const parseParasite = (body) => parseDose(body, { isVaccine: false });
 
-const normName = (name) => String(name ?? '').trim().toLowerCase();
-
-/**
- * Vaccines that are overdue or due within `days` days. Only the most recent dose of each vaccine
- * counts, so giving the next dose clears the old reminder. (Parasite treatment is just recorded when
- * given; the clinic does not track it as a schedule.)
- */
-function dueVaccines(pets, days) {
-  const limit = new Date();
-  limit.setDate(limit.getDate() + days);
-  const pad = (n) => String(n).padStart(2, '0');
-  const limitString = `${limit.getFullYear()}-${pad(limit.getMonth() + 1)}-${pad(limit.getDate())}`;
-  const t = today();
-  const due = [];
-
-  const collect = (pet, rows, keyOf, describe) => {
-    const latest = new Map();
-    for (const row of rows) {
-      const key = keyOf(row) || row.id;
-      const current = latest.get(key);
-      if (!current || (row.date ?? '') >= (current.date ?? '')) latest.set(key, row);
-    }
-    for (const row of latest.values()) {
-      if (!row.nextDate || row.nextDate > limitString) continue;
-      due.push({
-        ...describe(row),
-        petId: pet.id,
-        petName: pet.name,
-        petSpecies: pet.species,
-        petBreed: pet.breed,
-        lastDate: row.date || '',
-        nextDate: row.nextDate,
-        status: row.nextDate < t ? 'overdue' : 'soon',
-      });
-    }
-  };
-
-  for (const pet of pets) {
-    collect(pet, pet.vaccines ?? [], (v) => normName(v.name), (v) => ({ name: v.name }));
-  }
-  return due.sort((a, b) => a.nextDate.localeCompare(b.nextDate));
-}
+// dueVaccines() lives in dueVaccines.js (shared with the Medical Assistant module).
 
 router.use('/vaccination', requireVet);
 router.use('/parasite', requireVet);

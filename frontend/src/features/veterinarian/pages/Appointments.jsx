@@ -7,13 +7,20 @@ import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 
 /**
  * Appointments — Role: Veterinarian (มะแอ่ว)
- * Bookings made by pet owners: the vet confirms or declines new ones and marks confirmed ones
- * as completed or no-show. Data comes from /api/veterinarian/appointments.
+ * Bookings made by pet owners. The Medical Assistant confirms / declines them, marks no-shows and
+ * reschedules; the vet examines the pet, records the work and closes the case (completed).
+ * Data comes from /api/veterinarian/appointments.
  */
+
+/** Status labels as the vet sees them (owners keep the labels in BOOKING_STATUS). */
+const vetStatus = (status) =>
+  status === 'pending'
+    ? { label: 'รอผู้ช่วยฯ ยืนยัน', tone: 'warn' }
+    : BOOKING_STATUS[status] ?? { label: status, tone: '' };
 
 const FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
-  { value: 'pending', label: 'รอยืนยัน' },
+  { value: 'pending', label: 'รอผู้ช่วยฯ ยืนยัน' },
   { value: 'confirmed', label: 'ยืนยันแล้ว' },
   { value: 'completed', label: 'เสร็จสิ้น' },
   { value: 'other', label: 'อื่นๆ' },
@@ -67,7 +74,7 @@ function PetInfo({ pet, fallbackName }) {
 }
 
 function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
-  const status = BOOKING_STATUS[a.status] ?? { label: a.status, tone: '' };
+  const status = vetStatus(a.status);
   return (
     <div className="card-soft mb-3">
       <div className="d-flex flex-wrap align-items-start gap-3">
@@ -92,17 +99,6 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
         </div>
 
         <div className="d-flex flex-column gap-2">
-          {a.status === 'pending' && (
-            <>
-              <button type="button" className="btn btn-sky btn-sm" disabled={busy} onClick={() => onAction(a, 'confirmed')}>
-                <i className="bi bi-check2 me-1" />
-                ยืนยันนัด
-              </button>
-              <button type="button" className="btn btn-soft-danger btn-sm" disabled={busy} onClick={() => onAction(a, 'rejected')}>
-                ปฏิเสธ
-              </button>
-            </>
-          )}
           {['confirmed', 'completed'].includes(a.status) && a.pet && (
             <Link to={recordLink(a)} className="btn btn-soft btn-sm">
               <i className="bi bi-journal-plus me-1" />
@@ -110,15 +106,10 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
             </Link>
           )}
           {a.status === 'confirmed' && (
-            <>
-              <button type="button" className="btn btn-sky btn-sm" disabled={busy} onClick={() => onAction(a, 'completed')}>
-                <i className="bi bi-check2-all me-1" />
-                ตรวจเสร็จสิ้น
-              </button>
-              <button type="button" className="btn btn-soft-danger btn-sm" disabled={busy} onClick={() => onAction(a, 'no_show')}>
-                ไม่มาตามนัด
-              </button>
-            </>
+            <button type="button" className="btn btn-sky btn-sm" disabled={busy} onClick={() => onAction(a, 'completed')}>
+              <i className="bi bi-check2-all me-1" />
+              ตรวจเสร็จสิ้น
+            </button>
           )}
         </div>
       </div>
@@ -138,18 +129,10 @@ export default function AppointmentsPage() {
   const count = (f) => appointments.filter((a) => inFilter(a, f)).length;
 
   async function handleAction(a, status) {
-    let note = '';
-    if (status === 'rejected') {
-      const reason = window.prompt(`เหตุผลที่ไม่สามารถรับนัดของ "${a.petName}" (แสดงให้เจ้าของเห็น ไม่บังคับ)`, '');
-      if (reason === null) return;
-      note = reason;
-    } else if (status === 'no_show' && !window.confirm(`บันทึกว่า "${a.petName}" ไม่มาตามนัด?`)) {
-      return;
-    }
     setBusyId(a.id);
     setActionError('');
     try {
-      await setStatus(a.id, status, note);
+      await setStatus(a.id, status);
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -164,7 +147,7 @@ export default function AppointmentsPage() {
         <div className="page-head">
           <div>
             <h1>นัดหมาย</h1>
-            <p>นัดที่เจ้าของสัตว์เลี้ยงจองเข้ามา ยืนยัน หรือบันทึกผลการนัด</p>
+            <p>นัดที่เจ้าของสัตว์เลี้ยงจองเข้ามา บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ (ผู้ช่วยฯ เป็นผู้ยืนยันนัด)</p>
           </div>
         </div>
 

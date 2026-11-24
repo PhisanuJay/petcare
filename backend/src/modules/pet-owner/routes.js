@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { cancelBooking, createBooking, listBookings } from './bookingStore.js';
+import { BOOKING_SERVICES, isDateString, todayString, validateSlot } from './clinicSchedule.js';
 import { cancelReservation, createReservation, listReservations } from './hotelStore.js';
 import { findAdoptionAnimal, listAdoptionAnimals } from './adoptionAnimals.js';
 import { cancelAdoptionRequest, createAdoptionRequest, listAdoptionRequests } from './adoptionStore.js';
@@ -126,46 +127,10 @@ router.get('/adoption', (_req, res) => {
 
 /* ---------- Bookings ---------- */
 
-// Keep in sync with BOOKING_SERVICES / OPENING_HOURS in frontend/src/features/pet-owner/bookingOptions.js
-const BOOKING_SERVICES = {
-  checkup: 'ตรวจสุขภาพทั่วไป',
-  vaccine: 'ฉีดวัคซีน',
-  parasite: 'ถ่ายพยาธิ / เห็บหมัด',
-  followup: 'ติดตามอาการ',
-  other: 'อื่นๆ',
-};
+// Services and opening hours live in clinicSchedule.js (shared with the clinic-side modules).
 
-/**
- * Clinic opening hours, taken from the home page (frontend/src/shared/pages/home/InfoSections.jsx):
- * Mon–Fri 08:00–22:00, Sat–Sun 09:00–21:00. Slots are 30 minutes and the last one starts
- * 30 minutes before closing. Emergency care (24h) is not booked online. Public holidays are not handled.
- */
-const WEEKDAY_HOURS = { open: '08:00', close: '22:00' };
-const WEEKEND_HOURS = { open: '09:00', close: '21:00' };
-
-const toMinutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
-
-function bookableSlots(dateString) {
-  const [y, m, d] = dateString.split('-').map(Number);
-  const day = new Date(y, m - 1, d).getDay(); // 0 = Sunday, 6 = Saturday
-  const { open, close } = day === 0 || day === 6 ? WEEKEND_HOURS : WEEKDAY_HOURS;
-  const slots = [];
-  for (let t = toMinutes(open); t + 30 <= toMinutes(close); t += 30) {
-    slots.push(`${String(Math.floor(t / 60)).padStart(2, '0')}:${t % 60 === 0 ? '00' : '30'}`);
-  }
-  return slots;
-}
-
-function nowTimeString() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-function todayString() {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
+/** Optional short text from the request body. */
+const optionalText = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 router.use('/bookings', requireOwner);
 
@@ -183,18 +148,16 @@ router.post('/bookings', wrap(async (req, res) => {
   const pet = await findPet(req.ownerId, petId);
   if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
   if (!Object.hasOwn(BOOKING_SERVICES, service)) throw httpError(400, 'กรุณาเลือกบริการ');
-  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(date).getTime())) {
-    throw httpError(400, 'กรุณาเลือกวันที่');
-  }
-  if (date < todayString()) throw httpError(400, 'ไม่สามารถจองวันที่ผ่านมาแล้ว');
-  if (typeof time !== 'string' || !time) throw httpError(400, 'กรุณาเลือกเวลา');
-  if (!bookableSlots(date).includes(time)) throw httpError(400, 'เวลานี้อยู่นอกเวลาทำการของคลินิก');
-  if (date === todayString() && time <= nowTimeString()) throw httpError(400, 'เวลานี้ผ่านไปแล้ว');
+  validateSlot(date, time);
 
+  // Users live in the browser (localStorage), so the clinic only learns the owner's name and phone
+  // from the booking itself. The Medical Assistant uses them to call the owner. Both are optional.
   const booking = await createBooking(req.ownerId, {
     petId,
     petName: pet.name,
     petSpecies: pet.species,
+    ownerName: optionalText(body.ownerName, 100),
+    ownerPhone: optionalText(body.ownerPhone, 30),
     service,
     serviceLabel: BOOKING_SERVICES[service],
     date,
@@ -219,9 +182,6 @@ const HOTEL_ROOMS = {
 };
 const HOTEL_SPECIES = 'cat';
 const MAX_HOTEL_NIGHTS = 30;
-
-const isDateString = (v) =>
-  typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(v).getTime());
 
 const nightsBetween = (from, to) => Math.round((new Date(to) - new Date(from)) / 86400000);
 
@@ -297,11 +257,7 @@ router.post('/transport/requests', wrap(async (req, res) => {
   const pet = await findPet(req.ownerId, petId);
   if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
   if (!Object.hasOwn(TRANSPORT_DIRECTIONS, direction)) throw httpError(400, 'กรุณาเลือกรูปแบบการรับ-ส่ง');
-  if (!isDateString(date)) throw httpError(400, 'กรุณาเลือกวันที่');
-  if (date < todayString()) throw httpError(400, 'ไม่สามารถเลือกวันที่ผ่านมาแล้ว');
-  if (typeof time !== 'string' || !time) throw httpError(400, 'กรุณาเลือกเวลา');
-  if (!bookableSlots(date).includes(time)) throw httpError(400, 'เวลานี้อยู่นอกเวลาทำการของคลินิก');
-  if (date === todayString() && time <= nowTimeString()) throw httpError(400, 'เวลานี้ผ่านไปแล้ว');
+  validateSlot(date, time);
   if (address.length < 10) throw httpError(400, 'กรุณากรอกที่อยู่ให้ละเอียด');
   if (address.length > 300) throw httpError(400, 'ที่อยู่ยาวเกินไป');
   if (!/^0\d{8,9}$/.test(phone)) throw httpError(400, 'เบอร์โทร 9-10 หลัก ขึ้นต้นด้วย 0');

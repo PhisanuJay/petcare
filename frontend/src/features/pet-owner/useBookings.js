@@ -49,11 +49,20 @@ export function useBookings() {
 
   const addBooking = useCallback(
     async (data) => {
-      const booking = await ownerRequest(ownerId, '/bookings', { method: 'POST', body: JSON.stringify(data) });
+      // The backend has no user accounts, so send the owner's name and phone with the booking:
+      // the Medical Assistant uses them to contact the owner.
+      const owner = {
+        ownerName: `${currentUser?.firstName ?? ''} ${currentUser?.lastName ?? ''}`.trim(),
+        ownerPhone: currentUser?.phone ?? '',
+      };
+      const booking = await ownerRequest(ownerId, '/bookings', {
+        method: 'POST',
+        body: JSON.stringify({ ...data, ...owner }),
+      });
       setBookings((list) => [...list, booking]);
       return booking;
     },
-    [ownerId],
+    [ownerId, currentUser],
   );
 
   const cancelBooking = useCallback(

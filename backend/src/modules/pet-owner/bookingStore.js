@@ -1,21 +1,32 @@
 import { randomUUID } from 'node:crypto';
+import { validateSlot } from './clinicSchedule.js';
 import { createJsonCollection, httpError } from './jsonCollection.js';
 
 /**
  * Pet owners' vet bookings.
- * Shape: { id, ownerId, petId, petName, petSpecies, service, serviceLabel, date, time, note,
- *          status, clinicNote?, createdAt, updatedAt }
- * status: 'pending' → 'confirmed' | 'rejected' (by the clinic);  'confirmed' → 'completed' | 'no_show';
+ * Shape: { id, ownerId, petId, petName, petSpecies, ownerName, ownerPhone, service, serviceLabel,
+ *          date, time, note, status, clinicNote?, createdAt, updatedAt }
+ *   ownerName / ownerPhone are copied from the owner's account when booking (may be '' on older bookings).
+ * status: 'pending' → 'confirmed' | 'rejected' (Medical Assistant);
+ *         'confirmed' → 'no_show' (Medical Assistant) | 'completed' (Veterinarian);
  *         'pending' / 'confirmed' → 'cancelled' (by the owner).
+ * The Medical Assistant can also move a pending / confirmed booking to another date and time
+ * (rescheduleBookingAsClinic).
  */
 const bookings = createJsonCollection('bookings.json');
 
-/** Statuses the veterinarian side may move a booking to, by current status. */
+/**
+ * Statuses the clinic side may move a booking to, by current status. Which role does which step is
+ * decided by each module's routes (the Veterinarian API only allows 'completed').
+ */
 const CLINIC_TRANSITIONS = {
   pending: ['confirmed', 'rejected'],
   confirmed: ['completed', 'no_show'],
 };
 const OWNER_CANCELLABLE = ['pending', 'confirmed'];
+const CLINIC_RESCHEDULABLE = ['pending', 'confirmed'];
+/** Bookings that no longer hold their time slot. */
+const INACTIVE = ['cancelled', 'rejected'];
 export const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'no_show', 'rejected', 'cancelled'];
 
 export function listBookings(ownerId) {
@@ -76,6 +87,38 @@ export function updateBookingStatus(id, status, clinicNote = '') {
       ...(clinicNote ? { clinicNote } : {}),
       updatedAt: new Date().toISOString(),
     };
+    const next = all.slice();
+    next[index] = booking;
+    return { records: next, result: booking };
+  });
+}
+
+/**
+ * Clinic-side change of date and time (e.g. the Medical Assistant moves a booking when approving it).
+ * Only pending / confirmed bookings; the status is kept. The new slot must be a future slot within
+ * opening hours, and the same pet must not already have another active booking at that time.
+ */
+export function rescheduleBookingAsClinic(id, { date, time } = {}) {
+  try {
+    validateSlot(date, time);
+  } catch (err) {
+    return Promise.reject(err);
+  }
+  return bookings.update((all) => {
+    const index = all.findIndex((b) => b.id === id);
+    if (index === -1) throw httpError(404, 'ไม่พบนัดหมายนี้');
+    const current = all[index];
+    if (!CLINIC_RESCHEDULABLE.includes(current.status)) throw httpError(409, 'นัดนี้ดำเนินการไปแล้ว ไม่สามารถเลื่อนได้');
+    const clash = all.some(
+      (b) =>
+        b.id !== id &&
+        b.petId === current.petId &&
+        !INACTIVE.includes(b.status) &&
+        b.date === date &&
+        b.time === time,
+    );
+    if (clash) throw httpError(409, 'สัตว์เลี้ยงตัวนี้มีนัดในวันและเวลานี้แล้ว');
+    const booking = { ...current, date, time, updatedAt: new Date().toISOString() };
     const next = all.slice();
     next[index] = booking;
     return { records: next, result: booking };
