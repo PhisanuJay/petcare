@@ -104,14 +104,16 @@ export const roleRoutes = (
     </Route>
 
     {/* Medical Assistant — เอิร์ท */}
-    <Route path="medical-assistant" element={<MedicalAssistantLayout />}>
-      <Route index element={<MedicalAssistantDashboardPage />} />
-      <Route path="appointments" element={<MaAppointmentsPage />} />
-      <Route path="patients" element={<MaPatientsPage />} />
-      <Route path="patients/:patientId" element={<MaPatientDetailPage />} />
-      <Route path="booking-management" element={<BookingManagementPage />} />
-      <Route path="medical-support" element={<MedicalSupportPage />} />
-      <Route path="medical-support/:appointmentId" element={<SupportCasePage />} />
+    <Route path="medical-assistant" element={<RequireStaff role="medical_assistant" />}>
+      <Route element={<MedicalAssistantLayout />}>
+        <Route index element={<MedicalAssistantDashboardPage />} />
+        <Route path="appointments" element={<MaAppointmentsPage />} />
+        <Route path="patients" element={<MaPatientsPage />} />
+        <Route path="patients/:patientId" element={<MaPatientDetailPage />} />
+        <Route path="booking-management" element={<BookingManagementPage />} />
+        <Route path="medical-support" element={<MedicalSupportPage />} />
+        <Route path="medical-support/:appointmentId" element={<SupportCasePage />} />
+      </Route>
     </Route>
 
     {/* Pet Profile (shared) — เอิร์ท, ปร่ย */}

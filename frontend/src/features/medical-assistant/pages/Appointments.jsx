@@ -9,7 +9,6 @@ import PatientNameLink from '../components/PatientNameLink.jsx';
 import {
   STAGE_LIST,
   STAGE_META,
-  VETS,
   offsetDateKey,
 } from '../data/constants.js';
 import { useAppointments } from '../data/useAppointments.js';
@@ -181,10 +180,7 @@ export default function AppointmentsPage() {
     [patients],
   );
 
-  const vetNames = useMemo(
-    () => (meta?.VET_NAMES?.length ? meta.VET_NAMES : VETS.map((v) => v.name)),
-    [meta],
-  );
+  const vetNames = meta?.VET_NAMES ?? [];
 
   const dayAppointments = useMemo(
     () =>

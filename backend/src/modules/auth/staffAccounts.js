@@ -5,8 +5,7 @@ import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
  * DEVELOPMENT DATA ONLY — the passwords below are plain text in the source so the team can log in.
  * Replace this list with a real accounts table before the system is used outside development.
  *
- * `role` decides which pages a staff member may open: 'veterinarian' (more roles can be added later,
- * e.g. 'medical_assistant').
+ * `role` decides which pages a staff member may open: 'veterinarian' or 'medical_assistant'.
  */
 const DEV_PASSWORD = 'vet12345';
 
@@ -14,6 +13,8 @@ const DEV_STAFF = [
   { id: 'staff-vet-1', name: 'สพ.ญ.ณัฐชา ใจดี', email: 'vet1@petcare.clinic', role: 'veterinarian' },
   { id: 'staff-vet-2', name: 'น.สพ.วิทยา รักสัตว์', email: 'vet2@petcare.clinic', role: 'veterinarian' },
   { id: 'staff-vet-3', name: 'สพ.ญ.พิมพ์ชนก แสนสุข', email: 'vet3@petcare.clinic', role: 'veterinarian' },
+  { id: 'staff-ma-1', name: 'สมใจ ช่วยดี', email: 'ma1@petcare.clinic', role: 'medical_assistant' },
+  { id: 'staff-ma-2', name: 'กมล ใส่ใจ', email: 'ma2@petcare.clinic', role: 'medical_assistant' },
 ];
 
 const hashPassword = (password, salt) => scryptSync(password, salt, 32);
@@ -25,6 +26,10 @@ const accounts = DEV_STAFF.map((staff) => {
 
 /** What the frontend may know about a staff member (never the password hash). */
 export const toPublicStaff = ({ id, name, email, role }) => ({ id, name, email, role });
+
+export function listStaff(role) {
+  return accounts.filter((a) => a.role === role).map(toPublicStaff);
+}
 
 export function findStaffById(id) {
   return accounts.find((a) => a.id === id) ?? null;

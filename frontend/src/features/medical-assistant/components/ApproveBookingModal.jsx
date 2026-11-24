@@ -18,10 +18,7 @@ function ApproveBookingModalInner({
   onSuccess,
 }) {
   const todayKey = todayString();
-  const vetNames = useMemo(
-    () => (meta?.VET_NAMES?.length ? meta.VET_NAMES : VETS.map((v) => v.name)),
-    [meta],
-  );
+  const vetNames = useMemo(() => meta?.VET_NAMES ?? [], [meta]);
   const durations = useMemo(
     () => (meta?.DURATIONS?.length ? meta.DURATIONS : FALLBACK_DURATIONS),
     [meta],
@@ -41,6 +38,12 @@ function ApproveBookingModalInner({
   }));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!form.vet && vetNames.length > 0) {
+      setForm((prev) => ({ ...prev, vet: vetNames[0] }));
+    }
+  }, [form.vet, vetNames]);
 
   useEffect(() => {
     const onKeyDown = (e) => {

@@ -1,11 +1,3 @@
-// รอระบบ staff ของ Admin (keep in sync with VETS in frontend/src/shared/data/homeContent.js)
-export const VET_NAMES = [
-  'สพ.ญ.ณัฐชา ใจดี',
-  'น.สพ.วิทยา รักสัตว์',
-  'สพ.ญ.พิมพ์ชนก แสนสุข',
-  'น.สพ.ธนกฤต มีเมตตา',
-];
-
 export const DURATIONS = [15, 30, 45, 60, 90];
 
 export const CAUTION_FLAGS = [

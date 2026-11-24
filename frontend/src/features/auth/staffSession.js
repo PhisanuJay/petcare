@@ -29,4 +29,4 @@ export function clearStaffSession() {
 export const STAFF_SESSION_EXPIRED = 'petcare:staff-session-expired';
 
 /** Where each staff role starts after logging in. */
-export const STAFF_HOME = { veterinarian: '/veterinarian' };
+export const STAFF_HOME = { veterinarian: '/veterinarian', medical_assistant: '/medical-assistant' };

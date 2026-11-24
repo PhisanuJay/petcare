@@ -11,7 +11,6 @@ import {
   OPENING_HOURS,
   STAGE_META,
   TRIAGE_LEVELS,
-  VETS,
   minutesToTime,
   offsetDateKey,
   timeToMinutes,
@@ -113,10 +112,7 @@ export default function MedicalAssistantDashboardPage() {
     [patients],
   );
 
-  const vetNames = useMemo(
-    () => (meta?.VET_NAMES?.length ? meta.VET_NAMES : VETS.map((v) => v.name)),
-    [meta],
-  );
+  const vetNames = meta?.VET_NAMES ?? [];
 
   const todayKey = toDateKey(now);
   const tomorrowKey = offsetDateKey(1);

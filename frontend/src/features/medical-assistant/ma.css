@@ -72,6 +72,14 @@
   gap: 0.35rem;
 }
 
+.ma-shell .ma-sidebar-footer {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1.5px solid var(--baby);
+  display: grid;
+  gap: 0.55rem;
+}
+
 .ma-shell a.ma-nav-link {
   display: flex;
   align-items: center;

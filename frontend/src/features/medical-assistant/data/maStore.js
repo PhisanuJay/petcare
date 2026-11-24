@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from 'react';
+import { STAFF_SESSION_EXPIRED } from '../../auth/staffSession.js';
 import { maRequest } from './maApi.js';
 
 const POLL_INTERVAL_MS = 30000;
 
-let state = {
+const INITIAL_STATE = {
   appointments: [],
   patients: [],
   meta: null,
@@ -12,12 +13,15 @@ let state = {
   lastLoadedAt: null,
 };
 
+let state = { ...INITIAL_STATE };
+
 const listeners = new Set();
 let pollTimer = null;
 let visibilityBound = false;
 let inFlightReload = null;
 let hasStartedInitialLoad = false;
 let mutationVersion = 0;
+let storeEpoch = 0;
 
 function emit() {
   for (const listener of listeners) listener();
@@ -46,12 +50,13 @@ function computeStageFromVisit(appt, visit) {
 export async function reloadMaStore({ silent = false } = {}) {
   if (inFlightReload) return inFlightReload;
 
+  const startEpoch = storeEpoch;
+  const startVersion = mutationVersion;
+  let staleAfterMutation = false;
+
   if (!silent) {
     setState((prev) => ({ ...prev, loading: true, error: '' }));
   }
-
-  const startVersion = mutationVersion;
-  let staleAfterMutation = false;
 
   inFlightReload = (async () => {
     try {
@@ -60,6 +65,9 @@ export async function reloadMaStore({ silent = false } = {}) {
         maRequest('/patients'),
         state.meta ? Promise.resolve(state.meta) : maRequest('/meta'),
       ]);
+
+      // Ignore in-flight results if the store was reset (logout / session expiry)
+      if (storeEpoch !== startEpoch) return;
 
       // Discard stale poll response if a mutation committed while this fetch was in flight
       if (mutationVersion !== startVersion) {
@@ -82,6 +90,7 @@ export async function reloadMaStore({ silent = false } = {}) {
         lastLoadedAt: new Date().toISOString(),
       });
     } catch (err) {
+      if (storeEpoch !== startEpoch) return;
       if (mutationVersion !== startVersion) {
         setState((prev) => ({ ...prev, loading: false }));
         return;
@@ -98,16 +107,18 @@ export async function reloadMaStore({ silent = false } = {}) {
 
   await inFlightReload;
 
-  if (staleAfterMutation && listeners.size > 0) {
+  if (storeEpoch === startEpoch && staleAfterMutation && listeners.size > 0) {
     return reloadMaStore({ silent: true });
   }
   return undefined;
 }
 
 export async function reloadPatientsSilent() {
+  const startEpoch = storeEpoch;
   const startVersion = mutationVersion;
   try {
     const patients = await maRequest('/patients');
+    if (storeEpoch !== startEpoch) return;
     if (mutationVersion !== startVersion) {
       if (listeners.size > 0) reloadPatientsSilent();
       return;
@@ -183,6 +194,21 @@ function stopSync() {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     visibilityBound = false;
   }
+}
+
+export function resetMaStore() {
+  storeEpoch += 1;
+  mutationVersion += 1;
+  inFlightReload = null;
+  hasStartedInitialLoad = false;
+  stopSync();
+  setState({ ...INITIAL_STATE });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener(STAFF_SESSION_EXPIRED, () => {
+    resetMaStore();
+  });
 }
 
 function subscribe(listener) {

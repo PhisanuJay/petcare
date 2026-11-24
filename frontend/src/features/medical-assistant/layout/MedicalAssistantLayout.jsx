@@ -1,5 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { startTransition } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import { offsetDateKey } from '../data/constants.js';
+import { resetMaStore } from '../data/maStore.js';
 import { awaitingTriage, needsContact, pendingBookings } from '../data/selectors.js';
 import { useAppointments } from '../data/useAppointments.js';
 import { useVisits } from '../data/useVisits.js';
@@ -53,6 +56,16 @@ function NavBadges({ badgeType, counts, alignEnd = false }) {
 export default function MedicalAssistantLayout() {
   const { appointments } = useAppointments();
   const { getVisit } = useVisits();
+  const { currentStaff, staffLogout } = useAuth();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    startTransition(() => {
+      staffLogout();
+      resetMaStore();
+      navigate('/login', { replace: true });
+    });
+  }
 
   const todayKey = offsetDateKey(0);
   const badgeCounts = {
@@ -65,13 +78,27 @@ export default function MedicalAssistantLayout() {
     <div className="pc-site ma-shell">
       <div className="container">
         <div className="d-lg-none mb-3 ma-no-print">
-          <div className="ma-mobile-header">
-            <span className="ma-brand-icon">
-              <i className="bi bi-heart-pulse-fill" />
-            </span>
-            <div>
-              <div className="mitr fs-5 lh-sm">ผู้ช่วยสัตวแพทย์</div>
-              <div className="small text-muted">คลินิก PetCare</div>
+          <div className="ma-mobile-header justify-content-between flex-wrap">
+            <div className="d-flex align-items-center gap-3">
+              <span className="ma-brand-icon">
+                <i className="bi bi-heart-pulse-fill" />
+              </span>
+              <div>
+                <div className="mitr fs-5 lh-sm">ผู้ช่วยสัตวแพทย์</div>
+                <div className="small text-muted">คลินิก PetCare</div>
+              </div>
+            </div>
+            <div className="d-flex align-items-center gap-2 ms-auto">
+              {currentStaff && (
+                <span className="small fw-medium">
+                  <i className="bi bi-person-circle me-1 text-sky" />
+                  {currentStaff.name}
+                </span>
+              )}
+              <button type="button" className="btn btn-soft btn-sm" onClick={handleLogout}>
+                <i className="bi bi-box-arrow-right me-1" />
+                ออกจากระบบ
+              </button>
             </div>
           </div>
           <nav className="pill-tabs ma-mobile-nav" aria-label="เมนูผู้ช่วยสัตวแพทย์">
@@ -115,6 +142,19 @@ export default function MedicalAssistantLayout() {
                 </NavLink>
               ))}
             </nav>
+
+            <div className="ma-sidebar-footer">
+              {currentStaff && (
+                <div className="small fw-medium px-2 d-flex align-items-center gap-2 text-truncate" title={currentStaff.name}>
+                  <i className="bi bi-person-circle text-sky flex-shrink-0" />
+                  <span className="text-truncate">{currentStaff.name}</span>
+                </div>
+              )}
+              <button type="button" className="btn btn-soft btn-sm w-100" onClick={handleLogout}>
+                <i className="bi bi-box-arrow-right me-1" />
+                ออกจากระบบ
+              </button>
+            </div>
           </aside>
 
           <div className="ma-content">

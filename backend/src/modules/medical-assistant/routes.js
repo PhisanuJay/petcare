@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { requireStaff } from '../auth/middleware.js';
+import { listStaff } from '../auth/staffAccounts.js';
 import {
   BOOKING_STATUSES,
   VET_VISIBLE_STATUSES,
@@ -23,7 +25,6 @@ import {
   NOTE_CATEGORIES,
   REJECT_REASONS,
   TRIAGE_LEVELS,
-  VET_NAMES,
   VITAL_LIMITS,
   minutesToTime,
   overlaps,
@@ -42,17 +43,8 @@ import { getVisit, listVisits, upsertVisit } from './visitStore.js';
  */
 const router = Router();
 
-/**
- * PLACEHOLDER access check — NOT real security.
- * The project has no staff login yet, so Medical Assistant pages send `x-staff-role: medical-assistant`.
- * Anyone can send that header. Replace this with real authentication once staff accounts exist.
- */
-function requireMA(req, _res, next) {
-  if (req.get('x-staff-role') !== 'medical-assistant') {
-    return next(httpError(401, 'กรุณาเข้าสู่ระบบผู้ช่วยสัตวแพทย์'));
-  }
-  next();
-}
+const requireMA = requireStaff('medical_assistant');
+const vetNames = () => listStaff('veterinarian').map((s) => s.name);
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
 
@@ -282,7 +274,7 @@ router.post(
       }
       const { vet } = body;
       const durationMin = Number(body.durationMin);
-      if (!VET_NAMES.includes(vet)) throw httpError(400, 'กรุณาเลือกสัตวแพทย์ที่ถูกต้อง');
+      if (!vetNames().includes(vet)) throw httpError(400, 'กรุณาเลือกสัตวแพทย์ที่ถูกต้อง');
       if (!DURATIONS.includes(durationMin)) throw httpError(400, 'กรุณาเลือกระยะเวลาที่ถูกต้อง');
 
       const conflict = findVetConflict(
@@ -304,6 +296,7 @@ router.post(
         vet,
         durationMin,
         handledAt: now,
+        handledBy: req.staff.name,
       });
       const pet = await getPetById(booking.petId);
       return res.json(appointmentView(booking, visit, pet));
@@ -325,6 +318,7 @@ router.post(
         petId: booking.petId,
         rejectReason: reason,
         handledAt: now,
+        handledBy: req.staff.name,
       });
       const pet = await getPetById(booking.petId);
       return res.json(appointmentView(booking, visit, pet));
@@ -429,6 +423,7 @@ router.post(
     const visit = await upsertVisit(current.id, {
       petId: current.petId,
       checkedInAt: new Date().toISOString(),
+      checkedInBy: req.staff.name,
     });
     const pet = await getPetById(current.petId);
     res.json(appointmentView(current, visit, pet));
@@ -477,6 +472,7 @@ router.post(
     const visit = await upsertVisit(current.id, {
       petId: current.petId,
       contactedAt: new Date().toISOString(),
+      contactedBy: req.staff.name,
     });
     const pet = await getPetById(current.petId);
     res.json(appointmentView(current, visit, pet));
@@ -662,7 +658,7 @@ router.get(
   '/patients/:id',
   wrap(async (req, res) => {
     const pet = await getPetById(req.params.id);
-    if (!pet) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
+    if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยง');
 
     const [allBookings, visits, noteEntry] = await Promise.all([
       listAllBookings(),
@@ -713,7 +709,7 @@ router.put(
   '/patients/:id/flags',
   wrap(async (req, res) => {
     const pet = await getPetById(req.params.id);
-    if (!pet) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
+    if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยง');
 
     const flags = req.body?.flags;
     if (!Array.isArray(flags)) throw httpError(400, 'ข้อมูล flags ไม่ถูกต้อง');
@@ -736,7 +732,7 @@ router.post(
   '/patients/:id/notes',
   wrap(async (req, res) => {
     const pet = await getPetById(req.params.id);
-    if (!pet) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
+    if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยง');
 
     const body = req.body;
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -763,7 +759,7 @@ router.delete(
   '/patients/:id/notes/:noteId',
   wrap(async (req, res) => {
     const pet = await getPetById(req.params.id);
-    if (!pet) throw httpError(404, 'ไม่พบข้อมูลคนไข้');
+    if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยง');
     res.json(await deleteNote(pet.id, req.params.noteId));
   }),
 );
@@ -856,7 +852,7 @@ router.get('/meta', (_req, res) => {
     BOOKING_SERVICES,
     WEEKDAY_HOURS,
     WEEKEND_HOURS,
-    VET_NAMES,
+    VET_NAMES: vetNames(),
     DURATIONS,
     CAUTION_FLAGS,
     NOTE_CATEGORIES,

@@ -9,7 +9,6 @@ import PatientNameLink from '../components/PatientNameLink.jsx';
 import RejectBookingModal from '../components/RejectBookingModal.jsx';
 import {
   STAGE_META,
-  VETS,
   offsetDateKey,
   toDateKey,
 } from '../data/constants.js';
@@ -79,10 +78,7 @@ export default function BookingManagementPage() {
     [patients],
   );
 
-  const vetNames = useMemo(
-    () => (meta?.VET_NAMES?.length ? meta.VET_NAMES : VETS.map((v) => v.name)),
-    [meta],
-  );
+  const vetNames = meta?.VET_NAMES ?? [];
 
   const pendingList = useMemo(() => pendingBookings(appointments), [appointments]);
   const needsContactList = useMemo(() => needsContact(appointments), [appointments]);
