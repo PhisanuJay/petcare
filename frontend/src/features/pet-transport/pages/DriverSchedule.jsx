@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import { th } from 'date-fns/locale/th';
 import { Link } from 'react-router-dom';
 import IssueFields from '../components/IssueFields.jsx';
 import { nextTripStatus, tripStatusMeta } from '../constants.js';
@@ -7,7 +9,10 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import { speciesOf } from '../../pet-owner/petUtils.js';
 import { STORAGE_KEYS, readJSON } from '../../../shared/utils/storage.js';
 import { useTransport } from '../useTransport.js';
+import 'react-datepicker/dist/react-datepicker.css';
 import '../transport.css';
+
+registerLocale('th', th);
 
 const JOB_KIND = {
   pickup: 'รับสัตว์ไปโรงแรม',
@@ -25,15 +30,52 @@ function findPet(petId) {
   return pets.find((p) => p.id === petId) || null;
 }
 
-function dayOffset(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const that = new Date(date);
-  that.setHours(0, 0, 0, 0);
-  return Math.round((that.getTime() - today.getTime()) / 86400000);
+function startOfDay(value = new Date()) {
+  const date = value instanceof Date ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
+
+function dayOffset(value, base = new Date()) {
+  const that = startOfDay(value);
+  const origin = startOfDay(base);
+  if (!that || !origin) return 0;
+  return Math.round((that.getTime() - origin.getTime()) / 86400000);
+}
+
+function sameDay(left, right) {
+  const a = startOfDay(left);
+  const b = startOfDay(right);
+  return Boolean(a && b && a.getTime() === b.getTime());
+}
+
+function formatThaiDate(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('th-TH', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+const DateTrigger = forwardRef(function DateTrigger({ label, onClick }, ref) {
+  return (
+    <button
+      type="button"
+      className="dv-date dv-date--picker"
+      onClick={onClick}
+      ref={ref}
+      aria-label="เลือกวันที่ดูงาน"
+    >
+      <span aria-hidden="true">📅</span>
+      <span>{label}</span>
+      <span className="dv-date__caret" aria-hidden="true">▾</span>
+    </button>
+  );
+});
 
 function formatWhen(value) {
   const date = new Date(value);
@@ -107,6 +149,7 @@ export default function DriverSchedule() {
   const [error, setError] = useState('');
   const [tab, setTab] = useState('today');
   const [issueId, setIssueId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
 
   useEffect(() => {
     purgeDemoDriverJobs();
@@ -120,8 +163,11 @@ export default function DriverSchedule() {
     [all],
   );
 
+  const selected = selectedDate || startOfDay(new Date());
+  const selectedOffset = dayOffset(selected, new Date());
   const todayJobs = openJobs.filter((job) => dayOffset(job.pickupTime) === 0);
   const tomorrowJobs = openJobs.filter((job) => dayOffset(job.pickupTime) === 1);
+  const selectedJobs = openJobs.filter((job) => sameDay(job.pickupTime, selected));
   const upcoming = openJobs.filter((job) => dayOffset(job.pickupTime) > 0).length;
   const done = all.filter((job) => job.status === 'completed').length;
   const moving = todayJobs.filter((job) => {
@@ -129,14 +175,34 @@ export default function DriverSchedule() {
     return step >= 2 && step < 7;
   }).length;
 
-  const visible = tab === 'today' ? todayJobs : tab === 'tomorrow' ? tomorrowJobs : openJobs;
+  const visible = tab === 'today'
+    ? todayJobs
+    : tab === 'tomorrow'
+      ? tomorrowJobs
+      : tab === 'selected'
+        ? selectedJobs
+        : openJobs;
   const firstName = currentUser?.firstName || 'คนขับ';
-  const dateLabel = new Date().toLocaleDateString('th-TH', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const dateLabel = formatThaiDate(selected);
+
+  function onPickDate(next) {
+    const day = startOfDay(next || new Date());
+    setSelectedDate(day);
+    const offset = dayOffset(day, new Date());
+    if (offset === 0) setTab('today');
+    else if (offset === 1) setTab('tomorrow');
+    else setTab('selected');
+  }
+
+  function pickTab(nextTab) {
+    setTab(nextTab);
+    if (nextTab === 'today') setSelectedDate(startOfDay(new Date()));
+    else if (nextTab === 'tomorrow') {
+      const tmr = startOfDay(new Date());
+      tmr.setDate(tmr.getDate() + 1);
+      setSelectedDate(tmr);
+    }
+  }
 
   function markNext(job) {
     setError('');
@@ -172,12 +238,6 @@ export default function DriverSchedule() {
           </h1>
           <p>พร้อมดูแลน้อง ๆ ให้เดินทางปลอดภัย</p>
         </div>
-        <div className="dv-hero__right">
-          <div className="dv-date" aria-label="วันที่">
-            <span aria-hidden="true">📅</span>
-            {dateLabel}
-          </div>
-        </div>
       </header>
 
       <div className="dv-kpis">
@@ -211,16 +271,33 @@ export default function DriverSchedule() {
         </article>
       </div>
 
-      <div className="dv-tabs" aria-label="ตัวกรองวัน">
-        <button type="button" className={tab === 'today' ? 'is-active' : ''} onClick={() => setTab('today')}>
-          วันนี้ <b>{todayJobs.length}</b>
-        </button>
-        <button type="button" className={tab === 'tomorrow' ? 'is-active' : ''} onClick={() => setTab('tomorrow')}>
-          พรุ่งนี้ <b>{tomorrowJobs.length}</b>
-        </button>
-        <button type="button" className={tab === 'all' ? 'is-active' : ''} onClick={() => setTab('all')}>
-          ทั้งหมด
-        </button>
+      <div className="dv-toolbar">
+        <div className="dv-tabs" aria-label="ตัวกรองวัน">
+          <button type="button" className={tab === 'today' ? 'is-active' : ''} onClick={() => pickTab('today')}>
+            วันนี้ <b>{todayJobs.length}</b>
+          </button>
+          <button type="button" className={tab === 'tomorrow' ? 'is-active' : ''} onClick={() => pickTab('tomorrow')}>
+            พรุ่งนี้ <b>{tomorrowJobs.length}</b>
+          </button>
+          {tab === 'selected' && selectedOffset !== 0 && selectedOffset !== 1 ? (
+            <button type="button" className="is-active" onClick={() => setTab('selected')}>
+              วันที่เลือก <b>{selectedJobs.length}</b>
+            </button>
+          ) : null}
+          <button type="button" className={tab === 'all' ? 'is-active' : ''} onClick={() => pickTab('all')}>
+            ทั้งหมด
+          </button>
+        </div>
+        <DatePicker
+          selected={selected}
+          onChange={onPickDate}
+          locale="th"
+          dateFormat="dd/MM/yyyy"
+          customInput={<DateTrigger label={dateLabel} />}
+          calendarClassName="dv-datepicker"
+          popperPlacement="bottom-end"
+          showPopperArrow={false}
+        />
       </div>
 
       {note ? <div className="tp-alert tp-alert--ok">{note}</div> : null}
@@ -355,7 +432,13 @@ export default function DriverSchedule() {
 
         {!visible.length ? (
           <div className="dv-empty">
-            {tab === 'today' ? 'วันนี้ยังไม่มีงานค้าง' : tab === 'tomorrow' ? 'พรุ่งนี้ยังไม่มีงาน' : 'ยังไม่มีงานที่ได้รับมอบหมาย'}
+            {tab === 'today'
+              ? 'วันนี้ยังไม่มีงานค้าง'
+              : tab === 'tomorrow'
+                ? 'พรุ่งนี้ยังไม่มีงาน'
+                : tab === 'selected'
+                  ? `ไม่มีงานในวันที่ ${dateLabel}`
+                  : 'ยังไม่มีงานที่ได้รับมอบหมาย'}
             <small>รอ Admin Assign จากรายการจองของ Owner แล้วงานจะขึ้นที่นี่</small>
           </div>
         ) : null}
