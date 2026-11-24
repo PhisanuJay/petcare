@@ -29,7 +29,10 @@ export default function AppShell() {
               <Link to="/pet-hotel">Pet Hotel</Link>
             </li>
             <li>
-              <Link to="/pet-transport">Pet Transport</Link>
+              <Link to="/pet-transport">Pet Transport (Driver)</Link>
+            </li>
+            <li>
+              <Link to="/admin/transport">Admin Transport</Link>
             </li>
             <li>
               <Link to="/adoption">Adoption</Link>
@@ -38,7 +41,7 @@ export default function AppShell() {
               <Link to="/admin">Admin</Link>
             </li>
             <li>
-              <Link to="/super-admin">Super Admin</Link>
+              <Link to="/super-admin">Super Admin (CCTV)</Link>
             </li>
           </ul>
         </nav>

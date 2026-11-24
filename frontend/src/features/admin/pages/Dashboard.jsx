@@ -1,18 +1,24 @@
+import { Link } from 'react-router-dom';
+
 /**
- * Placeholder — Admin Dashboard
- * Role: Admin
- * Owner: เจ
- * Source: Page 17 sitemap (Thanik Sapnonwai)
- *
- * TODO: implement UI and business logic later.
+ * Admin Dashboard — transport-first after role login.
  */
 export default function AdminDashboardPage() {
   return (
-    <section>
+    <section className="tp-page">
       <h1>Admin Dashboard</h1>
-      <p>Role: Admin</p>
-      <p>Owner: เจ</p>
-      <p>Placeholder page — not implemented yet.</p>
+      <p className="tp-lead">จัดการบริการรับ–ส่งและบัญชีคนขับ</p>
+      <ul>
+        <li>
+          <Link to="/admin/transport">Pet Transport Dashboard</Link>
+        </li>
+        <li>
+          <Link to="/admin/transport/drivers">จัดการคนขับ</Link>
+        </li>
+        <li>
+          <Link to="/admin/transport/bookings">Booking Management</Link>
+        </li>
+      </ul>
     </section>
   );
 }

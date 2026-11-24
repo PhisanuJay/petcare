@@ -1,20 +1,28 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '../AuthContext.jsx';
+import { DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, useAuth } from '../AuthContext.jsx';
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
+import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
 
 export default function LoginPage() {
   const { currentUser, login } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const next = safeNext(params.get('next'));
+  const requestedNext = safeNext(params.get('next'), null);
 
   const [form, setForm] = useState({ email: '', password: '', remember: true });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  if (currentUser) return <Navigate to={next} replace />;
+  if (currentUser) {
+    const role = normalizeRole(currentUser.role);
+    const dest =
+      requestedNext && canAccessPath(role, requestedNext)
+        ? requestedNext
+        : homePathForRole(role);
+    return <Navigate to={dest} replace />;
+  }
 
   const set = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
@@ -28,8 +36,13 @@ export default function LoginPage() {
     }
     setSubmitting(true);
     try {
-      await login(form.email, form.password, form.remember);
-      navigate(next, { replace: true });
+      const user = await login(form.email, form.password, form.remember);
+      const role = normalizeRole(user.role);
+      const dest =
+        requestedNext && canAccessPath(role, requestedNext)
+          ? requestedNext
+          : homePathForRole(role);
+      navigate(dest, { replace: true });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -38,7 +51,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบเพื่อจองคิวและดูข้อมูลน้องๆ ของคุณ">
+    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ)">
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <div className="alert-soft danger mb-3">
@@ -96,16 +109,24 @@ export default function LoginPage() {
             />
             <label className="form-check-label small" htmlFor="login-remember">จดจำฉันไว้</label>
           </div>
-          <span className="small text-muted">ลืมรหัสผ่าน? ติดต่อคลินิก 02-123-4567</span>
+          <span className="small text-muted">ลืมรหัสผ่าน? ติดต่อแอดมิน</span>
         </div>
         <button type="submit" className="btn btn-sky w-100 py-2" disabled={submitting}>
           {submitting ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
         </button>
-        <p className="text-center small mt-4 mb-0">
-          ยังไม่มีบัญชี?{' '}
-          <Link to={`/register${params.get('next') ? `?next=${encodeURIComponent(next)}` : ''}`} className="fw-medium">
+        <p className="text-center small mt-4 mb-1">
+          ยังไม่มีบัญชีเจ้าของสัตว์?{' '}
+          <Link to="/register" className="fw-medium">
             สมัครสมาชิกฟรี
           </Link>
+        </p>
+        <p className="text-center small text-muted mb-0">
+          คนขับไม่สามารถสมัครเองได้ — ให้แอดมินสร้างบัญชีให้
+        </p>
+        <p className="text-center small text-muted mt-2 mb-0">
+          คนขับ: {DEMO_DRIVER_LOGIN.email} / {DEMO_DRIVER_LOGIN.password}
+          {' · '}
+          แอดมิน: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
         </p>
       </form>
     </AuthCard>
