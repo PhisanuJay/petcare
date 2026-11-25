@@ -46,8 +46,11 @@ export function priceForZone(zoneId, zones = ZONES) {
  * Quote from pickup/dropoff zones.
  * Round trip = sum of both legs, no discount.
  * outbound / inbound / one_way = single leg.
+<<<<<<< HEAD
  * outbound / round_trip may include otherService (clinic/hotel) from Pet-Owner-Vet catalog.
  * inbound = transport only.
+=======
+>>>>>>> origin/Admin-transport
  */
 export function quotePrice({
   fromZoneId,
@@ -58,7 +61,10 @@ export function quotePrice({
   zones = ZONES,
   customPerTrip = null,
   fareZoneOverride = null,
+<<<<<<< HEAD
   otherService = null,
+=======
+>>>>>>> origin/Admin-transport
 }) {
   const outboundFareZone = fareZoneOverride || fareZoneId(fromZoneId, toZoneId);
   let outboundPerTrip = null;
@@ -71,15 +77,21 @@ export function quotePrice({
   }
 
   const round = isRoundTrip(serviceType);
+<<<<<<< HEAD
   const inboundOnly = serviceType === 'inbound';
+=======
+>>>>>>> origin/Admin-transport
   const retFrom = returnFromZoneId || toZoneId;
   const retTo = returnToZoneId || fromZoneId;
   const returnFareZone = round ? fareZoneId(retFrom, retTo) : null;
   const returnPerTrip = round ? fareForZones(retFrom, retTo, zones) : null;
 
+<<<<<<< HEAD
   const addon = !inboundOnly && otherService?.amount != null ? otherService : null;
   const otherServicesTotal = addon ? Number(addon.amount) : 0;
 
+=======
+>>>>>>> origin/Admin-transport
   if (
     outboundPerTrip == null
     || !Number.isFinite(outboundPerTrip)
@@ -99,10 +111,13 @@ export function quotePrice({
       returnPerTrip: round ? returnPerTrip : null,
       outboundFareZone,
       returnFareZone,
+<<<<<<< HEAD
       transportTotal: null,
       otherServicesTotal: inboundOnly ? 0 : otherServicesTotal || null,
       otherService: inboundOnly ? null : addon,
       lines: [],
+=======
+>>>>>>> origin/Admin-transport
       subtotal: null,
       discount: 0,
       total: null,
@@ -111,6 +126,7 @@ export function quotePrice({
   }
 
   const trips = round ? 2 : 1;
+<<<<<<< HEAD
   const transportTotal = round ? outboundPerTrip + returnPerTrip : outboundPerTrip;
   const lines = [
     {
@@ -128,6 +144,9 @@ export function quotePrice({
   }
 
   const subtotal = transportTotal + (Number.isFinite(otherServicesTotal) ? otherServicesTotal : 0);
+=======
+  const subtotal = round ? outboundPerTrip + returnPerTrip : outboundPerTrip;
+>>>>>>> origin/Admin-transport
   return {
     fromZoneId,
     toZoneId,
@@ -142,10 +161,13 @@ export function quotePrice({
     returnPerTrip: round ? returnPerTrip : null,
     outboundFareZone,
     returnFareZone,
+<<<<<<< HEAD
     transportTotal,
     otherServicesTotal: inboundOnly ? 0 : otherServicesTotal,
     otherService: inboundOnly ? null : addon,
     lines,
+=======
+>>>>>>> origin/Admin-transport
     subtotal,
     discount: 0,
     total: subtotal,

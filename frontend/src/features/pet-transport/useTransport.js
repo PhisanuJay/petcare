@@ -6,7 +6,10 @@ import {
   subscribeTransport,
   createBooking,
   confirmPrice,
+<<<<<<< HEAD
   setBookingOtherService,
+=======
+>>>>>>> origin/Admin-transport
   assignDriver as assignDriverStore,
   ownerConfirmPayment,
   adminMarkPaid,
@@ -98,7 +101,10 @@ export function useTransport() {
     driverUnreadCount,
     createBooking,
     confirmPrice,
+<<<<<<< HEAD
     setBookingOtherService,
+=======
+>>>>>>> origin/Admin-transport
     assignDriver,
     ownerConfirmPayment,
     adminMarkPaid,

@@ -4,6 +4,17 @@ import { useTransport } from '../useTransport.js';
 export default function TransportDashboard() {
   const { bookings, issues, trips } = useTransport();
   const pendingPrice = bookings.filter((b) => b.status === 'submitted').length;
+<<<<<<< HEAD
+=======
+  const awaitingPay = bookings.filter(
+    (b) =>
+      b.paymentStatus !== 'paid'
+      && (
+        b.paymentStatus === 'owner_confirmed'
+        || ['awaiting_payment', 'driver_assigned', 'price_confirmed'].includes(b.status)
+      ),
+  ).length;
+>>>>>>> origin/Admin-transport
   const cancelReq = bookings.filter((b) => b.status === 'cancel_requested').length;
   const activeTrips = trips.filter((t) => t.status !== 'completed' && t.driverId).length;
 
@@ -13,12 +24,20 @@ export default function TransportDashboard() {
       <p className="tp-lead">ภาพรวมงานรับ–ส่งสัตว์เลี้ยง</p>
       <div className="tp-stats">
         <div className="tp-stat"><strong>{pendingPrice}</strong><span>รอยืนยันราคา</span></div>
+<<<<<<< HEAD
+=======
+        <div className="tp-stat"><strong>{awaitingPay}</strong><span>รอตรวจชำระเงิน</span></div>
+>>>>>>> origin/Admin-transport
         <div className="tp-stat"><strong>{cancelReq}</strong><span>คำขอยกเลิก</span></div>
         <div className="tp-stat"><strong>{activeTrips}</strong><span>ทริปที่กำลังทำ</span></div>
         <div className="tp-stat"><strong>{issues.filter((i) => i.status === 'open').length}</strong><span>ปัญหาจากคนขับ</span></div>
       </div>
       <div className="tp-actions">
         <Link className="btn btn-sky" to="/admin/transport/bookings">จัดการ Booking</Link>
+<<<<<<< HEAD
+=======
+        <Link className="btn btn-soft" to="/admin/transport/payments">ตรวจชำระเงิน</Link>
+>>>>>>> origin/Admin-transport
       </div>
     </>
   );

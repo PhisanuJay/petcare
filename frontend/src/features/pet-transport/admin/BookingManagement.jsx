@@ -63,6 +63,10 @@ export default function BookingManagement() {
     activeDrivers,
     confirmPrice,
     assignDriver,
+<<<<<<< HEAD
+=======
+    adminMarkPaid,
+>>>>>>> origin/Admin-transport
   } = useTransport();
 
   const [tab, setTab] = useState('all');
@@ -123,6 +127,13 @@ export default function BookingManagement() {
     setModal({ type: 'assign', booking: b, picks });
   }
 
+<<<<<<< HEAD
+=======
+  function openPaid(b) {
+    setModal({ type: 'paid', booking: b });
+  }
+
+>>>>>>> origin/Admin-transport
   function closeModal() {
     setModal(null);
   }
@@ -145,10 +156,28 @@ export default function BookingManagement() {
     }
   }
 
+<<<<<<< HEAD
   return (
     <div className="tp-bookings">
       <h1>Booking Management</h1>
       <p className="tp-lead">ยืนยันราคา · มอบหมายคนขับ จากหน้ารายการหรือเข้า Detail — การตรวจชำระเป็นหน้าที่ฝ่ายการเงิน</p>
+=======
+  async function submitPaid() {
+    if (!modal?.booking) return;
+    try {
+      await adminMarkPaid(modal.booking.id);
+      flashOk(`ยืนยันชำระแล้ว · ${modal.booking.petName} — คนขับเริ่มงานได้`);
+      closeModal();
+    } catch (e) {
+      setErr(e.message);
+    }
+  }
+
+  return (
+    <div className="tp-bookings">
+      <h1>Booking Management</h1>
+      <p className="tp-lead">ยืนยันราคา · มอบหมายคนขับ · ยืนยันชำระเงิน จากหน้ารายการหรือเข้า Detail</p>
+>>>>>>> origin/Admin-transport
 
       {msg ? <div className="tp-alert tp-alert--ok">{msg}</div> : null}
       {err && !modal ? <div className="tp-alert tp-alert--danger">{err}</div> : null}
@@ -281,6 +310,14 @@ export default function BookingManagement() {
                           Assign
                         </button>
                       ) : null}
+<<<<<<< HEAD
+=======
+                      {b.paymentStatus !== 'paid' && bucket !== 'cancelled' && bucket !== 'awaiting_price' ? (
+                        <button type="button" className="btn btn-soft btn-sm" onClick={() => openPaid(b)}>
+                          ตรวจชำระ
+                        </button>
+                      ) : null}
+>>>>>>> origin/Admin-transport
                       <Link className="btn btn-sky btn-sm" to={`/admin/transport/bookings/${b.id}`}>
                         รายละเอียด
                       </Link>
@@ -343,6 +380,25 @@ export default function BookingManagement() {
               </>
             ) : null}
 
+<<<<<<< HEAD
+=======
+            {modal.type === 'paid' ? (
+              <>
+                <h2 id="bm-modal-title">ยืนยันการชำระเงิน</h2>
+                <p className="tp-muted">
+                  {modal.booking.petName} · {modal.booking.ownerName}
+                  <br />
+                  ยอด {formatBaht(modal.booking.quote?.total)} · สถานะปัจจุบัน: {paymentMeta(modal.booking.paymentStatus).label}
+                </p>
+                {err ? <div className="tp-alert tp-alert--danger">{err}</div> : null}
+                <p className="tp-muted">หลังยืนยัน คนขับจะเริ่มอัปเดตสถานะงานได้</p>
+                <div className="tp-actions">
+                  <button type="button" className="btn btn-soft" onClick={closeModal}>ยกเลิก</button>
+                  <button type="button" className="btn btn-sky" onClick={submitPaid}>ยืนยันชำระแล้ว</button>
+                </div>
+              </>
+            ) : null}
+>>>>>>> origin/Admin-transport
           </div>
         </div>
       ) : null}

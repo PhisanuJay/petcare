@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { hashPassword, needsPasswordRehash, verifyPassword } from './password.js';
 import { ROLES, homePathForRole, normalizeRole } from './roles.js';
 =======
@@ -8,6 +9,10 @@ import { API_BASE } from '../pet-owner/api.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { STAFF_SESSION_EXPIRED, clearStaffSession, readStaffSession, saveStaffSession } from './staffSession.js';
 >>>>>>> origin/Pet-Owner-Vet
+=======
+import { hashPassword, needsPasswordRehash, verifyPassword } from './password.js';
+import { ROLES, homePathForRole, normalizeRole } from './roles.js';
+>>>>>>> origin/Admin-transport
 
 const AuthContext = createContext(null);
 
@@ -26,6 +31,7 @@ const SEED_ADMIN = {
 };
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 const SEED_ACCOUNTANT = {
   email: 'accountant@petcare.local',
   password: 'Account1234',
@@ -33,6 +39,8 @@ const SEED_ACCOUNTANT = {
   lastName: 'บัญชี',
   phone: '0200000001',
 =======
+=======
+>>>>>>> origin/Admin-transport
 const SEED_OWNER = {
   id: DEMO_OWNER_ID,
   email: 'owner@petcare.local',
@@ -40,7 +48,10 @@ const SEED_OWNER = {
   firstName: 'มานี',
   lastName: 'รักสัตว์',
   phone: '0810001111',
+<<<<<<< HEAD
 >>>>>>> origin/Pet-Transport
+=======
+>>>>>>> origin/Admin-transport
 };
 
 const SEED_DRIVER = {
@@ -56,6 +67,7 @@ const SEED_DRIVER = {
   licenseExpiry: '2028-12-31',
 };
 
+<<<<<<< HEAD
 const SEED_FINANCE = {
   id: 'finance-seed',
   email: 'finance@petcare.local',
@@ -65,6 +77,8 @@ const SEED_FINANCE = {
   phone: '0211112222',
 };
 
+=======
+>>>>>>> origin/Admin-transport
 async function upsertSeedUser(users, seed, role) {
   const existing = users.find((u) => u.email === seed.email || (seed.id && u.id === seed.id));
   const salt = newId();
@@ -150,6 +164,7 @@ async function ensureUsersBootstrapped() {
   });
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   const adminEmail = SEED_ADMIN.email;
   if (!users.some((u) => u.email === adminEmail)) {
     const salt = newId();
@@ -225,6 +240,11 @@ async function ensureUsersBootstrapped() {
   if (await upsertSeedUser(users, SEED_DRIVER, ROLES.driver)) changed = true;
   if (await upsertSeedUser(users, SEED_FINANCE, ROLES.finance)) changed = true;
 >>>>>>> origin/Pet-Transport
+=======
+  if (await upsertSeedUser(users, SEED_ADMIN, ROLES.admin)) changed = true;
+  if (await upsertSeedUser(users, SEED_OWNER, ROLES.owner)) changed = true;
+  if (await upsertSeedUser(users, SEED_DRIVER, ROLES.driver)) changed = true;
+>>>>>>> origin/Admin-transport
 
   if (changed) saveUsers(users);
   return users;
@@ -538,6 +558,9 @@ export function AuthProvider({ children }) {
   const value = useMemo(
     () => ({
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> origin/Admin-transport
       currentUser,
       register,
       login,
@@ -562,12 +585,15 @@ export function AuthProvider({ children }) {
       setDriverActive,
       drivers,
     ],
+<<<<<<< HEAD
 =======
       currentUser, register, login, logout, updateProfile, changePassword,
       currentStaff, staffLogin, staffLogout,
     }),
     [currentUser, register, login, logout, updateProfile, changePassword, currentStaff, staffLogin, staffLogout],
 >>>>>>> origin/Pet-Owner-Vet
+=======
+>>>>>>> origin/Admin-transport
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -594,6 +620,7 @@ export const DEMO_DRIVER_LOGIN = {
   email: SEED_DRIVER.email,
   password: SEED_DRIVER.password,
 };
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 export const DEMO_ACCOUNTANT_LOGIN = {
@@ -605,3 +632,5 @@ export const DEMO_FINANCE_LOGIN = {
   password: SEED_FINANCE.password,
 >>>>>>> origin/Pet-Transport
 };
+=======
+>>>>>>> origin/Admin-transport

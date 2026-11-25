@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from 'react';
+=======
+import { useMemo, useState } from 'react';
+>>>>>>> origin/Admin-transport
 import { fareMatrixPreview, formatBaht } from '../pricing.js';
 import { useTransport } from '../useTransport.js';
 
@@ -7,10 +11,13 @@ export default function PricingPage() {
   const [rows, setRows] = useState(zones.map((z) => ({ ...z, price: z.price ?? '' })));
   const [msg, setMsg] = useState('');
 
+<<<<<<< HEAD
   useEffect(() => {
     setRows(zones.map((z) => ({ ...z, price: z.price ?? '' })));
   }, [zones]);
 
+=======
+>>>>>>> origin/Admin-transport
   const previewZones = useMemo(
     () => rows.map((r) => ({ ...r, price: r.price === '' ? null : Number(r.price) })),
     [rows],
@@ -21,8 +28,13 @@ export default function PricingPage() {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, price } : r)));
   }
 
+<<<<<<< HEAD
   async function save() {
     await updateZones(
+=======
+  function save() {
+    updateZones(
+>>>>>>> origin/Admin-transport
       rows.map((r) => ({
         id: r.id,
         label: r.label,

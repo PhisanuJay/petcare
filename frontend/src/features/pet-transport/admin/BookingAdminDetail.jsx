@@ -35,6 +35,10 @@ export default function BookingAdminDetail() {
     activeDrivers,
     confirmPrice,
     assignDriver,
+<<<<<<< HEAD
+=======
+    adminMarkPaid,
+>>>>>>> origin/Admin-transport
     updateTripSchedule,
   } = useTransport();
   const booking = getBooking(bookingId);
@@ -88,6 +92,18 @@ export default function BookingAdminDetail() {
     });
   }
 
+<<<<<<< HEAD
+=======
+  function askMarkPaid() {
+    setErr('');
+    setConfirm({
+      type: 'paid',
+      title: 'ยืนยันชำระแล้ว?',
+      body: `${booking.petName} · ${formatBaht(booking.quote?.total)} — คนขับจะเริ่มงานได้หลังยืนยัน`,
+    });
+  }
+
+>>>>>>> origin/Admin-transport
   function askSchedule(tripId) {
     const trip = booking.trips.find((t) => t.id === tripId);
     const next = scheduleDraft[tripId] || toLocalInput(trip?.pickupTime);
@@ -118,6 +134,12 @@ export default function BookingAdminDetail() {
       } else if (confirm.type === 'assign') {
         await assignDriver(confirm.tripId, confirm.driverId);
         setMsg('มอบหมายคนขับแล้ว');
+<<<<<<< HEAD
+=======
+      } else if (confirm.type === 'paid') {
+        await adminMarkPaid(booking.id);
+        setMsg('ยืนยันชำระแล้ว — คนขับเริ่มงานได้');
+>>>>>>> origin/Admin-transport
       } else if (confirm.type === 'schedule') {
         await updateTripSchedule(confirm.tripId, { pickupTime: confirm.pickupTime });
         setMsg('เปลี่ยนเวลานัดรับแล้ว — แจ้งคนขับแล้ว');
@@ -224,10 +246,19 @@ export default function BookingAdminDetail() {
             <button type="button" className="btn btn-sky" onClick={askConfirmPrice}>
               ยืนยันราคา
             </button>
+<<<<<<< HEAD
           </div>
           <p className="tp-muted" style={{ marginBottom: 0 }}>
             การตรวจ/ยืนยันชำระเงินเป็นหน้าที่ฝ่ายการเงิน
           </p>
+=======
+            {booking.paymentStatus !== 'paid' ? (
+              <button type="button" className="btn btn-soft" onClick={askMarkPaid}>
+                3) ยืนยันชำระแล้ว
+              </button>
+            ) : null}
+          </div>
+>>>>>>> origin/Admin-transport
         </div>
         <PriceQuote quote={booking.quote} title={booking.finalQuote ? 'ราคาสุดท้าย' : 'ราคาก่อนยืนยัน'} />
       </div>

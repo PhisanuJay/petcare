@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { DEMO_ACCOUNTANT_LOGIN, DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, useAuth } from '../AuthContext.jsx';
 =======
 import {
@@ -26,6 +27,11 @@ function staffDestination(staff, next) {
 /** True when `next` is a staff page (vet, medical assistant, clinic admin). */
 const isStaffPath = (next) => Object.values(STAFF_HOME).some((home) => next === home || next.startsWith(`${home}/`));
 >>>>>>> origin/Pet-Owner-Vet
+=======
+import { DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, DEMO_OWNER_LOGIN, useAuth } from '../AuthContext.jsx';
+import AuthCard, { safeNext } from '../components/AuthCard.jsx';
+import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
+>>>>>>> origin/Admin-transport
 
 export default function LoginPage() {
   const { currentUser, login, staffLogin } = useAuth();
@@ -39,6 +45,9 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> origin/Admin-transport
   if (currentUser) {
     const role = normalizeRole(currentUser.role);
     const dest =
@@ -47,6 +56,7 @@ export default function LoginPage() {
         : homePathForRole(role);
     return <Navigate to={dest} replace />;
   }
+<<<<<<< HEAD
 =======
   // Only a customer session skips this page. A staff session is shared by every tab of the browser, so
   // redirecting on it would stop a customer from logging in on another tab while a vet is logged in.
@@ -54,6 +64,8 @@ export default function LoginPage() {
   // would loop, since RequireStaff sends them straight back to this page.
   if (currentUser && !isStaffPath(next)) return <Navigate to={next} replace />;
 >>>>>>> origin/Pet-Owner-Vet
+=======
+>>>>>>> origin/Admin-transport
 
   const set = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
@@ -68,6 +80,9 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> origin/Admin-transport
       const user = await login(form.email, form.password, form.remember);
       const role = normalizeRole(user.role);
       const dest =
@@ -95,7 +110,11 @@ export default function LoginPage() {
   }
 
   return (
+<<<<<<< HEAD
     <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ / การเงิน)">
+=======
+    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ)">
+>>>>>>> origin/Admin-transport
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <div className="alert-soft danger mb-3">
@@ -174,11 +193,14 @@ export default function LoginPage() {
           คนขับ: {DEMO_DRIVER_LOGIN.email} / {DEMO_DRIVER_LOGIN.password}
           {' · '}
           แอดมิน: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
+<<<<<<< HEAD
           {' · '}
           บัญชี: {DEMO_ACCOUNTANT_LOGIN.email} / {DEMO_ACCOUNTANT_LOGIN.password}
         </p>
         <p className="text-center small text-muted mt-1 mb-0">
           การเงิน: {DEMO_FINANCE_LOGIN.email} / {DEMO_FINANCE_LOGIN.password}
+=======
+>>>>>>> origin/Admin-transport
         </p>
       </form>
     </AuthCard>

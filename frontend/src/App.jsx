@@ -9,6 +9,7 @@ import RequireRole from './features/auth/RequireRole.jsx';
 import RoleHomeRedirect from './features/auth/RoleHomeRedirect.jsx';
 import ProfilePage from './features/profile/pages/Profile.jsx';
 import { ROLES } from './features/auth/roles.js';
+<<<<<<< HEAD
 import {
   petOwnerRoutes,
   adminTransportRoutes,
@@ -21,6 +22,12 @@ import AccountingPage from './features/accounting/AccountingPage.jsx';
 /**
  * Customer site for owners; Admin/Driver/Finance use StaffShell with role guards.
  * Super Admin Pet Hotel CCTV mounts at /super-admin/* (from Super-Admin branch).
+=======
+import { petOwnerRoutes, roleRoutes, adminTransportRoutes } from './routes/roleRoutes.jsx';
+
+/**
+ * Customer site + Admin Pet Transport booking management.
+>>>>>>> origin/Admin-transport
  */
 export default function App() {
   return (
@@ -43,12 +50,17 @@ export default function App() {
 
       <Route element={<RequireAuth />}>
         <Route element={<RequireRole roles={[ROLES.admin]} />}>
+<<<<<<< HEAD
           <Route path="admin" element={<StaffShell variant="admin" />}>
+=======
+          <Route path="admin" element={<StaffShell />}>
+>>>>>>> origin/Admin-transport
             {adminTransportRoutes}
           </Route>
         </Route>
       </Route>
 
+<<<<<<< HEAD
       <Route element={<RequireAuth />}>
         <Route element={<RequireRole roles={[ROLES.accountant]} />}>
           <Route path="accounting" element={<AccountingPage />} />
@@ -71,6 +83,9 @@ export default function App() {
         </Route>
       </Route>
 
+=======
+      <Route element={<AppShell />}>{roleRoutes}</Route>
+>>>>>>> origin/Admin-transport
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

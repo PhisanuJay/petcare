@@ -5,10 +5,13 @@ export const ROLES = {
   admin: 'admin',
   driver: 'driver',
 <<<<<<< HEAD
+<<<<<<< HEAD
   accountant: 'accountant',
 =======
   finance: 'finance',
 >>>>>>> origin/Pet-Transport
+=======
+>>>>>>> origin/Admin-transport
 };
 
 export const ROLE_LABELS = {
@@ -16,10 +19,13 @@ export const ROLE_LABELS = {
   admin: 'แอดมิน',
   driver: 'พนักงานขับรถ',
 <<<<<<< HEAD
+<<<<<<< HEAD
   accountant: 'ฝ่ายบัญชี',
 =======
   finance: 'ฝ่ายการเงิน',
 >>>>>>> origin/Pet-Transport
+=======
+>>>>>>> origin/Admin-transport
 };
 
 /** Default landing path after login. */
@@ -27,10 +33,13 @@ export function homePathForRole(role) {
   if (role === ROLES.admin) return '/admin/transport';
   if (role === ROLES.driver) return '/pet-transport';
 <<<<<<< HEAD
+<<<<<<< HEAD
   if (role === ROLES.accountant) return '/accounting';
 =======
   if (role === ROLES.finance) return '/finance';
 >>>>>>> origin/Pet-Transport
+=======
+>>>>>>> origin/Admin-transport
   return '/';
 }
 
@@ -44,6 +53,7 @@ export function canAccessPath(role, pathname) {
   if (role === ROLES.driver) {
     return path === '/pet-transport' || path.startsWith('/pet-transport/');
   }
+<<<<<<< HEAD
 <<<<<<< HEAD
   if (role === ROLES.accountant) {
     return path === '/accounting' || path.startsWith('/accounting/');
@@ -59,13 +69,23 @@ export function canAccessPath(role, pathname) {
     path.startsWith('/admin') ||
     path.startsWith('/pet-transport') ||
     path.startsWith('/finance') ||
+=======
+  // Owner: customer site only — not admin / driver / other staff shells
+  if (
+    path.startsWith('/admin') ||
+    path.startsWith('/pet-transport') ||
+>>>>>>> origin/Admin-transport
     path.startsWith('/veterinarian') ||
     path.startsWith('/medical-assistant') ||
     path.startsWith('/pet-hotel') ||
     path.startsWith('/adoption') ||
     path.startsWith('/super-admin') ||
+<<<<<<< HEAD
     path.startsWith('/pet-profile') ||
     path.startsWith('/accounting')
+=======
+    path.startsWith('/pet-profile')
+>>>>>>> origin/Admin-transport
   ) {
     return false;
   }
@@ -73,6 +93,7 @@ export function canAccessPath(role, pathname) {
 }
 
 export function normalizeRole(role) {
+<<<<<<< HEAD
 <<<<<<< HEAD
   if (role === ROLES.admin || role === ROLES.driver || role === ROLES.owner || role === ROLES.accountant) return role;
 =======
@@ -85,5 +106,8 @@ export function normalizeRole(role) {
     return role;
   }
 >>>>>>> origin/Pet-Transport
+=======
+  if (role === ROLES.admin || role === ROLES.driver || role === ROLES.owner) return role;
+>>>>>>> origin/Admin-transport
   return ROLES.owner;
 }
