@@ -34,7 +34,7 @@ export default function HomePage() {
       <AboutSection />
       <ServicesSection />
       <HotelSection go={go} />
-      <AdoptionSection go={go} />
+      <AdoptionSection />
       <WhySection />
       <VetsSection />
       <PromoSection go={go} />

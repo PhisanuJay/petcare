@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
 <<<<<<< HEAD
@@ -13,6 +14,11 @@ import { STAFF_SESSION_EXPIRED, clearStaffSession, readStaffSession, saveStaffSe
 import { hashPassword, needsPasswordRehash, verifyPassword } from './password.js';
 import { ROLES, homePathForRole, normalizeRole } from './roles.js';
 >>>>>>> origin/Admin-transport
+=======
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { AUTH_API_URL } from '../../shared/api.js';
+import { STORAGE_KEYS, readJSON, writeJSON } from '../../shared/utils/storage.js';
+>>>>>>> origin/Adoption
 
 const AuthContext = createContext(null);
 
@@ -265,12 +271,11 @@ function loadUsers() {
   return loadUsersRaw().map((u) => ({ ...u, role: normalizeRole(u.role) }));
 }
 
-function loadSessionUserId() {
-  return (
-    readJSON(STORAGE_KEYS.session, null)?.userId ??
-    readJSON(STORAGE_KEYS.session, null, sessionStorage)?.userId ??
-    null
-  );
+function loadStoredSession() {
+  const rememberedSession = readJSON(STORAGE_KEYS.session, null);
+  if (rememberedSession?.userId && rememberedSession?.authToken) return rememberedSession;
+  const temporarySession = readJSON(STORAGE_KEYS.session, null, sessionStorage);
+  return temporarySession?.userId && temporarySession?.authToken ? temporarySession : null;
 }
 
 function toPublicUser(user) {
@@ -279,9 +284,45 @@ function toPublicUser(user) {
   return { ...rest, role: normalizeRole(rest.role) };
 }
 
-function findCurrentUser() {
-  const id = loadSessionUserId();
-  return id ? loadUsers().find((u) => u.id === id) ?? null : null;
+function localUserFromServer(serverUser, existingUser) {
+  const user = existingUser
+    ? { ...existingUser }
+    : {
+      address: '',
+      emergencyName: '',
+      emergencyPhone: '',
+      avatar: '',
+      points: WELCOME_POINTS,
+    };
+  delete user.passwordHash;
+  delete user.salt;
+  return {
+    ...user,
+    ...serverUser,
+    id: existingUser?.id ?? serverUser.id,
+  };
+}
+
+function loadAuthState() {
+  const session = loadStoredSession();
+  const user = session && loadUsers().find((item) => item.id === session.userId);
+  return {
+    currentUser: toPublicUser(user),
+    authToken: user ? session.authToken : '',
+  };
+}
+
+async function requestAuth(path, { token, ...options } = {}) {
+  const response = await fetch(`${AUTH_API_URL}${path}`, {
+    ...options,
+    headers: {
+      ...options.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'ดำเนินการบัญชีไม่สำเร็จ');
+  return result;
 }
 
 export function memberTier(points = 0) {
@@ -291,6 +332,7 @@ export function memberTier(points = 0) {
 }
 
 export function AuthProvider({ children }) {
+<<<<<<< HEAD
   const [currentUser, setCurrentUser] = useState(() => toPublicUser(findCurrentUser()));
   const [usersVersion, setUsersVersion] = useState(0);
 
@@ -308,16 +350,25 @@ export function AuthProvider({ children }) {
   }, []);
 
   const bumpUsers = useCallback(() => setUsersVersion((v) => v + 1), []);
+=======
+  const [authState, setAuthState] = useState(loadAuthState);
+  const { currentUser, authToken } = authState;
+>>>>>>> origin/Adoption
 
-  const startSession = useCallback((user, remember) => {
+  const startSession = useCallback((user, remember, token) => {
     localStorage.removeItem(STORAGE_KEYS.session);
     sessionStorage.removeItem(STORAGE_KEYS.session);
-    writeJSON(STORAGE_KEYS.session, { userId: user.id }, remember ? localStorage : sessionStorage);
-    setCurrentUser(toPublicUser(user));
+    writeJSON(
+      STORAGE_KEYS.session,
+      { userId: user.id, authToken: token },
+      remember ? localStorage : sessionStorage,
+    );
+    setAuthState({ currentUser: toPublicUser(user), authToken: token });
   }, []);
 
   const register = useCallback(
     async ({ firstName, lastName, email, phone, password }) => {
+<<<<<<< HEAD
       await bootUsers();
       const users = loadUsers();
       const normalizedEmail = email.trim().toLowerCase();
@@ -346,6 +397,19 @@ export function AuthProvider({ children }) {
       saveUsers([...users, user]);
       bumpUsers();
       startSession(user, true);
+=======
+      const result = await requestAuth('/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ firstName, lastName, email, phone, password, remember: true }),
+      });
+      const users = loadUsers();
+      const normalizedEmail = result.user.email;
+      const existingUser = users.find((user) => user.email === normalizedEmail);
+      const user = localUserFromServer(result.user, existingUser);
+      saveUsers([...users.filter((item) => item.id !== user.id), user]);
+      startSession(user, true, result.token);
+>>>>>>> origin/Adoption
       return toPublicUser(user);
     },
     [startSession, bumpUsers],
@@ -353,6 +417,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(
     async (email, password, remember = true) => {
+<<<<<<< HEAD
       await bootUsers();
       let users = loadUsers();
       const user = users.find((u) => u.email === email.trim().toLowerCase());
@@ -374,6 +439,18 @@ export function AuthProvider({ children }) {
         return toPublicUser(migrated);
       }
       startSession(user, remember);
+=======
+      const result = await requestAuth('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, remember }),
+      });
+      const users = loadUsers();
+      const existingUser = users.find((user) => user.email === result.user.email);
+      const user = localUserFromServer(result.user, existingUser);
+      saveUsers([...users.filter((item) => item.id !== user.id), user]);
+      startSession(user, remember, result.token);
+>>>>>>> origin/Adoption
       return toPublicUser(user);
     },
     [startSession, bumpUsers],
@@ -382,7 +459,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEYS.session);
     sessionStorage.removeItem(STORAGE_KEYS.session);
-    setCurrentUser(null);
+    setAuthState({ currentUser: null, authToken: '' });
   }, []);
 
   /* Staff (veterinarian) login: accounts live in the backend, see features/auth/staffSession.js. */
@@ -423,13 +500,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   const updateProfile = useCallback(
-    (patch) => {
-      if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบ');
+    async (patch) => {
+      if (!currentUser || !authToken) throw new Error('กรุณาเข้าสู่ระบบใหม่');
       const users = loadUsers();
       const email = patch.email?.trim().toLowerCase();
-      if (email && users.some((u) => u.email === email && u.id !== currentUser.id)) {
+      if (email && users.some((user) => user.email === email && user.id !== currentUser.id)) {
         throw new Error('อีเมลนี้มีผู้ใช้อื่นใช้แล้ว');
       }
+<<<<<<< HEAD
       // Owners cannot self-elevate role
       const { role: _role, ...safePatch } = patch;
       const next = users.map((u) =>
@@ -440,21 +518,47 @@ export function AuthProvider({ children }) {
       setCurrentUser(toPublicUser(next.find((u) => u.id === currentUser.id)));
     },
     [currentUser, bumpUsers],
+=======
+
+      const accountPatch = Object.fromEntries(
+        ['firstName', 'lastName', 'email', 'phone']
+          .filter((key) => patch[key] !== undefined)
+          .map((key) => [key, patch[key]]),
+      );
+      if (Object.keys(accountPatch).length) {
+        await requestAuth('/profile', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          token: authToken,
+          body: JSON.stringify(accountPatch),
+        });
+      }
+
+      const next = users.map((user) =>
+        user.id === currentUser.id ? { ...user, ...patch, ...(email ? { email } : {}) } : user,
+      );
+      saveUsers(next);
+      setAuthState((state) => ({
+        ...state,
+        currentUser: toPublicUser(next.find((user) => user.id === currentUser.id)),
+      }));
+    },
+    [authToken, currentUser],
+>>>>>>> origin/Adoption
   );
 
   const changePassword = useCallback(
     async (currentPassword, newPassword) => {
-      if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบ');
-      const users = loadUsers();
-      const user = users.find((u) => u.id === currentUser.id);
-      if (!(await verifyPassword(currentPassword, user.salt, user.passwordHash))) {
-        throw new Error('รหัสผ่านปัจจุบันไม่ถูกต้อง');
-      }
-      const salt = newId();
-      const passwordHash = await hashPassword(newPassword, salt);
-      saveUsers(users.map((u) => (u.id === user.id ? { ...u, salt, passwordHash } : u)));
+      if (!currentUser || !authToken) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+      await requestAuth('/password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        token: authToken,
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
     },
-    [currentUser],
+    [authToken, currentUser],
   );
 
   /** Admin-only: create a driver account (cannot self-register). */
@@ -556,6 +660,7 @@ export function AuthProvider({ children }) {
   }, [usersVersion]);
 
   const value = useMemo(
+<<<<<<< HEAD
     () => ({
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -594,6 +699,10 @@ export function AuthProvider({ children }) {
 >>>>>>> origin/Pet-Owner-Vet
 =======
 >>>>>>> origin/Admin-transport
+=======
+    () => ({ currentUser, authToken, register, login, logout, updateProfile, changePassword }),
+    [currentUser, authToken, register, login, logout, updateProfile, changePassword],
+>>>>>>> origin/Adoption
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

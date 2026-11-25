@@ -73,6 +73,9 @@ import AnimalsPage from '../features/adoption/pages/Animals.jsx';
 import AddAnimalPage from '../features/adoption/pages/AddAnimal.jsx';
 import AdoptionRequestsPage from '../features/adoption/pages/AdoptionRequests.jsx';
 import RequestDetailPage from '../features/adoption/pages/RequestDetail.jsx';
+import AdoptionStaffGate from '../features/adoption/AdoptionStaffGate.jsx';
+import AdoptionStaffLayout from '../features/adoption/AdoptionStaffLayout.jsx';
+import AdoptionStaffLoginPage from '../features/adoption/pages/StaffLogin.jsx';
 
 import AdminDashboardPage from '../features/admin/pages/Dashboard.jsx';
 import AdminUsersPage from '../features/admin/pages/Users.jsx';
@@ -136,6 +139,7 @@ export const petOwnerRoutes = (
   </Route>
 );
 
+<<<<<<< HEAD
 /** Admin routes — nested under `/admin` + StaffShell + RequireRole(admin). */
 export const adminTransportRoutes = (
   <>
@@ -181,6 +185,25 @@ export const financeRoutes = (
 );
 
 /** Legacy skeleton modules (other teams) — not mounted in App until they add auth. */
+=======
+/** Adoption staff — uses the main PetCare site layout and its existing navbar. */
+export const adoptionStaffRoutes = (
+  <>
+    <Route path="adoption/login" element={<AdoptionStaffLoginPage />} />
+    <Route element={<AdoptionStaffGate />}>
+      <Route path="adoption" element={<AdoptionStaffLayout />}>
+        <Route index element={<AdoptionDashboardPage />} />
+        <Route path="animals" element={<AnimalsPage />} />
+        <Route path="add-animal" element={<AddAnimalPage />} />
+        <Route path="requests" element={<AdoptionRequestsPage />} />
+        <Route path="requests/:requestId" element={<RequestDetailPage />} />
+      </Route>
+    </Route>
+  </>
+);
+
+/** Staff role modules — rendered inside the legacy AppShell. */
+>>>>>>> origin/Adoption
 export const roleRoutes = (
   <>
 <<<<<<< HEAD
@@ -239,6 +262,7 @@ export const roleRoutes = (
       <Route path="care-records" element={<CareRecordsPage />} />
       <Route path="cctv" element={<HotelCctvPage />} />
     </Route>
+<<<<<<< HEAD
     <Route path="adoption">
       <Route index element={<AdoptionDashboardPage />} />
       <Route path="animals" element={<AnimalsPage />} />
@@ -248,5 +272,37 @@ export const roleRoutes = (
     </Route>
     {/* Super Admin CCTV → App.jsx /super-admin/* (HotelCctvMount) */}
     {/* Admin transport → adminTransportRoutes under StaffShell */}
+=======
+
+    {/* Pet Transport — โมเดล */}
+    <Route path="pet-transport">
+      <Route index element={<PetTransportDashboardPage />} />
+      <Route path="assigned-jobs" element={<AssignedJobsPage />} />
+      <Route path="job-detail" element={<JobDetailPage />} />
+      <Route path="tracking" element={<TrackingPage />} />
+      <Route path="history" element={<HistoryPage />} />
+    </Route>
+
+    {/* Admin — เจ */}
+    <Route path="admin">
+      <Route index element={<AdminDashboardPage />} />
+      <Route path="users" element={<AdminUsersPage />} />
+      <Route path="providers" element={<AdminProvidersPage />} />
+      <Route path="bookings" element={<AdminBookingsPage />} />
+      <Route path="reports" element={<AdminReportsPage />} />
+    </Route>
+
+    {/* Super Admin — ฟ่าง */}
+    <Route path="super-admin">
+      <Route index element={<SuperAdminDashboardPage />} />
+      <Route path="users" element={<SuperAdminUsersPage />} />
+      <Route path="roles-permissions" element={<RolesPermissionsPage />} />
+      <Route path="providers" element={<SuperAdminProvidersPage />} />
+      <Route path="pricing" element={<PricingPage />} />
+      <Route path="promotions" element={<PromotionsPage />} />
+      <Route path="reports" element={<SuperAdminReportsPage />} />
+      <Route path="settings" element={<SettingsPage />} />
+    </Route>
+>>>>>>> origin/Adoption
   </>
 );

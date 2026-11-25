@@ -10,10 +10,14 @@ const PORT = config.port;
 
 app.use(cors());
 <<<<<<< HEAD
+<<<<<<< HEAD
 app.use(express.json({ limit: '2mb' })); // pet photos are sent as data URLs
 =======
 app.use(express.json({ limit: '8mb' }));
 >>>>>>> origin/Admin-transport
+=======
+app.use(express.json({ limit: '9mb' }));
+>>>>>>> origin/Adoption
 
 app.get('/health', (_req, res) => {
   res.json({

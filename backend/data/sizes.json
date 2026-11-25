@@ -1,0 +1,15 @@
+[
+  { "id": "size-38", "label": "38", "description": "ส่วนสูง 145-147 ซม.", "heightMin": 145, "heightMax": 147 },
+  { "id": "size-39", "label": "39", "description": "ส่วนสูง 147-150 ซม.", "heightMin": 147, "heightMax": 150 },
+  { "id": "size-40", "label": "40", "description": "ส่วนสูง 150-153 ซม.", "heightMin": 150, "heightMax": 153 },
+  { "id": "size-41", "label": "41", "description": "ส่วนสูง 153-156 ซม.", "heightMin": 153, "heightMax": 156 },
+  { "id": "size-42", "label": "42", "description": "ส่วนสูง 157-159 ซม.", "heightMin": 157, "heightMax": 159 },
+  { "id": "size-43", "label": "43", "description": "ส่วนสูง 159-160 ซม.", "heightMin": 159, "heightMax": 160 },
+  { "id": "size-44", "label": "44", "description": "ส่วนสูง 162-165 ซม.", "heightMin": 162, "heightMax": 165 },
+  { "id": "size-45", "label": "45", "description": "ส่วนสูง 165-170 ซม.", "heightMin": 165, "heightMax": 170 },
+  { "id": "size-46", "label": "46", "description": "ส่วนสูง 170-173 ซม.", "heightMin": 170, "heightMax": 173 },
+  { "id": "size-47", "label": "47", "description": "ส่วนสูง 174-176 ซม.", "heightMin": 174, "heightMax": 176 },
+  { "id": "size-48", "label": "48", "description": "ส่วนสูง 177-179 ซม.", "heightMin": 177, "heightMax": 179 },
+  { "id": "size-49", "label": "49", "description": "ส่วนสูง 180-182 ซม.", "heightMin": 180, "heightMax": 182 },
+  { "id": "size-50", "label": "50", "description": "ส่วนสูง 183-185 ซม.", "heightMin": 183, "heightMax": 185 }
+]

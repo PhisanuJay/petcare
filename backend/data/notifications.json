@@ -1,0 +1,357 @@
+[
+  {
+    "id": "ded3a4cd-19b5-480b-9401-e1a08bc3fae1",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": true,
+    "createdAt": "2026-07-09T07:11:37.463Z"
+  },
+  {
+    "id": "2fc97942-4c7e-4323-ad5d-b965781d8351",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": true,
+    "createdAt": "2026-07-14T19:31:02.961Z"
+  },
+  {
+    "id": "36c689f2-4d45-41dd-92fc-88de2a81da37",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": true,
+    "createdAt": "2026-07-14T19:46:38.963Z"
+  },
+  {
+    "id": "ed4fbd8b-5f14-4eea-865e-1df79238bfa4",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว กำลังรอพนักงานตรวจสอบการชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-14T19:49:17.198Z"
+  },
+  {
+    "id": "8d17c09a-c062-41fb-a22a-93b97d8a0a44",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T19:49:56.998Z"
+  },
+  {
+    "id": "4d75b37d-18cf-4e64-9e0c-8af5c54307f7",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว กำลังรอพนักงานตรวจสอบการชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-14T19:50:03.842Z"
+  },
+  {
+    "id": "38d0f1b6-7ca7-4459-abe2-648ee3befa90",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T20:35:54.735Z"
+  },
+  {
+    "id": "dcd61846-6d17-4c89-800b-fb47d651cca4",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T20:56:42.637Z"
+  },
+  {
+    "id": "96f148c4-fbe9-4ee1-943b-756296ca3c4b",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:08:20.810Z"
+  },
+  {
+    "id": "7371bf69-a2d6-41e5-8fad-bc4b87d58823",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว กำลังรอพนักงานตรวจสอบการชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:16:51.233Z"
+  },
+  {
+    "id": "a806524d-2e97-4c0c-b71f-23464d418db3",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว กำลังรอพนักงานตรวจสอบการชำระเงิน",
+    "isRead": true,
+    "createdAt": "2026-07-14T21:16:52.146Z",
+    "updatedAt": "2026-07-14T21:17:03.232Z"
+  },
+  {
+    "id": "dbdb8774-3b6c-4bc2-b116-934a93fd53a7",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว กำลังรอพนักงานตรวจสอบการชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:17:18.414Z"
+  },
+  {
+    "id": "a964c4a1-e058-4264-a943-7c4084915f3b",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:23:10.974Z"
+  },
+  {
+    "id": "2adec023-3298-4ef4-a9f1-0cbca93b6f47",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว การจองอยู่ระหว่างรออนุมัติ",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:23:14.869Z"
+  },
+  {
+    "id": "7e29a5cf-ab5c-4485-90d2-c73ea621664d",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:24:26.147Z"
+  },
+  {
+    "id": "7408a849-26a9-408d-8706-87865830d074",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว การจองอยู่ระหว่างรออนุมัติ",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:24:30.095Z"
+  },
+  {
+    "id": "1c3bdc01-4cf5-42ae-afce-05635de44c62",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:27:57.415Z"
+  },
+  {
+    "id": "3eb14047-586c-4af5-8f27-7e7411627b9c",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว การจองอยู่ระหว่างรออนุมัติ",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:28:06.499Z"
+  },
+  {
+    "id": "ba61a06f-2a4a-4065-8253-ff06cc30121d",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:36:39.465Z"
+  },
+  {
+    "id": "1c24e152-55c5-4609-bfb7-0b2fc4364dda",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว การจองอยู่ระหว่างรออนุมัติ",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:36:43.490Z"
+  },
+  {
+    "id": "c43e49ef-1263-4aab-9719-88b97c0dcdae",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:42:23.627Z"
+  },
+  {
+    "id": "7f4308ce-1f8d-4357-8084-f8bac6feb274",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว การจองอยู่ระหว่างรออนุมัติ",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:42:31.535Z"
+  },
+  {
+    "id": "c261a37f-238a-4dd2-b76d-64bbf663fdf5",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_rejected",
+    "message": "การจองของคุณถูกปฏิเสธ: nono",
+    "isRead": false,
+    "createdAt": "2026-07-14T21:42:52.465Z"
+  },
+  {
+    "id": "cf8826ff-603a-4866-b494-c55318e54805",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "returned",
+    "message": "พนักงานได้รับชุดคืนแล้ว กำลังดำเนินการคืนมัดจำ",
+    "isRead": true,
+    "createdAt": "2026-07-15T00:14:30.825Z",
+    "updatedAt": "2026-07-15T00:38:47.373Z"
+  },
+  {
+    "id": "819a6f62-7e42-425f-9713-aa8b404b686c",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "deposit_refunded",
+    "message": "เงินมัดจำของคุณได้รับการคืนแล้ว จำนวน 1500 บาท",
+    "isRead": true,
+    "createdAt": "2026-07-15T00:49:09.396Z",
+    "updatedAt": "2026-07-15T05:21:30.283Z"
+  },
+  {
+    "id": "cd379630-4faa-4731-bdf8-bb6591febf54",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": true,
+    "createdAt": "2026-07-15T05:24:15.472Z"
+  },
+  {
+    "id": "f5b00917-7156-4383-b3c5-120476b97d99",
+    "userId": "f3ce4c6d-0718-4305-ad72-acb4fee46855",
+    "type": "new_booking",
+    "message": "มีการจองใหม่จาก ลูกค้าทดสอบ — รอชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:24:15.473Z"
+  },
+  {
+    "id": "d962d3b1-e315-499b-bf15-e4f337eee202",
+    "userId": "f3f3b1a1-0dbb-4b69-b651-06e67495436c",
+    "type": "new_booking",
+    "message": "มีการจองใหม่จาก ลูกค้าทดสอบ — รอชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:24:15.474Z"
+  },
+  {
+    "id": "dbee9765-1256-4df6-b4f2-f92f75f065df",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": true,
+    "createdAt": "2026-07-15T05:29:15.944Z"
+  },
+  {
+    "id": "39d50d2f-24bc-4720-a347-819d996312b9",
+    "userId": "f3ce4c6d-0718-4305-ad72-acb4fee46855",
+    "type": "new_booking",
+    "message": "มีการจองใหม่จาก ลูกค้าทดสอบ — รอชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:29:15.953Z"
+  },
+  {
+    "id": "9ffee61b-b435-419d-9665-232439e5b4da",
+    "userId": "f3f3b1a1-0dbb-4b69-b651-06e67495436c",
+    "type": "new_booking",
+    "message": "มีการจองใหม่จาก ลูกค้าทดสอบ — รอชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:29:15.954Z"
+  },
+  {
+    "id": "f685ac98-2bd6-4317-8ba7-b4af24d9a4f8",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": true,
+    "createdAt": "2026-07-15T05:33:25.554Z"
+  },
+  {
+    "id": "24e5ec87-3ef2-46aa-98d4-279d815ceb88",
+    "userId": "f3ce4c6d-0718-4305-ad72-acb4fee46855",
+    "type": "new_booking",
+    "message": "มีการจองใหม่จาก ลูกค้าทดสอบ — รอชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:33:25.555Z"
+  },
+  {
+    "id": "8039a0ba-71fc-4946-8f61-5216f92df0f6",
+    "userId": "f3f3b1a1-0dbb-4b69-b651-06e67495436c",
+    "type": "new_booking",
+    "message": "มีการจองใหม่จาก ลูกค้าทดสอบ — รอชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:33:25.556Z"
+  },
+  {
+    "id": "bf66258a-fd94-47a1-a923-9080e786b4d2",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "booking_success",
+    "message": "การจองของคุณสำเร็จแล้ว กรุณาชำระเงินภายใน 24 ชั่วโมง",
+    "isRead": true,
+    "createdAt": "2026-07-15T05:38:05.413Z"
+  },
+  {
+    "id": "55e2acca-62af-40e0-a662-963fef501b9b",
+    "userId": "f3ce4c6d-0718-4305-ad72-acb4fee46855",
+    "type": "new_booking",
+    "message": "มีการจองใหม่จาก ลูกค้าทดสอบ — รอชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:38:05.414Z"
+  },
+  {
+    "id": "5eb21379-1e66-480d-aace-a8336eae57f4",
+    "userId": "f3f3b1a1-0dbb-4b69-b651-06e67495436c",
+    "type": "new_booking",
+    "message": "มีการจองใหม่จาก ลูกค้าทดสอบ — รอชำระเงิน",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:38:05.415Z"
+  },
+  {
+    "id": "508cba20-0e26-469f-9e6e-ae737113c2cb",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "payment_submitted",
+    "message": "ได้รับสลิปของคุณแล้ว การจองอยู่ระหว่างรออนุมัติ",
+    "isRead": true,
+    "createdAt": "2026-07-15T05:38:54.068Z"
+  },
+  {
+    "id": "9b4e2b9b-5d66-4a5d-b4be-011505d039fb",
+    "userId": "f3ce4c6d-0718-4305-ad72-acb4fee46855",
+    "type": "slip_pending",
+    "message": "มีสลิปใหม่รอตรวจ — เลขจอง ae727182…",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:38:54.069Z"
+  },
+  {
+    "id": "44b8b7a6-8ae0-4395-862b-723f6b5840e7",
+    "userId": "f3f3b1a1-0dbb-4b69-b651-06e67495436c",
+    "type": "slip_pending",
+    "message": "มีสลิปใหม่รอตรวจ — เลขจอง ae727182…",
+    "isRead": false,
+    "createdAt": "2026-07-15T05:38:54.070Z"
+  },
+  {
+    "id": "93e1a6e1-4221-4ce8-b0dc-fcdc9b40441a",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "payment_verified",
+    "message": "การชำระเงินได้รับการยืนยันแล้ว",
+    "isRead": false,
+    "createdAt": "2026-07-15T07:44:11.381Z"
+  },
+  {
+    "id": "ebca1714-da55-4d67-b4a3-6a641995b28a",
+    "userId": "74ef22ea-cbea-4ad0-b377-223262d9e001",
+    "type": "booking_approved",
+    "message": "การจองของคุณได้รับการอนุมัติแล้ว",
+    "isRead": false,
+    "createdAt": "2026-07-15T07:44:11.398Z"
+  },
+  {
+    "id": "b478d1e0-50a5-4af3-90dd-2c0f0b8ebecc",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "payment_verified",
+    "message": "การชำระเงินได้รับการยืนยันแล้ว",
+    "isRead": false,
+    "createdAt": "2026-07-15T07:44:51.187Z"
+  },
+  {
+    "id": "2dcc06d7-972d-473c-b89e-79cd33f38d96",
+    "userId": "b0e2aa38-952a-4e93-8257-7c384f859049",
+    "type": "booking_approved",
+    "message": "การจองของคุณได้รับการอนุมัติแล้ว",
+    "isRead": false,
+    "createdAt": "2026-07-15T07:44:51.210Z"
+  }
+]

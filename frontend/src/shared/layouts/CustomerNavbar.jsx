@@ -1,13 +1,14 @@
 import { startTransition, useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { memberTier, useAuth } from '../../features/auth/AuthContext.jsx';
+import { ADOPTION_STAFF_TOKEN_KEY } from '../../features/adoption/api.js';
 import UserAvatar from '../components/UserAvatar.jsx';
 
 const GUEST_MENU = [
   { to: '/', label: 'หน้าแรก', icon: 'bi-house-heart', end: true },
   { to: '/#services', label: 'บริการ', icon: 'bi-grid' },
   { to: '/#hotel', label: 'โรงแรมสัตว์', icon: 'bi-building' },
-  { to: '/#adopt', label: 'หาบ้าน', icon: 'bi-house-add' },
+  { to: '/find-home', label: 'หาบ้าน', icon: 'bi-house-add' },
   { to: '/#vets', label: 'สัตวแพทย์ของเรา', icon: 'bi-person-hearts' },
   { to: '/#promo', label: 'โปรโมชั่น', icon: 'bi-tag' },
   { to: '/#contact', label: 'ติดต่อเรา', icon: 'bi-telephone' },
@@ -24,8 +25,12 @@ const MEMBER_MENU = [
   { to: '/pet-owner/medical', label: 'ประวัติ', icon: 'bi-journal-medical' },
   { to: '/pet-owner/history', label: 'ประวัติการจอง', icon: 'bi-receipt' },
   { to: '/pet-owner/cat-hotel', label: 'โรงแรมสัตว์', icon: 'bi-building' },
+<<<<<<< HEAD
   { to: '/pet-owner/transport', label: 'รับ–ส่งสัตว์', icon: 'bi-truck' },
   { to: '/pet-owner/adoption', label: 'หาบ้าน', icon: 'bi-house-add' },
+=======
+  { to: '/find-home', label: 'หาบ้าน', icon: 'bi-house-add' },
+>>>>>>> origin/Adoption
   { to: '/#promo', label: 'โปรโมชั่น', icon: 'bi-tag' },
 ];
 
@@ -67,6 +72,8 @@ export default function CustomerNavbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const isAdoptionPage = location.pathname.startsWith('/adoption');
+  const isAdoptionStaff = isAdoptionPage && Boolean(sessionStorage.getItem(ADOPTION_STAFF_TOKEN_KEY));
 
   useEffect(() => {
     setOpen(false);
@@ -82,8 +89,13 @@ export default function CustomerNavbar() {
     startTransition(logout);
   }
 
+  function handleAdoptionStaffLogout() {
+    sessionStorage.removeItem(ADOPTION_STAFF_TOKEN_KEY);
+    navigate('/login', { replace: true });
+  }
+
   return (
-    <div className="nav-shell">
+    <div className={`nav-shell${isAdoptionPage ? ' adoption-nav-shell' : ''}`}>
       <div className="container">
         <nav className="navbar navbar-expand-xl pc-navbar">
           <Link className="navbar-brand d-flex align-items-center gap-2 ms-1" to="/">
@@ -109,7 +121,13 @@ export default function CustomerNavbar() {
               ))}
             </ul>
 
-            {currentUser ? (
+            {isAdoptionStaff ? (
+              <div className="d-flex gap-2 pb-2 pb-xl-0">
+                <button className="btn btn-soft" type="button" onClick={handleAdoptionStaffLogout}>
+                  <i className="bi bi-box-arrow-right me-1" />ออกจากระบบ
+                </button>
+              </div>
+            ) : currentUser ? (
               <div className="d-flex align-items-center gap-2 pb-2 pb-xl-0">
                 <button className="bell" type="button" title="การแจ้งเตือน">
                   <i className="bi bi-bell-fill" />

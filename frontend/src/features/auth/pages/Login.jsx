@@ -14,6 +14,7 @@ import {
 >>>>>>> origin/Pet-Transport
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
 =======
 import { STAFF_HOME } from '../staffSession.js';
@@ -32,6 +33,9 @@ import { DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, DEMO_OWNER_LOGIN, useAuth } from '
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
 import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
 >>>>>>> origin/Admin-transport
+=======
+import { ADOPTION_API_URL, ADOPTION_STAFF_TOKEN_KEY } from '../../adoption/api.js';
+>>>>>>> origin/Adoption
 
 export default function LoginPage() {
   const { currentUser, login, staffLogin } = useAuth();
@@ -81,6 +85,7 @@ export default function LoginPage() {
     try {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> origin/Admin-transport
       const user = await login(form.email, form.password, form.remember);
@@ -104,6 +109,36 @@ export default function LoginPage() {
         setError(customerError.message);
       }
 >>>>>>> origin/Pet-Owner-Vet
+=======
+      let staffLoginError = '';
+      try {
+        const response = await fetch(`${ADOPTION_API_URL}/staff/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email, password: form.password }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+          sessionStorage.setItem(ADOPTION_STAFF_TOKEN_KEY, result.token);
+          navigate('/adoption', { replace: true });
+          return;
+        }
+        if (response.status !== 401) {
+          staffLoginError = result.error || 'เข้าสู่ระบบพนักงานไม่สำเร็จ';
+        }
+      } catch (staffError) {
+        staffLoginError = staffError instanceof TypeError && staffError.message === 'Failed to fetch'
+          ? 'เชื่อมต่อระบบพนักงานไม่ได้ กรุณาตรวจสอบว่า Backend ทำงานอยู่'
+          : staffError.message || 'เข้าสู่ระบบพนักงานไม่สำเร็จ';
+      }
+
+      try {
+        await login(form.email, form.password, form.remember);
+        navigate(next, { replace: true });
+      } catch (err) {
+        setError(staffLoginError ? `${staffLoginError} (${err.message})` : err.message);
+      }
+>>>>>>> origin/Adoption
     } finally {
       setSubmitting(false);
     }

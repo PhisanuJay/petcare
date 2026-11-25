@@ -29,13 +29,13 @@ function InfoForm({ user, onSaved }) {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     setError('');
     if (!form.firstName.trim() || !form.lastName.trim()) return setError('กรุณากรอกชื่อและนามสกุล');
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) return setError('รูปแบบอีเมลไม่ถูกต้อง');
     try {
-      updateProfile({ ...form, firstName: form.firstName.trim(), lastName: form.lastName.trim() });
+      await updateProfile({ ...form, firstName: form.firstName.trim(), lastName: form.lastName.trim() });
       onSaved('บันทึกข้อมูลส่วนตัวแล้ว');
     } catch (err) {
       setError(err.message);
@@ -173,7 +173,7 @@ export default function ProfilePage() {
     if (!file) return;
     setAvatarError('');
     try {
-      updateProfile({ avatar: await fileToResizedDataUrl(file, 300) });
+      await updateProfile({ avatar: await fileToResizedDataUrl(file, 300) });
       show('อัปเดตรูปโปรไฟล์แล้ว');
     } catch (err) {
       setAvatarError(err.message);

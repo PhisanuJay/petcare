@@ -35,7 +35,7 @@ export default function AppShell() {
               <Link to="/admin/transport">Admin Transport</Link>
             </li>
             <li>
-              <Link to="/adoption">Adoption</Link>
+              <Link to="/adoption">Adoption Staff</Link>
             </li>
             <li>
               <Link to="/admin">Admin</Link>

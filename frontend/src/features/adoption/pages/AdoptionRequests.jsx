@@ -1,18 +1,87 @@
-/**
- * Placeholder — Adoption Requests
- * Role: Adoption
- * Owner: ปร่ย
- * Source: Page 17 sitemap (Thanik Sapnonwai)
- *
- * TODO: implement UI and business logic later.
- */
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { adoptionStaffFetch, readAdoptionResponse } from '../api.js';
+
+const STATUS_LABELS = {
+  pending: 'รอพิจารณา',
+  approved: 'อนุมัติแล้ว',
+  rejected: 'ไม่อนุมัติ',
+  closed: 'ปิดคำร้อง',
+};
+
 export default function AdoptionRequestsPage() {
+  const [requests, setRequests] = useState([]);
+  const [filter, setFilter] = useState('pending');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function loadRequests() {
+      try {
+        const response = await adoptionStaffFetch('/requests', { signal: controller.signal });
+        const result = await readAdoptionResponse(response, 'โหลดคำร้องไม่สำเร็จ');
+        setRequests(result.requests);
+      } catch (requestError) {
+        if (requestError.name !== 'AbortError') setError(requestError.message);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }
+
+    loadRequests();
+    return () => controller.abort();
+  }, []);
+
+  const filteredRequests = useMemo(
+    () => filter === 'all' ? requests : requests.filter((request) => request.status === filter),
+    [filter, requests],
+  );
+
   return (
     <section>
-      <h1>Adoption Requests</h1>
-      <p>Role: Adoption</p>
-      <p>Owner: ปร่ย</p>
-      <p>Placeholder page — not implemented yet.</p>
+      <div className="adoption-staff-page-title d-flex flex-wrap justify-content-between align-items-end gap-3">
+        <div>
+          <h1>คำร้องขอรับเลี้ยง</h1>
+          <p>ตรวจสอบข้อมูลผู้สมัครและพิจารณาคำร้อง</p>
+        </div>
+        <label className="d-flex align-items-center gap-2">
+          <span>แสดง</span>
+          <select className="form-select" value={filter} onChange={(event) => setFilter(event.target.value)}>
+            <option value="pending">รอพิจารณา</option>
+            <option value="approved">อนุมัติแล้ว</option>
+            <option value="rejected">ไม่อนุมัติ</option>
+            <option value="closed">ปิดคำร้อง</option>
+            <option value="all">ทั้งหมด</option>
+          </select>
+        </label>
+      </div>
+      {error && <div className="alert alert-danger" role="alert">{error}</div>}
+      {loading && <p role="status">กำลังโหลดคำร้อง...</p>}
+      {!loading && !error && filteredRequests.length === 0 && (
+        <div className="adoption-staff-panel">ไม่พบคำร้องในหมวดนี้</div>
+      )}
+      <div className="adoption-staff-list">
+        {filteredRequests.map((request) => (
+          <article className="adoption-staff-card" key={request.id}>
+            <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
+              <div>
+                <h2>{request.firstName} {request.lastName}</h2>
+                <p className="adoption-staff-muted mb-1">สนใจรับเลี้ยง: {request.animalName || 'ไม่พบข้อมูลสัตว์'}</p>
+                <p className="adoption-staff-muted mb-0">
+                  ส่งคำร้องเมื่อ {new Date(request.createdAt).toLocaleString('th-TH')}
+                </p>
+              </div>
+              <span className={`adoption-staff-status ${request.status}`}>
+                {STATUS_LABELS[request.status] || request.status}
+              </span>
+            </div>
+            <Link className="btn btn-soft btn-sm mt-3" to={`/adoption/requests/${request.id}`}>
+              ดูรายละเอียดคำร้อง
+            </Link>
+          </article>
+        ))}
+      </div>
     </section>
   );
 }
