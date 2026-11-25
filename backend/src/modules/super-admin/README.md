@@ -6,4 +6,4 @@
 
 ## Pet Hotel CCTV
 
-ดูรายละเอียดและวิธีรันที่ `hotel-cctv/README.md`
+API ที่รันจริงอยู่ที่ `D:\CCTV\backend` พอร์ต 3000 คู่กับ `frontend/src/features/super-admin/hotel-cctv/`

@@ -20,16 +20,22 @@ function viewerHost() {
 }
 
 function filterOfferSdp(sdp) {
-  const lines = String(sdp || '').split(/\r\n|\n/);
-  const kept = lines.filter((line) => {
-    if (!line.startsWith('a=candidate:')) return line !== '';
+  const lines = String(sdp || '').split(/\r\n|\n/).filter((line) => line !== '');
+  const usable = lines.filter((line) => {
+    if (!line.startsWith('a=candidate:')) return false;
     const parts = line.trim().split(/\s+/);
     const address = parts[4] || '';
     if ((parts[2] || '').toLowerCase() !== 'udp') return false;
     if (!address || address.startsWith('169.254.') || address.startsWith('fe80:') || address.includes(':')) return false;
     return true;
   });
-  return `${(kept.length ? kept : lines.filter(Boolean)).join('\r\n')}\r\n`;
+  const lan = usable.filter((line) => {
+    const address = line.trim().split(/\s+/)[4] || '';
+    return address !== '127.0.0.1' && !address.startsWith('127.');
+  });
+  const allow = new Set(lan.length ? lan : usable);
+  const kept = lines.filter((line) => !line.startsWith('a=candidate:') || allow.has(line));
+  return `${(kept.length ? kept : lines).join('\r\n')}\r\n`;
 }
 
 export default function Player({ cameraId, mode, tile = false, minimal = false, onPicture, onPhase }) {
@@ -135,7 +141,7 @@ export default function Player({ cameraId, mode, tile = false, minimal = false, 
         if (cancelled) return;
         await peer.setRemoteDescription({ type: 'answer', sdp: answer });
         const started = Date.now();
-        const waitMs = tile ? 20000 : 12000;
+        const waitMs = tile ? 25000 : 22000;
         videoRef.current?.addEventListener('resize', showPicture);
         pictureTimer = window.setInterval(() => {
           if (cancelled) return;

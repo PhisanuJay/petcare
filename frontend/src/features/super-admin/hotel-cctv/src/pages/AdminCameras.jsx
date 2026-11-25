@@ -18,7 +18,8 @@ export default function AdminCameras() {
 
 function can(user, key) {
   if (!user) return false;
-  if (user.role === 'admin') return true;
+  if (user.isSuper) return true;
+  if (user.role === 'admin') return Boolean(user.permissions && user.permissions[key]);
   return Boolean(user.permissions && user.permissions[key]);
 }
 

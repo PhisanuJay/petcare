@@ -1,22 +1,21 @@
 # Pet Hotel CCTV (Super Admin / ฟ่าง · Xsup404)
 
-แอปจัดการกล้องโรงแรมสัตว์เลี้ยง — รันแยกจาก monorepo หลักได้
+แอปจัดการกล้องโรงแรมสัตว์เลี้ยง ถูกเปิดจาก Super Admin ที่ `/super-admin/*`
 
 ## รัน
 
 ```bash
-# Backend (อีกโฟลเดอร์)
-cd ../../../backend/src/modules/super-admin/hotel-cctv
-cp .env.example .env
+# API ที่รันจริง
+cd D:\CCTV\backend
 npm install
 npm run dev
 
-# Frontend
-cd frontend/src/features/super-admin/hotel-cctv
+# Frontend ของ Super Admin (พอร์ต 5177 พร็อกซี /api ไปพอร์ต 3000)
+cd frontend
 npm install
 npm run dev
 ```
 
-ค่าเริ่มต้นแอดมิน: ดูใน `.env.example`
+ค่าเริ่มต้นแอดมิน: ดูใน `D:\CCTV\.env.example`
 
 **อย่า commit** `.env`, `data/`, หรือไฟล์ key/cert

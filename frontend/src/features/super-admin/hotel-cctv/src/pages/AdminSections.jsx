@@ -103,6 +103,26 @@ export function RoomsPanel({ canManage = true, canGrant = false, onOpenAccess } 
     });
   }
 
+  async function openEdit(camera) {
+    setError('');
+    setBusy(true);
+    try {
+      const data = await api(`/api/admin/cameras/${camera.id}`);
+      const rtspUrl = data.camera?.rtspUrl || '';
+      setEditing({
+        id: camera.id,
+        roomLabel: camera.roomLabel || '',
+        catName: camera.catName || '',
+        rtspUrl,
+        originalRtspUrl: rtspUrl,
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveCamera(event) {
     event.preventDefault();
     setBusy(true);
@@ -115,8 +135,10 @@ export function RoomsPanel({ canManage = true, canGrant = false, onOpenAccess } 
         catName: cat,
         name: room && cat ? `${room} · ${cat}` : room || cat || 'กล้อง',
       };
-      const rtspUrl = editing.rtspUrl?.trim();
-      if (rtspUrl) body.rtspUrl = rtspUrl;
+      const rtspUrl = editing.rtspUrl?.trim() || '';
+      const originalRtspUrl = editing.originalRtspUrl?.trim() || '';
+      if (!rtspUrl) throw new Error('ใส่ที่อยู่กล้อง');
+      if (rtspUrl !== originalRtspUrl) body.rtspUrl = rtspUrl;
       await api(`/api/admin/cameras/${editing.id}`, {
         method: 'PATCH',
         body,
@@ -415,15 +437,8 @@ export function RoomsPanel({ canManage = true, canGrant = false, onOpenAccess } 
                                 <button
                                   className="room-tool"
                                   type="button"
-                                  onClick={() => {
-                                    setError('');
-                                    setEditing({
-                                      id: camera.id,
-                                      roomLabel: camera.roomLabel || '',
-                                      catName: camera.catName || '',
-                                      rtspUrl: '',
-                                    });
-                                  }}
+                                  disabled={busy}
+                                  onClick={() => openEdit(camera)}
                                   title="แก้ไข"
                                 >
                                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V20h2.5L17.1 9.4l-2.5-2.5L4 17.5Zm15.7-9.2a.7.7 0 0 0 0-1l-1.5-1.5a.7.7 0 0 0-1 0l-1.2 1.2 2.5 2.5 1.2-1.2Z" fill="currentColor"/></svg>
@@ -539,8 +554,9 @@ export function RoomsPanel({ canManage = true, canGrant = false, onOpenAccess } 
               <input
                 value={editing.rtspUrl}
                 autoComplete="off"
-                placeholder="เว้นว่างถ้าไม่เปลี่ยน · rtsp://user:pass@ip:554/stream1"
+                placeholder="rtsp://user:pass@ip:554/stream1"
                 onChange={(event) => setEditing({ ...editing, rtspUrl: event.target.value })}
+                required
               />
             </label>
             <div className="card-actions">
@@ -960,31 +976,37 @@ export function LogsPanel() {
   const [items, setItems] = useState([]);
   const [cameras, setCameras] = useState([]);
   const [error, setError] = useState('');
-  const [draft, setDraft] = useState({ cameraId: '', kind: '', days: '7' });
+  const [draft, setDraft] = useState({ cameraId: '', kind: '', days: '0' });
 
   async function load(next = draft) {
     const params = new URLSearchParams();
     if (next.cameraId) params.set('cameraId', next.cameraId);
     if (next.kind) params.set('kind', next.kind);
-    params.set('days', next.days || '7');
+    params.set('days', next.days || '0');
     const [logs, cams] = await Promise.all([
       api(`/api/admin/care?${params}`),
       api('/api/admin/cameras?pageSize=100'),
     ]);
-    setItems(logs.items);
-    setCameras(cams.items);
+    setItems(logs.items || []);
+    setCameras(cams.items || []);
+    setError('');
   }
 
   useEffect(() => {
     load().catch((err) => setError(err.message));
   }, []);
 
+  function applyFilters(next) {
+    setDraft(next);
+    load(next).catch((err) => setError(err.message));
+  }
+
   return (
     <div className="page">
       <div className="page-head">
         <div>
           <h1>บันทึกกิจกรรม</h1>
-          <p className="muted">บันทึกการให้อาหาร น้ำ เล่น และตรวจสุขภาพจากภาพสด</p>
+          <p className="muted">บันทึกการดูแลที่มีในระบบ{items.length ? ` · ${items.length} รายการ` : ''}</p>
         </div>
       </div>
       {error ? <p className="banner error">{error}</p> : null}
@@ -998,7 +1020,7 @@ export function LogsPanel() {
           }}
         >
           <label>กล้อง
-            <select value={draft.cameraId} onChange={(event) => setDraft({ ...draft, cameraId: event.target.value })}>
+            <select value={draft.cameraId} onChange={(event) => applyFilters({ ...draft, cameraId: event.target.value })}>
               <option value="">ทุกกล้อง</option>
               {cameras.map((item) => (
                 <option key={item.id} value={item.id}>{item.name}</option>
@@ -1006,7 +1028,7 @@ export function LogsPanel() {
             </select>
           </label>
           <label>ประเภท
-            <select value={draft.kind} onChange={(event) => setDraft({ ...draft, kind: event.target.value })}>
+            <select value={draft.kind} onChange={(event) => applyFilters({ ...draft, kind: event.target.value })}>
               <option value="">ทั้งหมด</option>
               <option value="feed">อาหาร</option>
               <option value="water">น้ำ</option>
@@ -1018,7 +1040,8 @@ export function LogsPanel() {
             </select>
           </label>
           <label>ช่วงวัน
-            <select value={draft.days} onChange={(event) => setDraft({ ...draft, days: event.target.value })}>
+            <select value={draft.days} onChange={(event) => applyFilters({ ...draft, days: event.target.value })}>
+              <option value="0">ทั้งหมด</option>
               <option value="1">วันนี้</option>
               <option value="7">7 วัน</option>
               <option value="30">30 วัน</option>
@@ -1251,25 +1274,62 @@ export function SettingsPanel({ session }) {
   );
 }
 
-const STAFF_PERMISSION_OPTIONS = [
-  { key: 'view_cameras', label: 'ดูภาพกล้อง', group: 'กล้อง' },
-  { key: 'manage_cameras', label: 'เพิ่ม แก้ ลบกล้อง', group: 'กล้อง' },
-  { key: 'care_logs', label: 'บันทึกการดูแล', group: 'งานดูแล' },
-  { key: 'manage_rooms', label: 'จัดการห้อง', group: 'งานดูแล' },
-  { key: 'manage_customers', label: 'จัดการลูกค้า', group: 'บัญชี' },
-  { key: 'manage_grants', label: 'ให้สิทธิ์ดูกล้อง', group: 'บัญชี' },
-  { key: 'view_logs', label: 'ดูบันทึกกิจกรรม', group: 'ระบบ' },
-  { key: 'view_settings', label: 'ดูตั้งค่า', group: 'ระบบ' },
+const ACCOUNT_KINDS = [
+  {
+    id: 'admins',
+    label: 'แอดมิน',
+    add: 'เพิ่มแอดมิน',
+    empty: 'ยังไม่มีแอดมิน',
+    search: 'ค้นหาชื่อหรืออีเมลแอดมิน',
+    create: 'สร้างแอดมิน',
+    hint: 'เลือกได้ว่าแอดมินคนนี้จัดการอะไรได้',
+    path: '/api/admin/admins',
+  },
+  {
+    id: 'drivers',
+    label: 'คนขับ',
+    add: 'เพิ่มคนขับ',
+    empty: 'ยังไม่มีคนขับ',
+    search: 'ค้นหาชื่อหรืออีเมลคนขับ',
+    create: 'สร้างคนขับ',
+    hint: 'คนขับเข้าดูภาพกล้องได้',
+    path: '/api/admin/drivers',
+  },
+  {
+    id: 'customers',
+    label: 'ลูกค้า',
+    add: 'เพิ่มลูกค้า',
+    empty: 'ยังไม่มีลูกค้า',
+    search: 'ค้นหาชื่อหรืออีเมลลูกค้า',
+    create: 'สร้างลูกค้า',
+    hint: 'สร้างบัญชีให้ลูกค้าเข้าดูกล้องได้',
+    path: '/api/admin/customers',
+  },
 ];
 
-const EMPTY_STAFF = {
-  email: '',
-  displayName: '',
-  password: '',
-  permissions: Object.fromEntries(STAFF_PERMISSION_OPTIONS.map((item) => [item.key, ['view_cameras', 'care_logs'].includes(item.key)])),
-};
+const ADMIN_RIGHTS = [
+  { key: 'view_cameras', label: 'ดูภาพกล้อง', hint: 'เปิดภาพรวมและดูภาพสด', group: 'กล้อง' },
+  { key: 'manage_cameras', label: 'จัดการกล้อง', hint: 'เพิ่ม แก้ไข และลบกล้อง', group: 'กล้อง' },
+  { key: 'manage_rooms', label: 'จัดการห้อง', hint: 'ตั้งชื่อห้องและจัดกล้องเข้าห้อง', group: 'กล้อง' },
+  { key: 'care_logs', label: 'บันทึกการดูแล', hint: 'บันทึกอาหาร น้ำ และการดูแล', group: 'งานดูแล' },
+  { key: 'manage_customers', label: 'จัดการลูกค้า', hint: 'เพิ่มและลบบัญชีลูกค้า', group: 'บัญชี' },
+  { key: 'manage_grants', label: 'ให้สิทธิ์ดูกล้อง', hint: 'เลือกว่าลูกค้าดูกล้องไหนได้', group: 'บัญชี' },
+  { key: 'view_logs', label: 'ดูบันทึกกิจกรรม', hint: 'เปิดหน้ารายการที่บันทึกไว้', group: 'ระบบ' },
+  { key: 'view_settings', label: 'ดูตั้งค่า', hint: 'เปิดหน้าตั้งค่าระบบ', group: 'ระบบ' },
+];
 
-const EMPTY_CUSTOMER = { email: '', displayName: '', password: '' };
+const RIGHT_GROUPS = ['กล้อง', 'งานดูแล', 'บัญชี', 'ระบบ'];
+const FULL_RIGHTS = Object.fromEntries(ADMIN_RIGHTS.map((item) => [item.key, true]));
+const EMPTY_RIGHTS = Object.fromEntries(ADMIN_RIGHTS.map((item) => [item.key, false]));
+
+function applyRights(current, key, on) {
+  const permissions = { ...current, [key]: on };
+  if (key === 'view_cameras' && !on) permissions.manage_cameras = false;
+  if (permissions.manage_cameras) permissions.view_cameras = true;
+  return permissions;
+}
+
+const EMPTY_ACCOUNT = { email: '', displayName: '', password: '', permissions: { ...FULL_RIGHTS } };
 
 function cleanDisplayName(name) {
   const text = String(name || '').trim();
@@ -1284,34 +1344,32 @@ function initialOf(name) {
   return text ? text.slice(0, 1).toUpperCase() : '?';
 }
 
-function permissionLabel(key) {
-  return STAFF_PERMISSION_OPTIONS.find((item) => item.key === key)?.label || key;
-}
-
-function activePermissionKeys(permissions = {}) {
-  return Object.entries(permissions).filter(([, on]) => on).map(([key]) => key);
-}
-
 export function UsersPanel({ mode, session }) {
   const isAdmin = session?.user?.role === 'admin';
-  const [tab, setTab] = useState(isAdmin ? 'staff' : 'customers');
-  const [customers, setCustomers] = useState([]);
-  const [staff, setStaff] = useState([]);
+  const kinds = isAdmin ? ACCOUNT_KINDS : ACCOUNT_KINDS.filter((item) => item.id === 'customers');
+  const [tab, setTab] = useState(kinds[0].id);
+  const [lists, setLists] = useState({ admins: [], drivers: [], customers: [] });
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [created, setCreated] = useState('');
   const [busy, setBusy] = useState(false);
   const [composer, setComposer] = useState(null);
-  const [staffForm, setStaffForm] = useState(EMPTY_STAFF);
-  const [customerForm, setCustomerForm] = useState(EMPTY_CUSTOMER);
-  const [editingStaff, setEditingStaff] = useState(null);
+  const [form, setForm] = useState(EMPTY_ACCOUNT);
+  const [editing, setEditing] = useState(null);
+  const [removeTarget, setRemoveTarget] = useState(null);
+
+  const kind = kinds.find((item) => item.id === tab) || kinds[0];
 
   async function load() {
-    const tasks = [api('/api/admin/customers')];
-    if (isAdmin) tasks.push(api('/api/admin/staff'));
-    const [customerData, staffData] = await Promise.all(tasks);
-    setCustomers(customerData.items);
-    if (staffData) setStaff(staffData.items);
+    const tasks = kinds.map((item) => api(item.path));
+    const results = await Promise.all(tasks);
+    setLists((prev) => {
+      const next = { ...prev };
+      kinds.forEach((item, index) => {
+        next[item.id] = results[index].items;
+      });
+      return next;
+    });
   }
 
   useEffect(() => {
@@ -1319,11 +1377,7 @@ export function UsersPanel({ mode, session }) {
   }, [isAdmin]);
 
   const q = query.trim().toLowerCase();
-  const visibleStaff = staff.filter((item) => {
-    if (!q) return true;
-    return `${cleanDisplayName(item.displayName)} ${item.email}`.toLowerCase().includes(q);
-  });
-  const visibleCustomers = customers.filter((item) => {
+  const visible = (lists[kind.id] || []).filter((item) => {
     if (!q) return true;
     return `${cleanDisplayName(item.displayName)} ${item.email}`.toLowerCase().includes(q);
   });
@@ -1331,54 +1385,59 @@ export function UsersPanel({ mode, session }) {
   function openCreate() {
     setError('');
     setCreated('');
-    if (tab === 'staff') {
-      setEditingStaff(null);
-      setStaffForm(EMPTY_STAFF);
-      setComposer('staff');
-    } else {
-      setCustomerForm(EMPTY_CUSTOMER);
-      setComposer('customer');
-    }
+    setEditing(null);
+    setForm({ ...EMPTY_ACCOUNT, permissions: { ...FULL_RIGHTS } });
+    setComposer(kind.id);
   }
 
-  function openEditStaff(item) {
-    setEditingStaff(item);
-    setStaffForm({
+  function openEdit(item) {
+    setError('');
+    setCreated('');
+    setEditing(item);
+    setForm({
       email: item.email,
       displayName: cleanDisplayName(item.displayName),
       password: '',
-      permissions: { ...EMPTY_STAFF.permissions, ...(item.permissions || {}) },
+      permissions: { ...FULL_RIGHTS, ...(item.permissions || {}) },
     });
-    setComposer('staff');
-    setTab('staff');
+    setComposer(kind.id);
   }
 
   function closeComposer() {
     setComposer(null);
-    setEditingStaff(null);
-    setStaffForm(EMPTY_STAFF);
-    setCustomerForm(EMPTY_CUSTOMER);
+    setEditing(null);
+    setForm({ ...EMPTY_ACCOUNT, permissions: { ...FULL_RIGHTS } });
   }
 
-  async function saveStaff(event) {
+  async function saveAccount(event) {
     event.preventDefault();
+    const current = kinds.find((item) => item.id === composer);
+    if (!current) return;
     setBusy(true);
     setError('');
     setCreated('');
     try {
-      if (editingStaff) {
-        await api(`/api/admin/staff/${editingStaff.id}`, {
+      if (editing) {
+        await api(`${current.path}/${editing.id}`, {
           method: 'PATCH',
           body: {
-            displayName: staffForm.displayName,
-            permissions: staffForm.permissions,
-            password: staffForm.password || undefined,
+            displayName: form.displayName,
+            password: form.password || undefined,
+            permissions: current.id === 'admins' ? form.permissions : undefined,
           },
         });
-        setCreated(`บันทึกพนักงาน ${staffForm.displayName} แล้ว`);
+        setCreated(`บันทึก${current.label} ${form.displayName} แล้ว`);
       } else {
-        const result = await api('/api/admin/staff', { method: 'POST', body: staffForm });
-        setCreated(`สร้างพนักงานแล้ว · อีเมล ${result.user.email} · รหัส ${result.password}`);
+        const result = await api(current.path, {
+          method: 'POST',
+          body: {
+            email: form.email,
+            displayName: form.displayName,
+            password: form.password,
+            permissions: current.id === 'admins' ? form.permissions : undefined,
+          },
+        });
+        setCreated(`สร้าง${current.label}แล้ว · อีเมล ${result.user.email} · รหัส ${result.password}`);
       }
       closeComposer();
       await load();
@@ -1389,15 +1448,17 @@ export function UsersPanel({ mode, session }) {
     }
   }
 
-  async function saveCustomer(event) {
-    event.preventDefault();
+  const composerKind = kinds.find((item) => item.id === composer);
+
+  async function confirmRemove() {
+    if (!removeTarget) return;
     setBusy(true);
     setError('');
     setCreated('');
     try {
-      const result = await api('/api/admin/customers', { method: 'POST', body: customerForm });
-      setCreated(`สร้างลูกค้าแล้ว · อีเมล ${result.user.email} · รหัส ${result.password}`);
-      closeComposer();
+      await api(`${removeTarget.kind.path}/${removeTarget.id}`, { method: 'DELETE' });
+      setCreated(`ลบ${removeTarget.kind.label} ${cleanDisplayName(removeTarget.displayName) || removeTarget.email} แล้ว`);
+      setRemoveTarget(null);
       await load();
     } catch (err) {
       setError(err.message);
@@ -1405,83 +1466,40 @@ export function UsersPanel({ mode, session }) {
       setBusy(false);
     }
   }
-
-  async function toggleStaff(item) {
-    setBusy(true);
-    setError('');
-    try {
-      await api(`/api/admin/staff/${item.id}`, { method: 'PATCH', body: { isActive: !item.isActive } });
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function toggleCustomer(item) {
-    setBusy(true);
-    setError('');
-    try {
-      await api(`/api/admin/customers/${item.id}`, { method: 'PATCH', body: { isActive: !item.isActive } });
-      await load();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const showingStaff = tab === 'staff' && isAdmin;
-  const list = showingStaff ? visibleStaff : visibleCustomers;
-
-  const permissionGroups = STAFF_PERMISSION_OPTIONS.reduce((acc, item) => {
-    if (!acc[item.group]) acc[item.group] = [];
-    acc[item.group].push(item);
-    return acc;
-  }, {});
 
   return (
     <div className="page users-page">
       <div className="page-head">
         <div>
           <h1>จัดการผู้ใช้</h1>
-          <p className="muted">ดูรายชื่อ เปิด-ปิดบัญชี และกำหนดสิทธิ์พนักงาน</p>
+          <p className="muted">เพิ่ม แก้ไขสิทธิ์ และลบบัญชีแอดมิน คนขับ และลูกค้า</p>
         </div>
         <button className="button" type="button" onClick={openCreate}>
-          {showingStaff ? '+ เพิ่มพนักงาน' : '+ เพิ่มลูกค้า'}
+          + {kind.add}
         </button>
       </div>
 
       <div className="users-toolbar">
-        {isAdmin ? (
-          <div className="users-tabs" role="tablist">
+        <div className="users-tabs" role="tablist">
+          {kinds.map((item) => (
             <button
+              key={item.id}
               type="button"
               role="tab"
-              className={tab === 'staff' ? 'active' : ''}
-              aria-selected={tab === 'staff'}
-              onClick={() => { setTab('staff'); setQuery(''); }}
+              className={tab === item.id ? 'active' : ''}
+              aria-selected={tab === item.id}
+              onClick={() => { setTab(item.id); setQuery(''); }}
             >
-              พนักงาน <span>{staff.length}</span>
+              {item.label} <span>{(lists[item.id] || []).length}</span>
             </button>
-            <button
-              type="button"
-              role="tab"
-              className={tab === 'customers' ? 'active' : ''}
-              aria-selected={tab === 'customers'}
-              onClick={() => { setTab('customers'); setQuery(''); }}
-            >
-              ลูกค้า <span>{customers.length}</span>
-            </button>
-          </div>
-        ) : <div />}
+          ))}
+        </div>
         <label className="search users-search">
           <IconSearch />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={showingStaff ? 'ค้นหาชื่อหรืออีเมลพนักงาน' : 'ค้นหาชื่อหรืออีเมลลูกค้า'}
+            placeholder={kind.search}
           />
         </label>
       </div>
@@ -1490,140 +1508,183 @@ export function UsersPanel({ mode, session }) {
       {created ? <p className="banner ok">{created}</p> : null}
 
       <section className="panel users-panel">
-        {list.length === 0 ? (
+        {visible.length === 0 ? (
           <div className="users-empty">
-            <strong>{showingStaff ? 'ยังไม่มีพนักงาน' : 'ยังไม่มีลูกค้า'}</strong>
+            <strong>{kind.empty}</strong>
             <p className="muted">{q ? 'ไม่พบตามคำค้นหา' : 'กดปุ่มเพิ่มด้านบนเพื่อสร้างบัญชีแรก'}</p>
-            {!q ? <button className="button" type="button" onClick={openCreate}>{showingStaff ? '+ เพิ่มพนักงาน' : '+ เพิ่มลูกค้า'}</button> : null}
+            {!q ? <button className="button" type="button" onClick={openCreate}>+ {kind.add}</button> : null}
           </div>
         ) : (
           <ul className="people-list">
-            {showingStaff
-              ? visibleStaff.map((item) => {
-                const keys = activePermissionKeys(item.permissions);
-                return (
-                  <li key={item.id} className={`person-row ${item.isActive ? '' : 'is-disabled'}`}>
-                    <span className="avatar person-avatar">{initialOf(item.displayName)}</span>
-                    <div className="person-main">
-                      <div className="person-title">
-                        <strong>{cleanDisplayName(item.displayName) || 'ไม่มีชื่อ'}</strong>
-                        <span className={`pill ${item.isActive ? 'online' : 'offline'}`}>{item.isActive ? 'ใช้งาน' : 'ปิดอยู่'}</span>
-                      </div>
-                      <p className="muted">{item.email}</p>
-                      <div className="perm-chips">
-                        {keys.length === 0 ? <span className="perm-chip muted-chip">ยังไม่ให้สิทธิ์</span> : null}
-                        {keys.slice(0, 4).map((key) => <span className="perm-chip" key={key}>{permissionLabel(key)}</span>)}
-                        {keys.length > 4 ? <span className="perm-chip more-chip">+{keys.length - 4}</span> : null}
-                      </div>
-                    </div>
-                    <div className="person-actions">
-                      <button className="button ghost tiny" type="button" onClick={() => openEditStaff(item)}>แก้สิทธิ์</button>
-                      <button className="button ghost tiny" type="button" disabled={busy} onClick={() => toggleStaff(item)}>
-                        {item.isActive ? 'ปิดใช้' : 'เปิดใช้'}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })
-              : visibleCustomers.map((item) => (
-                <li key={item.id} className={`person-row ${item.isActive ? '' : 'is-disabled'}`}>
-                  <span className="avatar person-avatar customer">{initialOf(item.displayName)}</span>
+            {visible.map((item) => {
+              const superAdmin = Boolean(item.isSuper);
+              const name = superAdmin ? 'Super admin' : (cleanDisplayName(item.displayName) || 'ไม่มีชื่อ');
+              return (
+                <li key={item.id} className="person-row">
+                  <span className={`avatar person-avatar ${kind.id === 'customers' ? 'customer' : ''}`}>{initialOf(name)}</span>
                   <div className="person-main">
                     <div className="person-title">
-                      <strong>{cleanDisplayName(item.displayName) || 'ไม่มีชื่อ'}</strong>
-                      <span className={`pill ${item.isActive ? 'online' : 'offline'}`}>{item.isActive ? 'ใช้งาน' : 'ปิดอยู่'}</span>
+                      <strong>{name}</strong>
+                      {superAdmin ? <span className="pill online">บัญชีหลัก</span> : null}
                     </div>
                     <p className="muted">{item.email}</p>
+                      {kind.id === 'admins' && !superAdmin ? (
+                        <div className="perm-chips">
+                          {ADMIN_RIGHTS.filter((right) => item.permissions?.[right.key]).slice(0, 3).map((right) => (
+                            <span className="perm-chip" key={right.key}>{right.label}</span>
+                          ))}
+                          {ADMIN_RIGHTS.filter((right) => item.permissions?.[right.key]).length > 3 ? (
+                            <span className="perm-chip more-chip">+{ADMIN_RIGHTS.filter((right) => item.permissions?.[right.key]).length - 3}</span>
+                          ) : null}
+                        </div>
+                      ) : null}
                   </div>
-                  <div className="person-actions">
-                    <button className="button ghost tiny" type="button" disabled={busy} onClick={() => toggleCustomer(item)}>
-                      {item.isActive ? 'ปิดใช้' : 'เปิดใช้'}
-                    </button>
-                  </div>
+                  {superAdmin ? null : (
+                    <div className="person-actions">
+                      <button className="person-edit" type="button" disabled={busy} onClick={() => openEdit(item)}>
+                        แก้ไข
+                      </button>
+                      <button
+                        className="person-delete"
+                        type="button"
+                        disabled={busy}
+                        onClick={() => setRemoveTarget({ ...item, kind })}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1h4v1.5h-1.2l-1 12.2A2 2 0 0 1 15.8 23H8.2a2 2 0 0 1-2-1.8L5.2 7.5H4V6h4Zm1.5 0h5V5h-5v1Zm-1.1 1.5 1 11.8h6.2l1-11.8H8.4Z" fill="currentColor"/></svg>
+                        ลบ
+                      </button>
+                    </div>
+                  )}
                 </li>
-              ))}
+              );
+            })}
           </ul>
         )}
       </section>
 
-      {composer === 'staff' ? (
-        <div className="overlay" onClick={closeComposer}>
+      {removeTarget ? (
+        <div className="overlay" onClick={() => { if (!busy) setRemoveTarget(null); }}>
           <div className="modal profile-modal users-modal" onClick={(event) => event.stopPropagation()}>
             <div className="card-top">
               <div>
-                <h2>{editingStaff ? 'แก้ไขพนักงาน' : 'เพิ่มพนักงาน'}</h2>
-                <p className="muted tiny">ตั้งชื่อบัญชี แล้วเลือกสิทธิ์ที่ให้ทำได้</p>
+                <h2>ลบ{removeTarget.kind.label}นี้?</h2>
+                <p className="muted tiny">ลบแล้วกู้คืนไม่ได้</p>
               </div>
-              <button className="button ghost" type="button" onClick={closeComposer}>ปิด</button>
+              <button className="button ghost" type="button" onClick={() => setRemoveTarget(null)} disabled={busy}>ปิด</button>
             </div>
-            <form onSubmit={saveStaff}>
-              <div className="form-row">
-                <label>ชื่อที่แสดง
-                  <input value={staffForm.displayName} onChange={(event) => setStaffForm({ ...staffForm, displayName: event.target.value })} required />
-                </label>
-                <label>อีเมลเข้าสู่ระบบ
-                  <input type="email" value={staffForm.email} onChange={(event) => setStaffForm({ ...staffForm, email: event.target.value })} required disabled={Boolean(editingStaff)} />
-                </label>
-              </div>
-              <label>{editingStaff ? 'รหัสผ่านใหม่ (เว้นว่างถ้าไม่เปลี่ยน)' : 'รหัสผ่านเริ่มต้น'}
-                <input type="text" value={staffForm.password} onChange={(event) => setStaffForm({ ...staffForm, password: event.target.value })} required={!editingStaff} minLength={4} />
-              </label>
-
-              <div className="perm-sections">
-                {Object.entries(permissionGroups).map(([group, items]) => (
-                  <div className="perm-section" key={group}>
-                    <h3>{group}</h3>
-                    <div className="perm-grid">
-                      {items.map((item) => (
-                        <label className={`perm-toggle ${staffForm.permissions[item.key] ? 'on' : ''}`} key={item.key}>
-                          <input
-                            type="checkbox"
-                            checked={Boolean(staffForm.permissions[item.key])}
-                            onChange={(event) => setStaffForm({
-                              ...staffForm,
-                              permissions: { ...staffForm.permissions, [item.key]: event.target.checked },
-                            })}
-                          />
-                          <span>{item.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="card-actions">
-                <button className="button ghost" type="button" onClick={closeComposer}>ยกเลิก</button>
-                <button className="button" type="submit" disabled={busy}>{busy ? 'กำลังบันทึก' : editingStaff ? 'บันทึก' : 'สร้างพนักงาน'}</button>
-              </div>
-            </form>
+            {error ? <p className="banner error">{error}</p> : null}
+            <div className="person-delete-card">
+              <strong>{removeTarget.isSuper ? 'Super admin' : (cleanDisplayName(removeTarget.displayName) || 'ไม่มีชื่อ')}</strong>
+              <p className="muted">{removeTarget.email}</p>
+            </div>
+            <p className="muted">บัญชีนี้จะหายจากระบบ และใช้อีเมลนี้เข้าสู่ระบบไม่ได้อีก</p>
+            <div className="card-actions">
+              <button className="button ghost" type="button" onClick={() => setRemoveTarget(null)} disabled={busy}>ยกเลิก</button>
+              <button className="button danger" type="button" onClick={confirmRemove} disabled={busy}>
+                {busy ? 'กำลังลบ' : `ลบ${removeTarget.kind.label}`}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {composer === 'customer' ? (
+      {composerKind ? (
         <div className="overlay" onClick={closeComposer}>
-          <div className="modal profile-modal users-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="card-top">
+          <div className="modal account-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="account-modal-head">
               <div>
+<<<<<<< HEAD
                 <h2>เพิ่มลูกค้า</h2>
                 <p className="muted tiny">ใช้อีเมลเดียวกับที่ลูกค้าจองใน PetCare แล้วค่อยให้สิทธิ์กล้องหลังรับฝาก</p>
+=======
+                <h2>{editing ? `แก้ไข${composerKind.label}` : composerKind.add}</h2>
+                <p className="muted tiny">{editing ? form.email : composerKind.hint}</p>
+>>>>>>> origin/Super-Admin
               </div>
               <button className="button ghost" type="button" onClick={closeComposer}>ปิด</button>
             </div>
-            <form onSubmit={saveCustomer}>
-              <label>ชื่อที่แสดง
-                <input value={customerForm.displayName} onChange={(event) => setCustomerForm({ ...customerForm, displayName: event.target.value })} required />
-              </label>
-              <label>อีเมล
-                <input type="email" value={customerForm.email} onChange={(event) => setCustomerForm({ ...customerForm, email: event.target.value })} required />
-              </label>
-              <label>รหัสผ่าน
-                <input type="text" value={customerForm.password} onChange={(event) => setCustomerForm({ ...customerForm, password: event.target.value })} required minLength={8} />
-              </label>
-              <div className="card-actions">
+            <form onSubmit={saveAccount}>
+              <div className={`account-fields ${editing ? 'is-edit' : ''}`}>
+                <label>ชื่อที่แสดง
+                  <input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} required />
+                </label>
+                {editing ? null : (
+                  <label>อีเมล
+                    <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
+                  </label>
+                )}
+                <label>{editing ? 'รหัสผ่านใหม่' : 'รหัสผ่าน'}
+                  <input
+                    type="text"
+                    value={form.password}
+                    placeholder={editing ? 'เว้นว่างถ้าไม่เปลี่ยน' : ''}
+                    onChange={(event) => setForm({ ...form, password: event.target.value })}
+                    required={!editing}
+                    minLength={editing && !form.password ? undefined : 4}
+                  />
+                </label>
+              </div>
+              {composerKind.id === 'admins' ? (
+                <>
+                  <div className="rights-bar">
+                    <div>
+                      <strong>จัดการอะไรได้</strong>
+                      <span className="muted tiny">เลือก {ADMIN_RIGHTS.filter((item) => form.permissions[item.key]).length} จาก {ADMIN_RIGHTS.length}</span>
+                    </div>
+                    <div className="rights-presets">
+                      <button type="button" onClick={() => setForm({ ...form, permissions: { ...FULL_RIGHTS } })}>ทั้งหมด</button>
+                      <button type="button" onClick={() => setForm({ ...form, permissions: { ...EMPTY_RIGHTS, view_cameras: true } })}>ดูอย่างเดียว</button>
+                      <button type="button" onClick={() => setForm({ ...form, permissions: { ...EMPTY_RIGHTS } })}>ปิดทั้งหมด</button>
+                    </div>
+                  </div>
+                  <div className="rights-list">
+                    {RIGHT_GROUPS.map((group) => {
+                      const items = ADMIN_RIGHTS.filter((item) => item.group === group);
+                      const onCount = items.filter((item) => form.permissions[item.key]).length;
+                      return (
+                        <section className="right-group" key={group}>
+                          <button
+                            className="right-group-head"
+                            type="button"
+                            onClick={() => {
+                              const turnOn = onCount < items.length;
+                              const permissions = { ...form.permissions };
+                              items.forEach((item) => { permissions[item.key] = turnOn; });
+                              if (permissions.manage_cameras) permissions.view_cameras = true;
+                              if (!permissions.view_cameras) permissions.manage_cameras = false;
+                              setForm({ ...form, permissions });
+                            }}
+                          >
+                            <strong>{group}</strong>
+                            <span>{onCount === items.length ? 'เปิดทั้งกลุ่ม' : `เปิด ${onCount}/${items.length}`}</span>
+                          </button>
+                          {items.map((item) => {
+                            const on = Boolean(form.permissions[item.key]);
+                            return (
+                              <button
+                                className={`right-row ${on ? 'on' : ''}`}
+                                type="button"
+                                key={item.key}
+                                aria-pressed={on}
+                                onClick={() => setForm({ ...form, permissions: applyRights(form.permissions, item.key, !on) })}
+                              >
+                                <span>
+                                  <strong>{item.label}</strong>
+                                  <small>{item.hint}</small>
+                                </span>
+                                <span className="switch" aria-hidden="true" />
+                              </button>
+                            );
+                          })}
+                        </section>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : <div className="account-spacer" />}
+              <div className="account-modal-foot">
                 <button className="button ghost" type="button" onClick={closeComposer}>ยกเลิก</button>
-                <button className="button" type="submit" disabled={busy}>{busy ? 'กำลังสร้าง' : 'สร้างลูกค้า'}</button>
+                <button className="button" type="submit" disabled={busy}>{busy ? 'กำลังบันทึก' : editing ? 'บันทึก' : composerKind.create}</button>
               </div>
             </form>
           </div>
