@@ -3,21 +3,12 @@ import cors from 'cors';
 import { registerRoutes } from './routes/index.js';
 import { config } from './config/index.js';
 import { dbPath } from './db/sqlite.js';
-import { initTransportDb } from './modules/pet-transport/db.js';
 
 const app = express();
 const PORT = config.port;
 
 app.use(cors());
-<<<<<<< HEAD
-<<<<<<< HEAD
-app.use(express.json({ limit: '2mb' })); // pet photos are sent as data URLs
-=======
-app.use(express.json({ limit: '8mb' }));
->>>>>>> origin/Admin-transport
-=======
 app.use(express.json({ limit: '9mb' }));
->>>>>>> origin/Adoption
 
 app.get('/health', (_req, res) => {
   res.json({
@@ -27,7 +18,6 @@ app.get('/health', (_req, res) => {
   });
 });
 
-initTransportDb();
 registerRoutes(app);
 
 app.listen(PORT, () => {

@@ -25,12 +25,9 @@ const MEMBER_MENU = [
   { to: '/pet-owner/medical', label: 'ประวัติ', icon: 'bi-journal-medical' },
   { to: '/pet-owner/history', label: 'ประวัติการจอง', icon: 'bi-receipt' },
   { to: '/pet-owner/cat-hotel', label: 'โรงแรมสัตว์', icon: 'bi-building' },
-<<<<<<< HEAD
   { to: '/pet-owner/transport', label: 'รับ–ส่งสัตว์', icon: 'bi-truck' },
   { to: '/pet-owner/adoption', label: 'หาบ้าน', icon: 'bi-house-add' },
-=======
   { to: '/find-home', label: 'หาบ้าน', icon: 'bi-house-add' },
->>>>>>> origin/Adoption
   { to: '/#promo', label: 'โปรโมชั่น', icon: 'bi-tag' },
 ];
 
@@ -96,8 +93,8 @@ export default function CustomerNavbar() {
 
   return (
     <div className={`nav-shell${isAdoptionPage ? ' adoption-nav-shell' : ''}`}>
-      <div className="container">
-        <nav className="navbar navbar-expand-xl pc-navbar">
+      <div className="container-fluid">
+        <nav className="navbar navbar-expand-xxl pc-navbar">
           <Link className="navbar-brand d-flex align-items-center gap-2 ms-1" to="/">
             <span className="brand-logo"><i className="bi bi-balloon-heart-fill" /></span>
             <span className="brand-text">Pet<span>Care</span></span>

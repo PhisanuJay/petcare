@@ -160,26 +160,17 @@
 .tp-quote__map {
   display: block;
   width: 100%;
-<<<<<<< HEAD
   max-width: 100%;
-=======
->>>>>>> origin/Admin-transport
   height: auto;
   border-radius: 12px;
   border: 1px solid var(--baby, #d6e9fc);
   background: #fff;
-<<<<<<< HEAD
   object-fit: contain;
-=======
->>>>>>> origin/Admin-transport
 }
 
 .tp-quote__map--solo {
   box-shadow: 0 8px 24px rgba(29, 58, 87, 0.08);
-<<<<<<< HEAD
   align-self: stretch;
-=======
->>>>>>> origin/Admin-transport
 }
 
 .tp-quote__row {
@@ -197,7 +188,6 @@
   font-size: 1rem;
 }
 
-<<<<<<< HEAD
 .tp-add-service-head {
   display: flex;
   align-items: flex-start;
@@ -267,8 +257,6 @@
   color: #0f172a;
 }
 
-=======
->>>>>>> origin/Admin-transport
 .tp-timeline {
   list-style: none;
   margin: 0;

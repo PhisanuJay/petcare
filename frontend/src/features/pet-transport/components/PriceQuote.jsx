@@ -1,26 +1,18 @@
 import { formatBaht } from '../pricing.js';
 import { isRoundTrip, serviceTypeMeta } from '../constants.js';
-<<<<<<< HEAD
 import zonesMapUrl from '../assets/service-zones-map.jpg';
-=======
->>>>>>> origin/Admin-transport
 
 /** Zone map image only (separate from price summary). */
 export function ServiceZonesMap() {
   return (
     <img
       className="tp-quote__map tp-quote__map--solo"
-<<<<<<< HEAD
       src={zonesMapUrl}
       alt="พื้นที่ให้บริการเขตจตุจักร Zone 1 ฿100 · Zone 2 ฿150"
       width={1024}
       height={682}
       decoding="async"
       loading="eager"
-=======
-      src="/pet-transport/service-zones-map.jpg"
-      alt="พื้นที่ให้บริการเขตจตุจักร Zone 1 ฿100 · Zone 2 ฿150"
->>>>>>> origin/Admin-transport
     />
   );
 }
@@ -37,13 +29,10 @@ export default function PriceQuote({ quote, title = 'สรุปค่าบร
 
   const meta = serviceTypeMeta(quote.serviceType);
   const round = isRoundTrip(quote.serviceType);
-<<<<<<< HEAD
   const inboundOnly = quote.serviceType === 'inbound';
   const lines = Array.isArray(quote.lines) && quote.lines.length
     ? quote.lines
     : null;
-=======
->>>>>>> origin/Admin-transport
 
   return (
     <div className="tp-quote">
@@ -73,7 +62,6 @@ export default function PriceQuote({ quote, title = 'สรุปค่าบร
         </div>
       )}
       <div className="tp-quote__row">
-<<<<<<< HEAD
         <span>จำนวนเที่ยวรถ</span>
         <strong>{quote.trips}</strong>
       </div>
@@ -100,17 +88,6 @@ export default function PriceQuote({ quote, title = 'สรุปค่าบร
       </div>
       {round && (
         <p className="tp-muted" style={{ marginBottom: 0 }}>ไป–กลับคิดราคารถรวมทั้ง 2 เที่ยว ไม่มีส่วนลด</p>
-=======
-        <span>จำนวนเที่ยว</span>
-        <strong>{quote.trips}</strong>
-      </div>
-      <div className="tp-quote__row tp-quote__total">
-        <span>รวม</span>
-        <strong>{formatBaht(quote.total)}</strong>
-      </div>
-      {round && (
-        <p className="tp-muted" style={{ marginBottom: 0 }}>ไป–กลับคิดราคารวมทั้ง 2 เที่ยว ไม่มีส่วนลด</p>
->>>>>>> origin/Admin-transport
       )}
       {quote.needsAdminReview && (
         <p className="tp-muted">รอ Admin พิจารณาราคา</p>

@@ -2,7 +2,6 @@
 
 เก็บข้อมูลจอง / ทริป / แจ้งเตือนในไฟล์ SQLite จริง ที่ `backend/data/petcare-transport.sqlite`
 
-<<<<<<< HEAD
 REST API บน SQLite (`backend/data/petcare-transport.sqlite`) คู่กับ `frontend/src/features/pet-transport/`
 
 ## เริ่มต้น
@@ -18,7 +17,6 @@ npm run dev
 - `GET /api/pet-transport/state` — snapshot ทั้งระบบ
 - `POST /api/pet-transport/bookings` — สร้างการจอง
 - workflow อื่น: confirm-price, assign-driver, payment, trip status, cancel, hotels, zones
-=======
 ใช้ built-in `node:sqlite` (Node 22+) — ไม่ต้องติดตั้ง DB server
 
 ## รัน
@@ -51,4 +49,3 @@ Health: `GET http://localhost:3001/health`
 | GET | `/drivers/:id/notifications` | แจ้งเตือนคนขับ |
 
 Response รูปแบบ: `{ ok: true, data }` หรือ `{ ok: false, error }`
->>>>>>> origin/Admin-transport

@@ -1,42 +1,9 @@
+import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { Router } from 'express';
-<<<<<<< HEAD
 import { bearerToken } from './middleware.js';
 import { createSession, destroySession, sessionStaffId } from './sessions.js';
 import { checkStaffLogin, findStaffById, toPublicStaff } from './staffAccounts.js';
-
-/**
- * Staff login API (veterinarians now; other staff roles can use it later).
- * Customers still log in on the frontend only — this module does not touch their accounts.
- */
-const router = Router();
-
-// POST /staff/login  { email, password } → { token, staff }
-router.post('/staff/login', (req, res) => {
-  const { email, password } = req.body ?? {};
-  const account = checkStaffLogin(email, password);
-  // The same message for a wrong email and a wrong password.
-  if (!account) return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
-  res.json({ token: createSession(account.id), staff: toPublicStaff(account) });
-});
-
-// GET /staff/me — who is logged in (the frontend uses it to check a saved session)
-router.get('/staff/me', (req, res) => {
-  const token = bearerToken(req);
-  const staff = token ? findStaffById(sessionStaffId(token)) : null;
-  if (!staff) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ' });
-  res.json(toPublicStaff(staff));
-});
-
-// POST /staff/logout
-router.post('/staff/logout', (req, res) => {
-  const token = bearerToken(req);
-  if (token) destroySession(token);
-  res.json({ ok: true });
-});
-
-=======
-import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
-import { promisify } from 'node:util';
 import {
   createCustomer,
   createCustomerSession,
@@ -77,19 +44,39 @@ function createLoginResponse(user, remember) {
   return { user: publicCustomer(user), token, expiresAt: new Date(expiresAt).toISOString() };
 }
 
+router.post('/staff/login', (req, res) => {
+  const { email, password } = req.body ?? {};
+  const account = checkStaffLogin(email, password);
+  if (!account) return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+  res.json({ token: createSession(account.id), staff: toPublicStaff(account) });
+});
+
+router.get('/staff/me', (req, res) => {
+  const token = bearerToken(req);
+  const staff = token ? findStaffById(sessionStaffId(token)) : null;
+  if (!staff) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ' });
+  res.json(toPublicStaff(staff));
+});
+
+router.post('/staff/logout', (req, res) => {
+  const token = bearerToken(req);
+  if (token) destroySession(token);
+  res.json({ ok: true });
+});
+
 router.post('/register', async (req, res) => {
   const { firstName, lastName, email, phone, password, remember = true } = req.body ?? {};
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
   if (
-    !validName(firstName) ||
-    !validName(lastName) ||
-    !validEmail(normalizedEmail) ||
-    !validPhone(phone) ||
-    typeof password !== 'string' ||
-    password.length < 8 ||
-    password.length > 128 ||
-    typeof remember !== 'boolean'
+    !validName(firstName)
+    || !validName(lastName)
+    || !validEmail(normalizedEmail)
+    || !validPhone(phone)
+    || typeof password !== 'string'
+    || password.length < 8
+    || password.length > 128
+    || typeof remember !== 'boolean'
   ) {
     return res.status(400).json({ error: 'กรุณาตรวจสอบข้อมูลสมัครสมาชิก' });
   }
@@ -115,11 +102,7 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   const { email, password, remember = true } = req.body ?? {};
-  if (
-    typeof email !== 'string' ||
-    typeof password !== 'string' ||
-    typeof remember !== 'boolean'
-  ) {
+  if (typeof email !== 'string' || typeof password !== 'string' || typeof remember !== 'boolean') {
     return res.status(400).json({ error: 'กรุณากรอกอีเมลและรหัสผ่าน' });
   }
 
@@ -127,7 +110,6 @@ router.post('/login', async (req, res) => {
   if (!(await verifyPassword(password, user))) {
     return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
   }
-
   return res.json(createLoginResponse(user, remember));
 });
 
@@ -190,5 +172,4 @@ router.patch('/password', requireCustomer, async (req, res) => {
   return res.json({ ok: true });
 });
 
->>>>>>> origin/Adoption
 export default router;

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { fileToResizedDataUrl } from '../../shared/utils/storage.js';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { PAY_ACCOUNT, promptPayPayload } from './promptpay.js';
-import { PAY_KIND_LABEL, PAY_STATUS, getPayment, submitSlip, usePayments } from './store.js';
+import { PAY_KIND, PAY_KIND_LABEL, PAY_STATUS, getPayment, submitSlip, usePayments } from './store.js';
 import './payment.css';
 
 function baht(value) {
@@ -22,7 +22,7 @@ export default function PaymentPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!payment) return undefined;
+    if (!payment || payment.kind === PAY_KIND.transport) return undefined;
     let gone = false;
     QRCode.toDataURL(promptPayPayload(PAY_ACCOUNT.promptpay, payment.deposit), {
       margin: 1,
@@ -37,6 +37,14 @@ export default function PaymentPage() {
       gone = true;
     };
   }, [payment]);
+
+  if (
+    payment?.ownerId === currentUser?.id
+    && payment.kind === PAY_KIND.transport
+    && payment.refId
+  ) {
+    return <Navigate to={`/pet-owner/transport/${payment.refId}`} replace />;
+  }
 
   if (!payment || payment.ownerId !== currentUser?.id) {
     return (

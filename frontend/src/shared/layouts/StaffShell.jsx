@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext.jsx';
@@ -70,28 +69,6 @@ export default function StaffShell({ variant }) {
 
   const links = isFinance ? financeLinks : adminLinks;
 
-=======
-import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../features/auth/AuthContext.jsx';
-import { ROLE_LABELS, ROLES, homePathForRole } from '../../features/auth/roles.js';
-import '../../features/pet-transport/transport.css';
-
-/**
- * Admin shell for Pet Transport booking ops.
- */
-export default function StaffShell() {
-  const { currentUser, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const links = [
-    { to: '/admin/transport', label: 'Transport Dashboard' },
-    { to: '/admin/transport/bookings', label: 'Bookings' },
-    { to: '/admin/transport/drivers', label: 'จัดการคนขับ' },
-    { to: '/admin/transport/payments', label: 'Payment' },
-    { to: '/admin/transport/pricing', label: 'Pricing' },
-  ];
-
->>>>>>> origin/Admin-transport
   return (
     <div className="app-shell">
       <header style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
@@ -124,11 +101,7 @@ export default function StaffShell() {
             >
               ออกจากระบบ
             </button>
-<<<<<<< HEAD
             <Link className="small" to={homePathForRole(currentUser?.role)}>
-=======
-            <Link className="small" to={homePathForRole(currentUser?.role || ROLES.admin)}>
->>>>>>> origin/Admin-transport
               หน้าหลัก
             </Link>
           </div>
@@ -140,7 +113,6 @@ export default function StaffShell() {
     </div>
   );
 }
-<<<<<<< HEAD
 
 function driverPageTitle(path) {
   if (path.includes('/history')) return 'ส่งแล้ว';
@@ -250,5 +222,3 @@ function DriverShell({ currentUser, path, logout, navigate }) {
     </div>
   );
 }
-=======
->>>>>>> origin/Admin-transport

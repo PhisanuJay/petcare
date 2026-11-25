@@ -7,7 +7,6 @@ export default function HotelsPage() {
   const [address, setAddress] = useState('');
   const [err, setErr] = useState('');
 
-<<<<<<< HEAD
   async function submit(e) {
     e.preventDefault();
     setErr('');
@@ -19,16 +18,6 @@ export default function HotelsPage() {
     } catch (error) {
       setErr(error.message);
     }
-=======
-  function submit(e) {
-    e.preventDefault();
-    setErr('');
-    if (!name.trim() || !address.trim()) return setErr('กรอกชื่อและที่อยู่');
-    addHotel({ name, address });
-    setName('');
-    setAddress('');
->>>>>>> origin/Admin-transport
-    return undefined;
   }
 
   return (

@@ -51,7 +51,11 @@
   z-index: 1030;
   padding: 0 12px;
 }
+.nav-shell > .container-fluid {
+  max-width: 1600px;
+}
 .pc-navbar {
+  width: 100%;
   background: #fff;
   border-radius: 999px;
   box-shadow: 0 10px 30px rgba(var(--shadow), 0.12);
@@ -112,6 +116,25 @@
   }
   .member-nav .nav-link i {
     font-size: 1.15rem;
+  }
+}
+@media (min-width: 1400px) {
+  .pc-navbar .navbar-collapse {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .pc-navbar .navbar-nav {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-width: 0;
+    margin: 0 0.25rem !important;
+  }
+  .pc-navbar .member-nav .nav-link {
+    font-size: 0.72rem;
+    padding: 0.3rem 0.32rem !important;
+  }
+  .pc-navbar .member-nav .nav-link i {
+    font-size: 1.08rem;
   }
 }
 @media (min-width: 1200px) and (max-width: 1399px) {

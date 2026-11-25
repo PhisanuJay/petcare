@@ -1593,13 +1593,10 @@ export function UsersPanel({ mode, session }) {
           <div className="modal account-modal" onClick={(event) => event.stopPropagation()}>
             <div className="account-modal-head">
               <div>
-<<<<<<< HEAD
                 <h2>เพิ่มลูกค้า</h2>
                 <p className="muted tiny">ใช้อีเมลเดียวกับที่ลูกค้าจองใน PetCare แล้วค่อยให้สิทธิ์กล้องหลังรับฝาก</p>
-=======
                 <h2>{editing ? `แก้ไข${composerKind.label}` : composerKind.add}</h2>
                 <p className="muted tiny">{editing ? form.email : composerKind.hint}</p>
->>>>>>> origin/Super-Admin
               </div>
               <button className="button ghost" type="button" onClick={closeComposer}>ปิด</button>
             </div>

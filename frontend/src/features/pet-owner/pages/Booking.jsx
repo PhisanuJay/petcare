@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-export { default } from '../../payments/ClinicBookPage.jsx';
-=======
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { usePets } from '../usePets.js';
@@ -394,4 +391,3 @@ export default function BookingPage() {
     </div>
   );
 }
->>>>>>> origin/Pet-Owner-Vet

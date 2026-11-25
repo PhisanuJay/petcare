@@ -1,30 +1,13 @@
-<<<<<<< HEAD
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
-<<<<<<< HEAD
-<<<<<<< HEAD
-import { hashPassword, needsPasswordRehash, verifyPassword } from './password.js';
-import { ROLES, homePathForRole, normalizeRole } from './roles.js';
-=======
-import { API_BASE } from '../pet-owner/api.js';
-import { hashPassword, verifyPassword } from './password.js';
-import { STAFF_SESSION_EXPIRED, clearStaffSession, readStaffSession, saveStaffSession } from './staffSession.js';
->>>>>>> origin/Pet-Owner-Vet
-=======
-import { hashPassword, needsPasswordRehash, verifyPassword } from './password.js';
-import { ROLES, homePathForRole, normalizeRole } from './roles.js';
->>>>>>> origin/Admin-transport
-=======
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { AUTH_API_URL } from '../../shared/api.js';
-import { STORAGE_KEYS, readJSON, writeJSON } from '../../shared/utils/storage.js';
->>>>>>> origin/Adoption
+import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
+import { hashPassword, needsPasswordRehash, verifyPassword } from './password.js';
+import { ROLES, homePathForRole, normalizeRole } from './roles.js';
+import { API_BASE } from '../pet-owner/api.js';
+import { STAFF_SESSION_EXPIRED, clearStaffSession, readStaffSession, saveStaffSession } from './staffSession.js';
 
 const AuthContext = createContext(null);
-
 const WELCOME_POINTS = 50;
-
-/** Keep in sync with pet-transport DEMO_DRIVER_ID (avoid circular import). */
 const DEMO_DRIVER_ID = 'driver-seed';
 const DEMO_OWNER_ID = 'owner-seed';
 
@@ -36,17 +19,6 @@ const SEED_ADMIN = {
   phone: '0200000000',
 };
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-const SEED_ACCOUNTANT = {
-  email: 'accountant@petcare.local',
-  password: 'Account1234',
-  firstName: 'ฝ่าย',
-  lastName: 'บัญชี',
-  phone: '0200000001',
-=======
-=======
->>>>>>> origin/Admin-transport
 const SEED_OWNER = {
   id: DEMO_OWNER_ID,
   email: 'owner@petcare.local',
@@ -54,10 +26,6 @@ const SEED_OWNER = {
   firstName: 'มานี',
   lastName: 'รักสัตว์',
   phone: '0810001111',
-<<<<<<< HEAD
->>>>>>> origin/Pet-Transport
-=======
->>>>>>> origin/Admin-transport
 };
 
 const SEED_DRIVER = {
@@ -73,7 +41,14 @@ const SEED_DRIVER = {
   licenseExpiry: '2028-12-31',
 };
 
-<<<<<<< HEAD
+const SEED_ACCOUNTANT = {
+  email: 'accountant@petcare.local',
+  password: 'Account1234',
+  firstName: 'ฝ่าย',
+  lastName: 'บัญชี',
+  phone: '0200000001',
+};
+
 const SEED_FINANCE = {
   id: 'finance-seed',
   email: 'finance@petcare.local',
@@ -83,10 +58,45 @@ const SEED_FINANCE = {
   phone: '0211112222',
 };
 
-=======
->>>>>>> origin/Admin-transport
+const usersListeners = new Set();
+
+function notifyUsers() {
+  usersListeners.forEach((listener) => listener());
+}
+
+export function subscribeUsers(listener) {
+  usersListeners.add(listener);
+  const onStorage = (event) => {
+    if (event.key === STORAGE_KEYS.users) listener();
+  };
+  window.addEventListener('storage', onStorage);
+  return () => {
+    usersListeners.delete(listener);
+    window.removeEventListener('storage', onStorage);
+  };
+}
+
+function loadUsersRaw() {
+  return readJSON(STORAGE_KEYS.users, []);
+}
+
+function loadUsers() {
+  return loadUsersRaw().map((user) => ({ ...user, role: normalizeRole(user.role) }));
+}
+
+function saveUsers(users) {
+  writeJSON(STORAGE_KEYS.users, users);
+  notifyUsers();
+}
+
+function toPublicUser(user) {
+  if (!user) return null;
+  const { passwordHash: _hash, salt: _salt, ...rest } = user;
+  return { ...rest, role: normalizeRole(rest.role) };
+}
+
 async function upsertSeedUser(users, seed, role) {
-  const existing = users.find((u) => u.email === seed.email || (seed.id && u.id === seed.id));
+  const existing = users.find((user) => user.email === seed.email || (seed.id && user.id === seed.id));
   const salt = newId();
   const passwordHash = await hashPassword(seed.password, salt);
   const base = {
@@ -123,134 +133,28 @@ async function upsertSeedUser(users, seed, role) {
     || existing.active === false
     || !passwordOk
     || needsPasswordRehash(existing.passwordHash);
-
   if (!needsSync) return false;
 
-  const idx = users.findIndex((u) => u.id === existing.id || u.email === seed.email);
-  if (idx >= 0) users[idx] = { ...existing, ...base };
+  const index = users.findIndex((user) => user.id === existing.id || user.email === seed.email);
+  if (index >= 0) users[index] = { ...existing, ...base };
   return true;
 }
 
-const usersListeners = new Set();
-
-function notifyUsers() {
-  usersListeners.forEach((l) => l());
-}
-
-export function subscribeUsers(listener) {
-  usersListeners.add(listener);
-  const onStorage = (e) => {
-    if (e.key === STORAGE_KEYS.users) listener();
-  };
-  window.addEventListener('storage', onStorage);
-  return () => {
-    usersListeners.delete(listener);
-    window.removeEventListener('storage', onStorage);
-  };
-}
-
-function loadUsersRaw() {
-  return readJSON(STORAGE_KEYS.users, []);
-}
-
-function saveUsers(users) {
-  writeJSON(STORAGE_KEYS.users, users);
-  notifyUsers();
-}
-
-/** Migrate legacy users + ensure seed admin/driver exist. */
 async function ensureUsersBootstrapped() {
   let users = loadUsersRaw();
   let changed = false;
 
-  users = users.map((u) => {
-    if (u.role) return u;
+  users = users.map((user) => {
+    if (user.role) return user;
     changed = true;
-    return { ...u, role: ROLES.owner };
+    return { ...user, role: ROLES.owner };
   });
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-  const adminEmail = SEED_ADMIN.email;
-  if (!users.some((u) => u.email === adminEmail)) {
-    const salt = newId();
-    users.push({
-      id: newId(),
-      firstName: SEED_ADMIN.firstName,
-      lastName: SEED_ADMIN.lastName,
-      email: adminEmail,
-      phone: SEED_ADMIN.phone,
-      address: '',
-      emergencyName: '',
-      emergencyPhone: '',
-      avatar: '',
-      points: 0,
-      role: ROLES.admin,
-      vehicle: '',
-      active: true,
-      createdAt: new Date().toISOString(),
-      salt,
-      passwordHash: await hashPassword(SEED_ADMIN.password, salt),
-    });
-    changed = true;
-  }
-
-  if (!users.some((u) => u.email === SEED_ACCOUNTANT.email)) {
-    const salt = newId();
-    users.push({
-      id: newId(),
-      firstName: SEED_ACCOUNTANT.firstName,
-      lastName: SEED_ACCOUNTANT.lastName,
-      email: SEED_ACCOUNTANT.email,
-      phone: SEED_ACCOUNTANT.phone,
-      address: '',
-      emergencyName: '',
-      emergencyPhone: '',
-      avatar: '',
-      points: 0,
-      role: ROLES.accountant,
-      vehicle: '',
-      active: true,
-      createdAt: new Date().toISOString(),
-      salt,
-      passwordHash: await hashPassword(SEED_ACCOUNTANT.password, salt),
-    });
-    changed = true;
-  }
-
-  if (!users.some((u) => u.email === SEED_DRIVER.email || u.id === SEED_DRIVER.id)) {
-    const salt = newId();
-    users.push({
-      id: SEED_DRIVER.id,
-      firstName: SEED_DRIVER.firstName,
-      lastName: SEED_DRIVER.lastName,
-      email: SEED_DRIVER.email,
-      phone: SEED_DRIVER.phone,
-      address: '',
-      emergencyName: '',
-      emergencyPhone: '',
-      avatar: '',
-      points: 0,
-      role: ROLES.driver,
-      vehicle: 'รถตู้ สก 1234',
-      active: true,
-      createdAt: new Date().toISOString(),
-      salt,
-      passwordHash: await hashPassword(SEED_DRIVER.password, salt),
-    });
-    changed = true;
-  }
-=======
   if (await upsertSeedUser(users, SEED_ADMIN, ROLES.admin)) changed = true;
   if (await upsertSeedUser(users, SEED_OWNER, ROLES.owner)) changed = true;
   if (await upsertSeedUser(users, SEED_DRIVER, ROLES.driver)) changed = true;
+  if (await upsertSeedUser(users, SEED_ACCOUNTANT, ROLES.accountant)) changed = true;
   if (await upsertSeedUser(users, SEED_FINANCE, ROLES.finance)) changed = true;
->>>>>>> origin/Pet-Transport
-=======
-  if (await upsertSeedUser(users, SEED_ADMIN, ROLES.admin)) changed = true;
-  if (await upsertSeedUser(users, SEED_OWNER, ROLES.owner)) changed = true;
-  if (await upsertSeedUser(users, SEED_DRIVER, ROLES.driver)) changed = true;
->>>>>>> origin/Admin-transport
 
   if (changed) saveUsers(users);
   return users;
@@ -259,33 +163,32 @@ async function ensureUsersBootstrapped() {
 let bootPromise = null;
 function bootUsers() {
   if (!bootPromise) {
-    bootPromise = ensureUsersBootstrapped().catch((err) => {
+    bootPromise = ensureUsersBootstrapped().catch((error) => {
       bootPromise = null;
-      throw err;
+      throw error;
     });
   }
   return bootPromise;
 }
 
-function loadUsers() {
-  return loadUsersRaw().map((u) => ({ ...u, role: normalizeRole(u.role) }));
-}
-
 function loadStoredSession() {
   const rememberedSession = readJSON(STORAGE_KEYS.session, null);
-  if (rememberedSession?.userId && rememberedSession?.authToken) return rememberedSession;
+  if (rememberedSession?.userId) return rememberedSession;
   const temporarySession = readJSON(STORAGE_KEYS.session, null, sessionStorage);
-  return temporarySession?.userId && temporarySession?.authToken ? temporarySession : null;
+  return temporarySession?.userId ? temporarySession : null;
 }
 
-function toPublicUser(user) {
-  if (!user) return null;
-  const { passwordHash: _hash, salt: _salt, ...rest } = user;
-  return { ...rest, role: normalizeRole(rest.role) };
+function loadAuthState() {
+  const session = loadStoredSession();
+  const user = session && loadUsers().find((item) => item.id === session.userId);
+  return {
+    currentUser: toPublicUser(user),
+    authToken: user ? session.authToken || '' : '',
+  };
 }
 
 function localUserFromServer(serverUser, existingUser) {
-  const user = existingUser
+  const localFields = existingUser
     ? { ...existingUser }
     : {
       address: '',
@@ -294,32 +197,29 @@ function localUserFromServer(serverUser, existingUser) {
       avatar: '',
       points: WELCOME_POINTS,
     };
-  delete user.passwordHash;
-  delete user.salt;
+  delete localFields.passwordHash;
+  delete localFields.salt;
   return {
-    ...user,
+    ...localFields,
     ...serverUser,
     id: existingUser?.id ?? serverUser.id,
-  };
-}
-
-function loadAuthState() {
-  const session = loadStoredSession();
-  const user = session && loadUsers().find((item) => item.id === session.userId);
-  return {
-    currentUser: toPublicUser(user),
-    authToken: user ? session.authToken : '',
+    role: ROLES.owner,
   };
 }
 
 async function requestAuth(path, { token, ...options } = {}) {
-  const response = await fetch(`${AUTH_API_URL}${path}`, {
-    ...options,
-    headers: {
-      ...options.headers,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  let response;
+  try {
+    response = await fetch(`${AUTH_API_URL}${path}`, {
+      ...options,
+      headers: {
+        ...options.headers,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  } catch {
+    throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบว่า backend ทำงานอยู่');
+  }
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'ดำเนินการบัญชีไม่สำเร็จ');
   return result;
@@ -332,30 +232,32 @@ export function memberTier(points = 0) {
 }
 
 export function AuthProvider({ children }) {
-<<<<<<< HEAD
-  const [currentUser, setCurrentUser] = useState(() => toPublicUser(findCurrentUser()));
+  const [authState, setAuthState] = useState(loadAuthState);
   const [usersVersion, setUsersVersion] = useState(0);
+  const { currentUser, authToken } = authState;
+  const [currentStaff, setCurrentStaff] = useState(() => readStaffSession()?.staff ?? null);
 
-  // Bootstrap seed admin once (async hash).
   useEffect(() => {
     let cancelled = false;
     bootUsers().then(() => {
       if (cancelled) return;
-      setCurrentUser(toPublicUser(findCurrentUser()));
-      setUsersVersion((v) => v + 1);
+      setAuthState(loadAuthState());
+      setUsersVersion((version) => version + 1);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const bumpUsers = useCallback(() => setUsersVersion((v) => v + 1), []);
-=======
-  const [authState, setAuthState] = useState(loadAuthState);
-  const { currentUser, authToken } = authState;
->>>>>>> origin/Adoption
+  useEffect(() => {
+    const onExpired = () => setCurrentStaff(null);
+    window.addEventListener(STAFF_SESSION_EXPIRED, onExpired);
+    return () => window.removeEventListener(STAFF_SESSION_EXPIRED, onExpired);
+  }, []);
 
-  const startSession = useCallback((user, remember, token) => {
+  const bumpUsers = useCallback(() => setUsersVersion((version) => version + 1), []);
+
+  const startSession = useCallback((user, remember, token = '') => {
     localStorage.removeItem(STORAGE_KEYS.session);
     sessionStorage.removeItem(STORAGE_KEYS.session);
     writeJSON(
@@ -366,95 +268,58 @@ export function AuthProvider({ children }) {
     setAuthState({ currentUser: toPublicUser(user), authToken: token });
   }, []);
 
-  const register = useCallback(
-    async ({ firstName, lastName, email, phone, password }) => {
-<<<<<<< HEAD
-      await bootUsers();
-      const users = loadUsers();
-      const normalizedEmail = email.trim().toLowerCase();
-      if (users.some((u) => u.email === normalizedEmail)) {
-        throw new Error('อีเมลนี้ถูกใช้สมัครแล้ว ลองเข้าสู่ระบบแทน');
-      }
-      const salt = newId();
-      const user = {
-        id: newId(),
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: normalizedEmail,
-        phone: phone.trim(),
-        address: '',
-        emergencyName: '',
-        emergencyPhone: '',
-        avatar: '',
-        points: WELCOME_POINTS,
-        role: ROLES.owner,
-        vehicle: '',
-        active: true,
-        createdAt: new Date().toISOString(),
-        salt,
-        passwordHash: await hashPassword(password, salt),
-      };
-      saveUsers([...users, user]);
-      bumpUsers();
-      startSession(user, true);
-=======
-      const result = await requestAuth('/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, email, phone, password, remember: true }),
-      });
-      const users = loadUsers();
-      const normalizedEmail = result.user.email;
-      const existingUser = users.find((user) => user.email === normalizedEmail);
-      const user = localUserFromServer(result.user, existingUser);
-      saveUsers([...users.filter((item) => item.id !== user.id), user]);
-      startSession(user, true, result.token);
->>>>>>> origin/Adoption
-      return toPublicUser(user);
-    },
-    [startSession, bumpUsers],
-  );
+  const register = useCallback(async ({ firstName, lastName, email, phone, password }) => {
+    await bootUsers();
+    const result = await requestAuth('/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName, lastName, email, phone, password, remember: true }),
+    });
+    const users = loadUsers();
+    const existing = users.find((user) => user.email === result.user.email);
+    const user = localUserFromServer(result.user, existing);
+    saveUsers([...users.filter((item) => item.id !== user.id), user]);
+    bumpUsers();
+    startSession(user, true, result.token);
+    return toPublicUser(user);
+  }, [bumpUsers, startSession]);
 
-  const login = useCallback(
-    async (email, password, remember = true) => {
-<<<<<<< HEAD
-      await bootUsers();
-      let users = loadUsers();
-      const user = users.find((u) => u.email === email.trim().toLowerCase());
-      if (!user || !(await verifyPassword(password, user.salt, user.passwordHash))) {
-        throw new Error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+  const login = useCallback(async (email, password, remember = true) => {
+    await bootUsers();
+    const normalizedEmail = email.trim().toLowerCase();
+    const users = loadUsers();
+    const localUser = users.find((user) => user.email === normalizedEmail);
+
+    if (localUser?.salt && localUser?.passwordHash) {
+      const passwordMatches = await verifyPassword(password, localUser.salt, localUser.passwordHash);
+      if (passwordMatches) {
+        if (localUser.active === false) throw new Error('บัญชีนี้ถูกระงับการใช้งาน ติดต่อแอดมิน');
+        let user = localUser;
+        if (needsPasswordRehash(localUser.passwordHash)) {
+          const salt = newId();
+          const passwordHash = await hashPassword(password, salt);
+          user = { ...localUser, salt, passwordHash };
+          saveUsers(users.map((item) => (item.id === user.id ? user : item)));
+          bumpUsers();
+        }
+        startSession(user, remember);
+        return toPublicUser(user);
       }
-      if (user.active === false) {
-        throw new Error('บัญชีนี้ถูกระงับการใช้งาน ติดต่อแอดมิน');
-      }
-      // Migrate legacy sha256 hashes → fnv so LAN http origins keep working
-      if (needsPasswordRehash(user.passwordHash)) {
-        const salt = newId();
-        const passwordHash = await hashPassword(password, salt);
-        users = users.map((u) => (u.id === user.id ? { ...u, salt, passwordHash } : u));
-        saveUsers(users);
-        bumpUsers();
-        const migrated = users.find((u) => u.id === user.id);
-        startSession(migrated, remember);
-        return toPublicUser(migrated);
-      }
-      startSession(user, remember);
-=======
-      const result = await requestAuth('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, remember }),
-      });
-      const users = loadUsers();
-      const existingUser = users.find((user) => user.email === result.user.email);
-      const user = localUserFromServer(result.user, existingUser);
-      saveUsers([...users.filter((item) => item.id !== user.id), user]);
-      startSession(user, remember, result.token);
->>>>>>> origin/Adoption
-      return toPublicUser(user);
-    },
-    [startSession, bumpUsers],
-  );
+      throw new Error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    }
+
+    const result = await requestAuth('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail, password, remember }),
+    });
+    const existing = users.find((user) => user.email === result.user.email);
+    const user = localUserFromServer(result.user, existing);
+    saveUsers([...users.filter((item) => item.id !== user.id), user]);
+    bumpUsers();
+    startSession(user, remember, result.token);
+    return toPublicUser(user);
+  }, [bumpUsers, startSession]);
 
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEYS.session);
@@ -462,13 +327,10 @@ export function AuthProvider({ children }) {
     setAuthState({ currentUser: null, authToken: '' });
   }, []);
 
-  /* Staff (veterinarian) login: accounts live in the backend, see features/auth/staffSession.js. */
-  const [currentStaff, setCurrentStaff] = useState(() => readStaffSession()?.staff ?? null);
-
   const staffLogin = useCallback(async (email, password, remember = true) => {
-    let res;
+    let response;
     try {
-      res = await fetch(`${API_BASE}/api/auth/staff/login`, {
+      response = await fetch(`${API_BASE}/api/auth/staff/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -476,270 +338,199 @@ export function AuthProvider({ children }) {
     } catch {
       throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบว่า backend ทำงานอยู่');
     }
-    const body = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(body?.error || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
     saveStaffSession({ token: body.token, staff: body.staff }, remember);
     setCurrentStaff(body.staff);
     return body.staff;
   }, []);
 
   const staffLogout = useCallback(() => {
-    const token = readStaffSession()?.token;
     clearStaffSession();
     setCurrentStaff(null);
-    if (token) {
-      fetch(`${API_BASE}/api/auth/staff/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+  }, []);
+
+  const updateProfile = useCallback(async (patch) => {
+    if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบ');
+    const users = loadUsers();
+    const email = patch.email?.trim().toLowerCase();
+    if (email && users.some((user) => user.email === email && user.id !== currentUser.id)) {
+      throw new Error('อีเมลนี้มีผู้ใช้อื่นใช้แล้ว');
     }
-  }, []);
+    const { role: _role, ...safePatch } = patch;
+    const accountPatch = Object.fromEntries(
+      ['firstName', 'lastName', 'email', 'phone']
+        .filter((key) => safePatch[key] !== undefined)
+        .map((key) => [key, key === 'email' ? email : safePatch[key]]),
+    );
+    let serverUser = {};
+    if (authToken && Object.keys(accountPatch).length) {
+      const result = await requestAuth('/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        token: authToken,
+        body: JSON.stringify(accountPatch),
+      });
+      serverUser = result.user;
+    }
+    const next = users.map((user) =>
+      user.id === currentUser.id
+        ? { ...user, ...safePatch, ...serverUser, ...(email ? { email } : {}) }
+        : user,
+    );
+    saveUsers(next);
+    bumpUsers();
+    setAuthState((state) => ({
+      ...state,
+      currentUser: toPublicUser(next.find((user) => user.id === currentUser.id)),
+    }));
+  }, [authToken, bumpUsers, currentUser]);
 
-  // vetApi.js clears the saved session when the backend answers 401 (e.g. it was restarted).
-  useEffect(() => {
-    const onExpired = () => setCurrentStaff(null);
-    window.addEventListener(STAFF_SESSION_EXPIRED, onExpired);
-    return () => window.removeEventListener(STAFF_SESSION_EXPIRED, onExpired);
-  }, []);
-
-  const updateProfile = useCallback(
-    async (patch) => {
-      if (!currentUser || !authToken) throw new Error('กรุณาเข้าสู่ระบบใหม่');
-      const users = loadUsers();
-      const email = patch.email?.trim().toLowerCase();
-      if (email && users.some((user) => user.email === email && user.id !== currentUser.id)) {
-        throw new Error('อีเมลนี้มีผู้ใช้อื่นใช้แล้ว');
-      }
-<<<<<<< HEAD
-      // Owners cannot self-elevate role
-      const { role: _role, ...safePatch } = patch;
-      const next = users.map((u) =>
-        u.id === currentUser.id ? { ...u, ...safePatch, ...(email ? { email } : {}) } : u,
-      );
-      saveUsers(next);
-      bumpUsers();
-      setCurrentUser(toPublicUser(next.find((u) => u.id === currentUser.id)));
-    },
-    [currentUser, bumpUsers],
-=======
-
-      const accountPatch = Object.fromEntries(
-        ['firstName', 'lastName', 'email', 'phone']
-          .filter((key) => patch[key] !== undefined)
-          .map((key) => [key, patch[key]]),
-      );
-      if (Object.keys(accountPatch).length) {
-        await requestAuth('/profile', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          token: authToken,
-          body: JSON.stringify(accountPatch),
-        });
-      }
-
-      const next = users.map((user) =>
-        user.id === currentUser.id ? { ...user, ...patch, ...(email ? { email } : {}) } : user,
-      );
-      saveUsers(next);
-      setAuthState((state) => ({
-        ...state,
-        currentUser: toPublicUser(next.find((user) => user.id === currentUser.id)),
-      }));
-    },
-    [authToken, currentUser],
->>>>>>> origin/Adoption
-  );
-
-  const changePassword = useCallback(
-    async (currentPassword, newPassword) => {
-      if (!currentUser || !authToken) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบ');
+    if (authToken) {
       await requestAuth('/password', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         token: authToken,
         body: JSON.stringify({ currentPassword, newPassword }),
       });
+      return;
+    }
 
-    },
-    [authToken, currentUser],
-  );
+    const users = loadUsers();
+    const user = users.find((item) => item.id === currentUser.id);
+    if (!user || !(await verifyPassword(currentPassword, user.salt, user.passwordHash))) {
+      throw new Error('รหัสผ่านปัจจุบันไม่ถูกต้อง');
+    }
+    const salt = newId();
+    const passwordHash = await hashPassword(newPassword, salt);
+    saveUsers(users.map((item) => (item.id === user.id ? { ...item, salt, passwordHash } : item)));
+    bumpUsers();
+  }, [authToken, bumpUsers, currentUser]);
 
-  /** Admin-only: create a driver account (cannot self-register). */
-  const createDriver = useCallback(
-    async ({ firstName, lastName, email, phone, password, vehicle }) => {
-      if (!currentUser || currentUser.role !== ROLES.admin) {
-        throw new Error('เฉพาะแอดมินเท่านั้นที่สร้างบัญชีคนขับได้');
-      }
-      await bootUsers();
-      const users = loadUsers();
-      const normalizedEmail = email.trim().toLowerCase();
-      if (users.some((u) => u.email === normalizedEmail)) {
-        throw new Error('อีเมลนี้มีในระบบแล้ว');
-      }
-      if (!password || password.length < 8) {
-        throw new Error('รหัสผ่านอย่างน้อย 8 ตัวอักษร');
-      }
-      const salt = newId();
-      const user = {
-        id: newId(),
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: normalizedEmail,
-        phone: (phone || '').trim(),
-        address: '',
-        emergencyName: '',
-        emergencyPhone: '',
-        avatar: '',
-        points: 0,
-        role: ROLES.driver,
-        vehicle: (vehicle || '').trim(),
-        plateNumber: '',
-        licenseNumber: '',
-        licenseExpiry: '',
-        active: true,
-        createdAt: new Date().toISOString(),
-        createdBy: currentUser.id,
-        salt,
-        passwordHash: await hashPassword(password, salt),
-      };
-      saveUsers([...users, user]);
-      bumpUsers();
-      return toPublicUser(user);
-    },
-    [currentUser, bumpUsers],
-  );
+  const createDriver = useCallback(async ({ firstName, lastName, email, phone, password, vehicle }) => {
+    if (!currentUser || currentUser.role !== ROLES.admin) {
+      throw new Error('เฉพาะแอดมินเท่านั้นที่สร้างบัญชีคนขับได้');
+    }
+    await bootUsers();
+    const users = loadUsers();
+    const normalizedEmail = email.trim().toLowerCase();
+    if (users.some((user) => user.email === normalizedEmail)) throw new Error('อีเมลนี้มีในระบบแล้ว');
+    if (!password || password.length < 8) throw new Error('รหัสผ่านอย่างน้อย 8 ตัวอักษร');
+    const salt = newId();
+    const user = {
+      id: newId(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: normalizedEmail,
+      phone: (phone || '').trim(),
+      address: '',
+      emergencyName: '',
+      emergencyPhone: '',
+      avatar: '',
+      points: 0,
+      role: ROLES.driver,
+      vehicle: (vehicle || '').trim(),
+      plateNumber: '',
+      licenseNumber: '',
+      licenseExpiry: '',
+      active: true,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUser.id,
+      salt,
+      passwordHash: await hashPassword(password, salt),
+    };
+    saveUsers([...users, user]);
+    bumpUsers();
+    return toPublicUser(user);
+  }, [bumpUsers, currentUser]);
 
-  const updateDriver = useCallback(
-    (driverId, patch) => {
-      if (!currentUser || currentUser.role !== ROLES.admin) {
-        throw new Error('เฉพาะแอดมินเท่านั้น');
+  const updateDriver = useCallback((driverId, patch) => {
+    if (!currentUser || currentUser.role !== ROLES.admin) throw new Error('เฉพาะแอดมินเท่านั้น');
+    const users = loadUsers();
+    const target = users.find((user) => user.id === driverId && user.role === ROLES.driver);
+    if (!target) throw new Error('ไม่พบบัญชีคนขับ');
+    const email = patch.email?.trim().toLowerCase();
+    if (email && users.some((user) => user.email === email && user.id !== driverId)) {
+      throw new Error('อีเมลนี้มีผู้ใช้อื่นใช้แล้ว');
+    }
+    const { role: _role, passwordHash: _hash, salt: _salt, ...safePatch } = patch;
+    const next = users.map((user) => user.id === driverId
+      ? {
+        ...user,
+        ...safePatch,
+        ...(email ? { email } : {}),
+        ...(patch.vehicle != null ? { vehicle: String(patch.vehicle).trim() } : {}),
       }
-      const users = loadUsers();
-      const target = users.find((u) => u.id === driverId && u.role === ROLES.driver);
-      if (!target) throw new Error('ไม่พบบัญชีคนขับ');
-      const email = patch.email?.trim().toLowerCase();
-      if (email && users.some((u) => u.email === email && u.id !== driverId)) {
-        throw new Error('อีเมลนี้มีผู้ใช้อื่นใช้แล้ว');
-      }
-      const { role: _r, passwordHash: _p, salt: _s, ...safe } = patch;
-      const next = users.map((u) =>
-        u.id === driverId
-          ? {
-              ...u,
-              ...safe,
-              ...(email ? { email } : {}),
-              ...(patch.vehicle != null ? { vehicle: String(patch.vehicle).trim() } : {}),
-            }
-          : u,
-      );
-      saveUsers(next);
-      bumpUsers();
-      return toPublicUser(next.find((u) => u.id === driverId));
-    },
-    [currentUser, bumpUsers],
-  );
+      : user);
+    saveUsers(next);
+    bumpUsers();
+    return toPublicUser(next.find((user) => user.id === driverId));
+  }, [bumpUsers, currentUser]);
 
-  const setDriverActive = useCallback(
-    (driverId, active) => {
-      if (!currentUser || currentUser.role !== ROLES.admin) {
-        throw new Error('เฉพาะแอดมินเท่านั้น');
-      }
-      const users = loadUsers();
-      if (!users.some((u) => u.id === driverId && u.role === ROLES.driver)) {
-        throw new Error('ไม่พบบัญชีคนขับ');
-      }
-      saveUsers(users.map((u) => (u.id === driverId ? { ...u, active: !!active } : u)));
-      bumpUsers();
-    },
-    [currentUser, bumpUsers],
-  );
+  const setDriverActive = useCallback((driverId, active) => {
+    if (!currentUser || currentUser.role !== ROLES.admin) throw new Error('เฉพาะแอดมินเท่านั้น');
+    const users = loadUsers();
+    if (!users.some((user) => user.id === driverId && user.role === ROLES.driver)) {
+      throw new Error('ไม่พบบัญชีคนขับ');
+    }
+    saveUsers(users.map((user) => (user.id === driverId ? { ...user, active: Boolean(active) } : user)));
+    bumpUsers();
+  }, [bumpUsers, currentUser]);
 
   const drivers = useMemo(() => {
     void usersVersion;
     return loadUsers()
-      .filter((u) => u.role === ROLES.driver)
+      .filter((user) => user.role === ROLES.driver)
       .map(toPublicUser)
-      .sort((a, b) => a.firstName.localeCompare(b.firstName, 'th'));
+      .sort((left, right) => left.firstName.localeCompare(right.firstName, 'th'));
   }, [usersVersion]);
 
-  const value = useMemo(
-<<<<<<< HEAD
-    () => ({
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> origin/Admin-transport
-      currentUser,
-      register,
-      login,
-      logout,
-      updateProfile,
-      changePassword,
-      createDriver,
-      updateDriver,
-      setDriverActive,
-      drivers,
-      homePath: homePathForRole(currentUser?.role),
-    }),
-    [
-      currentUser,
-      register,
-      login,
-      logout,
-      updateProfile,
-      changePassword,
-      createDriver,
-      updateDriver,
-      setDriverActive,
-      drivers,
-    ],
-<<<<<<< HEAD
-=======
-      currentUser, register, login, logout, updateProfile, changePassword,
-      currentStaff, staffLogin, staffLogout,
-    }),
-    [currentUser, register, login, logout, updateProfile, changePassword, currentStaff, staffLogin, staffLogout],
->>>>>>> origin/Pet-Owner-Vet
-=======
->>>>>>> origin/Admin-transport
-=======
-    () => ({ currentUser, authToken, register, login, logout, updateProfile, changePassword }),
-    [currentUser, authToken, register, login, logout, updateProfile, changePassword],
->>>>>>> origin/Adoption
-  );
+  const value = useMemo(() => ({
+    currentUser,
+    authToken,
+    register,
+    login,
+    logout,
+    updateProfile,
+    changePassword,
+    currentStaff,
+    staffLogin,
+    staffLogout,
+    createDriver,
+    updateDriver,
+    setDriverActive,
+    drivers,
+    homePath: homePathForRole(currentUser?.role),
+  }), [
+    currentUser,
+    authToken,
+    register,
+    login,
+    logout,
+    updateProfile,
+    changePassword,
+    currentStaff,
+    staffLogin,
+    staffLogout,
+    createDriver,
+    updateDriver,
+    setDriverActive,
+    drivers,
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
-  return ctx;
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used inside <AuthProvider>');
+  return context;
 }
 
-/** Demo seed credentials (shown on login). */
-export const DEMO_OWNER_LOGIN = {
-  email: SEED_OWNER.email,
-  password: SEED_OWNER.password,
-};
-
-export const DEMO_ADMIN_LOGIN = {
-  email: SEED_ADMIN.email,
-  password: SEED_ADMIN.password,
-};
-
-export const DEMO_DRIVER_LOGIN = {
-  email: SEED_DRIVER.email,
-  password: SEED_DRIVER.password,
-};
-<<<<<<< HEAD
-
-<<<<<<< HEAD
-export const DEMO_ACCOUNTANT_LOGIN = {
-  email: SEED_ACCOUNTANT.email,
-  password: SEED_ACCOUNTANT.password,
-=======
-export const DEMO_FINANCE_LOGIN = {
-  email: SEED_FINANCE.email,
-  password: SEED_FINANCE.password,
->>>>>>> origin/Pet-Transport
-};
-=======
->>>>>>> origin/Admin-transport
+export const DEMO_OWNER_LOGIN = { email: SEED_OWNER.email, password: SEED_OWNER.password };
+export const DEMO_ADMIN_LOGIN = { email: SEED_ADMIN.email, password: SEED_ADMIN.password };
+export const DEMO_DRIVER_LOGIN = { email: SEED_DRIVER.email, password: SEED_DRIVER.password };
+export const DEMO_ACCOUNTANT_LOGIN = { email: SEED_ACCOUNTANT.email, password: SEED_ACCOUNTANT.password };
+export const DEMO_FINANCE_LOGIN = { email: SEED_FINANCE.email, password: SEED_FINANCE.password };

@@ -11,7 +11,6 @@ import adoptionRouter from '../modules/adoption/routes.js';
 import adminRouter from '../modules/admin/routes.js';
 import clinicAdminRouter from '../modules/clinic-admin/routes.js';
 import superAdminRouter from '../modules/super-admin/routes.js';
-import authRouter from '../modules/auth/routes.js';
 
 /**
  * Mount each role module under its own API prefix.

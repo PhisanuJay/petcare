@@ -1,4 +1,4 @@
-﻿.hotel-cctv {
+:root {
   --sidebar: #1b253b;
   --sidebar-hover: #283655;
   --sidebar-active: #3b5284;
@@ -17,22 +17,22 @@
   line-height: 1.5;
 }
 
-.hotel-cctv, .hotel-cctv * { box-sizing: border-box; }
-.hotel-cctv { margin: 0; min-height: 100vh; background: var(--bg); }
-.hotel-cctv button, .hotel-cctv input, .hotel-cctv select, .hotel-cctv textarea { font: inherit; color: inherit; }
-.hotel-cctv h1, .hotel-cctv h2, .hotel-cctv h3, .hotel-cctv p { margin: 0; }
-.hotel-cctv button { cursor: pointer; }
-.hotel-cctv svg { display: block; }
-.hotel-cctv .muted { color: var(--muted); }
-.hotel-cctv .muted.tiny, .hotel-cctv .tiny { font-size: 0.78rem; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: var(--bg); }
+button, input, select, textarea { font: inherit; color: inherit; }
+h1, h2, h3, p { margin: 0; }
+button { cursor: pointer; }
+svg { display: block; }
+.muted { color: var(--muted); }
+.muted.tiny, .tiny { font-size: 0.78rem; }
 
-.hotel-cctv .workspace {
+.workspace {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   height: 100vh;
   overflow: hidden;
 }
-.hotel-cctv .sidebar {
+.sidebar {
   position: fixed;
   top: 0;
   left: 0;
@@ -48,11 +48,11 @@
   color: white;
   overflow: hidden;
 }
-.hotel-cctv .sidebar-top { display: grid; gap: 12px; min-height: 0; }
-.hotel-cctv .brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px; }
-.hotel-cctv .brand strong { display: block; font-size: 1.05rem; }
-.hotel-cctv .brand small { color: #94a3b8; }
-.hotel-cctv .brand-mark {
+.sidebar-top { display: grid; gap: 12px; min-height: 0; }
+.brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px; }
+.brand strong { display: block; font-size: 1.05rem; }
+.brand small { color: #94a3b8; }
+.brand-mark {
   width: 44px;
   height: 44px;
   border-radius: 14px;
@@ -63,22 +63,22 @@
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(74, 143, 240, 0.18);
 }
-.hotel-cctv .brand-mark svg { width: 34px; height: 34px; display: block; }
-.hotel-cctv .brand-mark-art {
+.brand-mark svg { width: 34px; height: 34px; display: block; }
+.brand-mark-art {
   width: 100%;
   height: 100%;
   display: block;
   object-fit: cover;
   object-position: center 42%;
 }
-.hotel-cctv .sidebar nav {
+.sidebar nav {
   display: grid;
   gap: 4px;
   align-content: start;
   min-height: 0;
   overflow: auto;
 }
-.hotel-cctv .nav-item {
+.nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -94,15 +94,15 @@
   height: auto;
   min-height: 0;
 }
-.hotel-cctv .nav-item:hover { background: var(--sidebar-hover); color: white; }
-.hotel-cctv .nav-item.active {
+.nav-item:hover { background: var(--sidebar-hover); color: white; }
+.nav-item.active {
   background: linear-gradient(90deg, var(--sidebar-active), #2f436e);
   color: white;
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
 }
-.hotel-cctv .nav-item svg { width: 18px; height: 18px; flex: none; opacity: 0.9; }
-.hotel-cctv .sidebar-foot { display: grid; gap: 8px; flex: none; }
-.hotel-cctv .sidebar-mascot {
+.nav-item svg { width: 18px; height: 18px; flex: none; opacity: 0.9; }
+.sidebar-foot { display: grid; gap: 8px; flex: none; }
+.sidebar-mascot {
   position: relative;
   margin: 0 4px;
   height: 118px;
@@ -115,7 +115,7 @@
     0 10px 22px rgba(15, 23, 42, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
-.hotel-cctv .mascot-art {
+.mascot-art {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -126,18 +126,18 @@
   pointer-events: none;
   transform: scale(1.02);
 }
-.hotel-cctv .sidebar-user {
+.sidebar-user {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 8px;
   border-top: 1px solid rgba(148, 163, 184, 0.25);
 }
-.hotel-cctv .sidebar-user strong { display: block; font-size: 0.9rem; }
-.hotel-cctv .sidebar-user small { color: #94a3b8; }
-.hotel-cctv .sidebar-user .button { margin-left: auto; }
-.hotel-cctv .empty-panel { display: grid; gap: 12px; justify-items: start; padding: 28px; }
-.hotel-cctv .avatar {
+.sidebar-user strong { display: block; font-size: 0.9rem; }
+.sidebar-user small { color: #94a3b8; }
+.sidebar-user .button { margin-left: auto; }
+.empty-panel { display: grid; gap: 12px; justify-items: start; padding: 28px; }
+.avatar {
   width: 40px;
   height: 40px;
   border-radius: 999px;
@@ -149,7 +149,7 @@
   flex: none;
 }
 
-.hotel-cctv .workspace-main {
+.workspace-main {
   grid-column: 2;
   min-width: 0;
   min-height: 0;
@@ -158,7 +158,7 @@
   grid-template-rows: auto 1fr;
   overflow: auto;
 }
-.hotel-cctv .topbar {
+.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -170,37 +170,37 @@
   top: 0;
   z-index: 10;
 }
-.hotel-cctv .top-title { font-size: 1.05rem; }
-.hotel-cctv .kicker { color: var(--muted); font-size: 0.78rem; font-weight: 600; }
-.hotel-cctv .who { display: flex; align-items: center; gap: 10px; }
-.hotel-cctv .who-btn {
+.top-title { font-size: 1.05rem; }
+.kicker { color: var(--muted); font-size: 0.78rem; font-weight: 600; }
+.who { display: flex; align-items: center; gap: 10px; }
+.who-btn {
   border: 0;
   background: transparent;
   padding: 4px 6px;
   border-radius: 12px;
   text-align: left;
 }
-.hotel-cctv .who-btn:hover { background: #eef2ff; }
-.hotel-cctv .who .avatar { background: #eef2ff; color: #334155; }
-.hotel-cctv .who strong { display: block; font-size: 0.9rem; }
-.hotel-cctv .who small { color: var(--muted); font-size: 0.78rem; }
-.hotel-cctv .avatar-btn {
+.who-btn:hover { background: #eef2ff; }
+.who .avatar { background: #eef2ff; color: #334155; }
+.who strong { display: block; font-size: 0.9rem; }
+.who small { color: var(--muted); font-size: 0.78rem; }
+.avatar-btn {
   border: 0;
   padding: 0;
   cursor: pointer;
 }
-.hotel-cctv .avatar.lg {
+.avatar.lg {
   width: 52px;
   height: 52px;
   font-size: 1.2rem;
 }
-.hotel-cctv .profile-modal .profile-head {
+.profile-modal .profile-head {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.hotel-cctv .profile-modal .profile-head h2 { margin: 0; }
-.hotel-cctv .profile-divider {
+.profile-modal .profile-head h2 { margin: 0; }
+.profile-divider {
   margin: 4px 0;
   padding-top: 8px;
   border-top: 1px solid var(--line);
@@ -208,20 +208,20 @@
   font-size: 0.82rem;
   font-weight: 600;
 }
-.hotel-cctv .button.danger.ghost {
+.button.danger.ghost {
   background: transparent;
   color: var(--red);
   border: 1px solid #fecaca;
 }
-.hotel-cctv .users-page { display: grid; gap: 14px; }
-.hotel-cctv .users-toolbar {
+.users-page { display: grid; gap: 14px; }
+.users-toolbar {
   display: flex;
   gap: 12px;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
 }
-.hotel-cctv .users-tabs {
+.users-tabs {
   display: inline-flex;
   gap: 6px;
   padding: 5px;
@@ -232,7 +232,7 @@
     0 1px 2px rgba(15, 23, 42, 0.04),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
-.hotel-cctv .users-tabs button {
+.users-tabs button {
   position: relative;
   border: 0;
   background: transparent;
@@ -247,11 +247,11 @@
   gap: 10px;
   transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
-.hotel-cctv .users-tabs button:hover:not(.active) {
+.users-tabs button:hover:not(.active) {
   color: #334155;
   background: rgba(37, 99, 235, 0.06);
 }
-.hotel-cctv .users-tabs button span {
+.users-tabs button span {
   min-width: 24px;
   height: 24px;
   padding: 0 7px;
@@ -264,27 +264,27 @@
   font-weight: 700;
   transition: background 0.18s ease, color 0.18s ease;
 }
-.hotel-cctv .users-tabs button.active {
+.users-tabs button.active {
   color: white;
   background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
   box-shadow:
     0 6px 14px rgba(37, 99, 235, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
-.hotel-cctv .users-tabs button.active span {
+.users-tabs button.active span {
   background: rgba(255, 255, 255, 0.22);
   color: white;
 }
-.hotel-cctv .users-search { width: min(320px, 100%); flex: 1 1 220px; }
-.hotel-cctv .users-panel { padding: 0; overflow: hidden; }
-.hotel-cctv .users-empty {
+.users-search { width: min(320px, 100%); flex: 1 1 220px; }
+.users-panel { padding: 0; overflow: hidden; }
+.users-empty {
   display: grid;
   gap: 8px;
   justify-items: start;
   padding: 36px 24px;
 }
-.hotel-cctv .people-list { list-style: none; margin: 0; padding: 0; }
-.hotel-cctv .person-row {
+.people-list { list-style: none; margin: 0; padding: 0; }
+.person-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 14px;
@@ -292,18 +292,6 @@
   padding: 16px 18px;
   border-bottom: 1px solid #f1f5f9;
 }
-<<<<<<< HEAD
-.hotel-cctv .person-row:last-child { border-bottom: 0; }
-.hotel-cctv .person-row.is-disabled { opacity: 0.72; background: #fafbfc; }
-.hotel-cctv .person-avatar { background: #2563eb; }
-.hotel-cctv .person-avatar.customer { background: #0f766e; }
-.hotel-cctv .person-main { min-width: 0; display: grid; gap: 4px; }
-.hotel-cctv .person-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.hotel-cctv .person-title strong { font-size: 1rem; }
-.hotel-cctv .person-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-.hotel-cctv .perm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.hotel-cctv .perm-chip {
-=======
 .person-row:last-child { border-bottom: 0; }
 .person-row.is-disabled { opacity: 0.72; background: #fafbfc; }
 .person-avatar { background: #2563eb; }
@@ -364,7 +352,6 @@
 .person-delete-card p { margin: 0; }
 .perm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .perm-chip {
->>>>>>> origin/Super-Admin
   border-radius: 999px;
   padding: 3px 9px;
   background: #eff6ff;
@@ -372,26 +359,26 @@
   font-size: 0.72rem;
   font-weight: 600;
 }
-.hotel-cctv .perm-chip.muted-chip { background: #f1f5f9; color: #64748b; }
-.hotel-cctv .perm-chip.more-chip { background: #e2e8f0; color: #475569; }
-.hotel-cctv .users-modal {
+.perm-chip.muted-chip { background: #f1f5f9; color: #64748b; }
+.perm-chip.more-chip { background: #e2e8f0; color: #475569; }
+.users-modal {
   width: min(640px, 100%);
   max-height: min(88vh, 820px);
   overflow: auto;
 }
-.hotel-cctv .perm-sections { display: grid; gap: 14px; }
-.hotel-cctv .perm-section h3 {
+.perm-sections { display: grid; gap: 14px; }
+.perm-section h3 {
   margin: 0 0 8px;
   font-size: 0.82rem;
   color: var(--muted);
   font-weight: 700;
 }
-.hotel-cctv .perm-grid {
+.perm-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
-.hotel-cctv .perm-toggle {
+.perm-toggle {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -404,49 +391,45 @@
   font-size: 0.88rem;
   cursor: pointer;
 }
-.hotel-cctv .perm-toggle input { width: 16px; height: 16px; accent-color: var(--blue); }
-.hotel-cctv .perm-toggle.on {
+.perm-toggle input { width: 16px; height: 16px; accent-color: var(--blue); }
+.perm-toggle.on {
   background: #eff6ff;
   border-color: #bfdbfe;
   color: #1e3a8a;
 }
 @media (max-width: 760px) {
-  .hotel-cctv .person-row { grid-template-columns: auto minmax(0, 1fr); }
-  .hotel-cctv .person-actions { grid-column: 1 / -1; justify-content: flex-start; }
-  .hotel-cctv .perm-grid { grid-template-columns: 1fr; }
+  .person-row { grid-template-columns: auto minmax(0, 1fr); }
+  .person-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .perm-grid { grid-template-columns: 1fr; }
 }
 
-.hotel-cctv .page { display: grid; gap: 18px; padding: 22px 24px 36px; max-width: 1400px; }
-.hotel-cctv .page-head, .hotel-cctv .section-head, .hotel-cctv .card-top, .hotel-cctv .card-actions, .hotel-cctv .pager, .hotel-cctv .who, .hotel-cctv .page-tools {
+.page { display: grid; gap: 18px; padding: 22px 24px 36px; max-width: 1400px; }
+.page-head, .section-head, .card-top, .card-actions, .pager, .who, .page-tools {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.hotel-cctv .page-head, .hotel-cctv .section-head, .hotel-cctv .card-top { justify-content: space-between; flex-wrap: wrap; }
-.hotel-cctv .page-head h1 { font-size: 1.55rem; display: flex; align-items: center; gap: 10px; }
-.hotel-cctv .page-tools { flex-wrap: wrap; justify-content: flex-end; }
+.page-head, .section-head, .card-top { justify-content: space-between; flex-wrap: wrap; }
+.page-head h1 { font-size: 1.55rem; display: flex; align-items: center; gap: 10px; }
+.page-tools { flex-wrap: wrap; justify-content: flex-end; }
 
-<<<<<<< HEAD
-.panel, .stat-card, .login-card, .overlay .modal, .empty, .banner {
-=======
-.hotel-cctv .panel, .hotel-cctv .stat-card, .hotel-cctv .login-card, .hotel-cctv .modal, .hotel-cctv .empty, .hotel-cctv .banner {
->>>>>>> origin/Pet-Transport
+.panel, .stat-card, .login-card, .modal, .empty, .banner {
   background: var(--card);
   border-radius: 16px;
   border: 1px solid #edf2f7;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
-.hotel-cctv .panel { padding: 18px; }
-.hotel-cctv .stat-row, .hotel-cctv .thumb-grid, .hotel-cctv .dash-bottom { display: grid; gap: 14px; }
-.hotel-cctv .stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.hotel-cctv .thumb-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
-.hotel-cctv .dash-bottom { grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.7fr); align-items: start; }
-.hotel-cctv .dash-bottom .grow { min-width: 0; }
-.hotel-cctv .stat-card { display: flex; align-items: center; gap: 14px; padding: 16px; }
-.hotel-cctv .stat-card span { color: var(--muted); font-size: 0.82rem; font-weight: 500; }
-.hotel-cctv .stat-card strong { display: block; font-size: 1.7rem; line-height: 1.1; }
-.hotel-cctv .stat-card small { color: var(--muted); }
-.hotel-cctv .stat-icon {
+.panel { padding: 18px; }
+.stat-row, .thumb-grid, .dash-bottom { display: grid; gap: 14px; }
+.stat-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.thumb-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); }
+.dash-bottom { grid-template-columns: minmax(0, 1.6fr) minmax(260px, 0.7fr); align-items: start; }
+.dash-bottom .grow { min-width: 0; }
+.stat-card { display: flex; align-items: center; gap: 14px; padding: 16px; }
+.stat-card span { color: var(--muted); font-size: 0.82rem; font-weight: 500; }
+.stat-card strong { display: block; font-size: 1.7rem; line-height: 1.1; }
+.stat-card small { color: var(--muted); }
+.stat-icon {
   width: 48px;
   height: 48px;
   border-radius: 14px;
@@ -455,34 +438,34 @@
   color: white;
   flex: none;
 }
-.hotel-cctv .stat-icon svg { width: 20px; height: 20px; }
-.hotel-cctv .stat-icon.total { background: #3b82f6; }
-.hotel-cctv .stat-icon.online { background: var(--green); }
-.hotel-cctv .stat-icon.connecting { background: var(--amber); }
-.hotel-cctv .stat-icon.offline { background: var(--red); }
+.stat-icon svg { width: 20px; height: 20px; }
+.stat-icon.total { background: #3b82f6; }
+.stat-icon.online { background: var(--green); }
+.stat-icon.connecting { background: var(--amber); }
+.stat-icon.offline { background: var(--red); }
 
-.hotel-cctv .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.hotel-cctv .toolbar.compact { margin: 0; }
-.hotel-cctv .camera-section-head { margin-bottom: 4px; }
-.hotel-cctv .camera-section-head h2 { margin-bottom: 2px; }
-.hotel-cctv .camera-filter-bar {
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.toolbar.compact { margin: 0; }
+.camera-section-head { margin-bottom: 4px; }
+.camera-section-head h2 { margin-bottom: 2px; }
+.camera-filter-bar {
   display: grid;
   gap: 12px;
   margin: 0 0 14px;
 }
-.hotel-cctv .camera-filter-search { width: 100%; }
-.hotel-cctv .camera-status-chips {
+.camera-filter-search { width: 100%; }
+.camera-status-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-.hotel-cctv .camera-status-chips .chip-btn {
+.camera-status-chips .chip-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
 }
-.hotel-cctv .camera-status-chips .chip-btn em {
+.camera-status-chips .chip-btn em {
   font-style: normal;
   min-width: 1.4rem;
   padding: 2px 7px;
@@ -491,18 +474,18 @@
   font-size: 0.74rem;
   text-align: center;
 }
-.hotel-cctv .camera-status-chips .chip-btn.active em {
+.camera-status-chips .chip-btn.active em {
   background: rgba(74, 143, 240, 0.16);
   color: #1d4ed8;
 }
-.hotel-cctv .camera-status-chips .chip-btn.online.active { color: #047857; border-color: #bbf7d0; background: #ecfdf5; }
-.hotel-cctv .camera-status-chips .chip-btn.online.active em { background: rgba(16, 185, 129, 0.16); color: #047857; }
-.hotel-cctv .camera-status-chips .chip-btn.connecting.active { color: #b45309; border-color: #fde68a; background: #fffbeb; }
-.hotel-cctv .camera-status-chips .chip-btn.connecting.active em { background: rgba(245, 158, 11, 0.16); color: #b45309; }
-.hotel-cctv .camera-status-chips .chip-btn.offline.active { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
-.hotel-cctv .camera-status-chips .chip-btn.offline.active em { background: rgba(239, 68, 68, 0.14); color: #b91c1c; }
-.hotel-cctv .search { position: relative; display: block; flex: 1 1 220px; min-width: 0; }
-.hotel-cctv .search svg {
+.camera-status-chips .chip-btn.online.active { color: #047857; border-color: #bbf7d0; background: #ecfdf5; }
+.camera-status-chips .chip-btn.online.active em { background: rgba(16, 185, 129, 0.16); color: #047857; }
+.camera-status-chips .chip-btn.connecting.active { color: #b45309; border-color: #fde68a; background: #fffbeb; }
+.camera-status-chips .chip-btn.connecting.active em { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+.camera-status-chips .chip-btn.offline.active { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+.camera-status-chips .chip-btn.offline.active em { background: rgba(239, 68, 68, 0.14); color: #b91c1c; }
+.search { position: relative; display: block; flex: 1 1 220px; min-width: 0; }
+.search svg {
   position: absolute;
   left: 12px;
   top: 50%;
@@ -511,26 +494,26 @@
   height: 16px;
   color: #94a3b8;
 }
-.hotel-cctv .search input { width: 100%; padding-left: 38px; }
-.hotel-cctv label input, .hotel-cctv label select, .hotel-cctv label textarea, .hotel-cctv .toolbar input, .hotel-cctv .toolbar select {
+.search input { width: 100%; padding-left: 38px; }
+label input, label select, label textarea, .toolbar input, .toolbar select {
   width: 100%;
   border: 1px solid var(--line);
   background: #f8fafc;
   border-radius: 12px;
   padding: 11px 12px;
 }
-.hotel-cctv .toolbar select { width: 150px; flex: none; }
-.hotel-cctv label { display: grid; gap: 6px; font-weight: 600; font-size: 0.9rem; }
-.hotel-cctv textarea { min-height: 80px; resize: vertical; }
-.hotel-cctv .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.hotel-cctv label input:focus, .hotel-cctv label select:focus, .hotel-cctv label textarea:focus, .hotel-cctv .toolbar input:focus, .hotel-cctv .toolbar select:focus {
+.toolbar select { width: 150px; flex: none; }
+label { display: grid; gap: 6px; font-weight: 600; font-size: 0.9rem; }
+textarea { min-height: 80px; resize: vertical; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+label input:focus, label select:focus, label textarea:focus, .toolbar input:focus, .toolbar select:focus {
   outline: 2px solid #bfdbfe;
   border-color: #93c5fd;
   background: white;
 }
 
-.hotel-cctv .thumb-card { min-width: 0; }
-.hotel-cctv .cam-preview {
+.thumb-card { min-width: 0; }
+.cam-preview {
   position: relative;
   display: block;
   width: 100%;
@@ -544,8 +527,8 @@
   font: inherit;
   color: inherit;
 }
-.hotel-cctv .cam-preview[aria-disabled="true"] { cursor: default; }
-.hotel-cctv .cam-preview .tile-stage {
+.cam-preview[aria-disabled="true"] { cursor: default; }
+.cam-preview .tile-stage {
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -554,7 +537,7 @@
   background: transparent;
   pointer-events: none;
 }
-.hotel-cctv .cam-preview .tile-stage video {
+.cam-preview .tile-stage video {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -564,18 +547,13 @@
   background: transparent;
   transition: opacity 0.25s ease;
 }
-.hotel-cctv .cam-preview .tile-stage[data-live="1"] video { opacity: 1; }
-.hotel-cctv .cam-preview:has(.tile-stage[data-live="1"]) .room-photo {
+.cam-preview .tile-stage[data-live="1"] video { opacity: 1; }
+.cam-preview:has(.tile-stage[data-live="1"]) .room-photo {
   opacity: 0;
   transition: opacity 0.25s ease;
 }
-<<<<<<< HEAD
-.cam-preview .room-art { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.85; }
-.cam-preview .room-photo {
-=======
-.hotel-cctv .room-art { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.85; }
-.hotel-cctv .room-photo {
->>>>>>> origin/Pet-Transport
+.room-art { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.85; }
+.room-photo {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -586,7 +564,7 @@
   transform: scale(1.02);
   transition: opacity 0.25s ease;
 }
-.hotel-cctv .cam-preview::after {
+.cam-preview::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -595,30 +573,30 @@
     linear-gradient(180deg, rgba(15, 23, 42, 0.12) 0%, transparent 35%, rgba(15, 23, 42, 0.55) 100%);
   pointer-events: none;
 }
-.hotel-cctv .cam-veil {
+.cam-veil {
   position: absolute;
   inset: 0;
   z-index: 2;
   background: rgba(15, 23, 42, 0.18);
   pointer-events: none;
 }
-.hotel-cctv .cam-badge, .hotel-cctv .cam-foot, .hotel-cctv .cam-offline { z-index: 4; }
-.hotel-cctv .cam-badge, .hotel-cctv .pill, .hotel-cctv .live-pill {
+.cam-badge, .cam-foot, .cam-offline { z-index: 4; }
+.cam-badge, .pill, .live-pill {
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 0.75rem;
   font-weight: 700;
 }
-.hotel-cctv .cam-badge {
+.cam-badge {
   position: absolute;
   top: 10px;
   left: 10px;
   background: rgba(16, 185, 129, 0.92);
   color: white;
 }
-.hotel-cctv .cam-badge.connecting { background: rgba(245, 158, 11, 0.95); }
-.hotel-cctv .cam-badge.offline { background: rgba(239, 83, 80, 0.95); }
-.hotel-cctv .cam-foot {
+.cam-badge.connecting { background: rgba(245, 158, 11, 0.95); }
+.cam-badge.offline { background: rgba(239, 83, 80, 0.95); }
+.cam-foot {
   position: absolute;
   left: 0;
   right: 0;
@@ -633,8 +611,8 @@
   font-weight: 600;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.72));
 }
-.hotel-cctv .cam-foot svg { width: 14px; height: 14px; flex: none; opacity: 0.85; }
-.hotel-cctv .cam-offline {
+.cam-foot svg { width: 14px; height: 14px; flex: none; opacity: 0.85; }
+.cam-offline {
   position: absolute;
   inset: 0;
   display: grid;
@@ -649,7 +627,7 @@
   padding: 16px;
   text-align: center;
 }
-.hotel-cctv .cam-offline span {
+.cam-offline span {
   width: 34px;
   height: 34px;
   border: 2px solid white;
@@ -659,32 +637,28 @@
   font-weight: 800;
   background: rgba(15, 23, 42, 0.35);
 }
-.hotel-cctv .cam-offline strong {
+.cam-offline strong {
   font-size: 0.9rem;
 }
-.hotel-cctv .cam-offline small {
+.cam-offline small {
   font-size: 0.72rem;
   opacity: 0.9;
 }
-<<<<<<< HEAD
-.thumb-card.is-off .cam-preview .room-photo {
-=======
-.hotel-cctv .thumb-card.is-off .room-photo {
->>>>>>> origin/Pet-Transport
+.thumb-card.is-off .room-photo {
   filter: saturate(0.7) brightness(0.82);
 }
-.hotel-cctv .thumb-card.is-off .cam-preview::after {
+.thumb-card.is-off .cam-preview::after {
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.18) 0%, rgba(15, 23, 42, 0.08) 40%, rgba(15, 23, 42, 0.55) 100%);
 }
 
-.hotel-cctv .live-page { display: grid; gap: 16px; }
-.hotel-cctv .live-status-bar {
+.live-page { display: grid; gap: 16px; }
+.live-status-bar {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
-.hotel-cctv .live-stat {
+.live-stat {
   display: grid;
   gap: 2px;
   text-align: left;
@@ -696,71 +670,71 @@
   height: auto;
   box-shadow: 0 8px 20px rgba(58, 74, 92, 0.05);
 }
-.hotel-cctv .live-stat strong {
+.live-stat strong {
   font-size: 1.35rem;
   line-height: 1.1;
   color: var(--text);
 }
-.hotel-cctv .live-stat span {
+.live-stat span {
   font-size: 0.78rem;
   color: var(--muted);
   font-weight: 600;
 }
-.hotel-cctv .live-stat.active {
+.live-stat.active {
   border-color: #bfdbfe;
   background: #eff6ff;
   box-shadow: 0 10px 24px rgba(74, 143, 240, 0.12);
 }
-.hotel-cctv .live-stat.online strong { color: #047857; }
-.hotel-cctv .live-stat.connecting strong { color: #b45309; }
-.hotel-cctv .live-stat.offline strong { color: #b91c1c; }
-.hotel-cctv .live-wall-panel { display: grid; gap: 14px; }
-.hotel-cctv .live-wall-head {
+.live-stat.online strong { color: #047857; }
+.live-stat.connecting strong { color: #b45309; }
+.live-stat.offline strong { color: #b91c1c; }
+.live-wall-panel { display: grid; gap: 14px; }
+.live-wall-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
 }
-.hotel-cctv .live-search { width: min(280px, 100%); }
-.hotel-cctv .live-wall {
+.live-search { width: min(280px, 100%); }
+.live-wall {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
   gap: 14px;
 }
-.hotel-cctv .live-card .cam-preview {
+.live-card .cam-preview {
   min-height: 200px;
   border-radius: 20px;
   box-shadow: 0 14px 28px rgba(36, 64, 110, 0.12);
 }
-.hotel-cctv .live-card .cam-preview:hover {
+.live-card .cam-preview:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 34px rgba(36, 64, 110, 0.16);
 }
-.hotel-cctv .live-card .cam-preview {
+.live-card .cam-preview {
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-.hotel-cctv .live-foot {
+.live-foot {
   padding: 34px 14px 12px;
   align-items: flex-end;
 }
-.hotel-cctv .live-foot-copy {
+.live-foot-copy {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
-.hotel-cctv .live-foot-copy strong {
+.live-foot-copy strong {
   font-size: 0.95rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hotel-cctv .live-foot-copy span {
+.live-foot-copy span {
   font-size: 0.72rem;
   font-weight: 500;
   opacity: 0.88;
 }
-.hotel-cctv .live-open-chip {
+.live-open-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -771,7 +745,7 @@
   font-size: 0.72rem;
   backdrop-filter: blur(8px);
 }
-.hotel-cctv .live-empty {
+.live-empty {
   text-align: center;
   display: grid;
   gap: 6px;
@@ -779,29 +753,29 @@
 }
 
 @media (max-width: 900px) {
-  .hotel-cctv .live-status-bar { grid-template-columns: 1fr 1fr; }
+  .live-status-bar { grid-template-columns: 1fr 1fr; }
 }
 
-.hotel-cctv .pill { background: #f1f5f9; color: #334155; }
-.hotel-cctv .pill.online, .hotel-cctv .pill.live { background: #ecfdf5; color: #047857; }
-.hotel-cctv .pill.connecting { background: #fffbeb; color: #b45309; }
-.hotel-cctv .pill.offline { background: #fef2f2; color: #b91c1c; }
+.pill { background: #f1f5f9; color: #334155; }
+.pill.online, .pill.live { background: #ecfdf5; color: #047857; }
+.pill.connecting { background: #fffbeb; color: #b45309; }
+.pill.offline { background: #fef2f2; color: #b91c1c; }
 
-.hotel-cctv .button, .hotel-cctv .button.ghost, .hotel-cctv .button.danger {
+.button, .button.ghost, .button.danger {
   border: 0;
   border-radius: 12px;
   padding: 10px 14px;
   font-weight: 600;
   font-size: 0.88rem;
 }
-.hotel-cctv .button { background: var(--blue); color: white; }
-.hotel-cctv .button:hover { background: #1d4ed8; }
-.hotel-cctv .button.ghost { background: white; color: #334155; box-shadow: inset 0 0 0 1px var(--line); }
-.hotel-cctv .button.danger { background: #fef2f2; color: #dc2626; }
-.hotel-cctv .button.wide { width: 100%; }
-.hotel-cctv .button.tiny, .hotel-cctv .button.ghost.tiny, .hotel-cctv .button.danger.tiny { padding: 6px 10px; font-size: 0.78rem; border-radius: 10px; }
-.hotel-cctv .button:disabled { opacity: 0.55; cursor: not-allowed; }
-.hotel-cctv .icon-round {
+.button { background: var(--blue); color: white; }
+.button:hover { background: #1d4ed8; }
+.button.ghost { background: white; color: #334155; box-shadow: inset 0 0 0 1px var(--line); }
+.button.danger { background: #fef2f2; color: #dc2626; }
+.button.wide { width: 100%; }
+.button.tiny, .button.ghost.tiny, .button.danger.tiny { padding: 6px 10px; font-size: 0.78rem; border-radius: 10px; }
+.button:disabled { opacity: 0.55; cursor: not-allowed; }
+.icon-round {
   width: 34px;
   height: 34px;
   border-radius: 999px;
@@ -810,50 +784,50 @@
   color: #475569;
 }
 
-.hotel-cctv .banner { padding: 12px 14px; }
-.hotel-cctv .banner.error { color: #9a3030; background: #fff4f3; border-color: #fecaca; }
-.hotel-cctv .banner.ok { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
-.hotel-cctv .empty, .hotel-cctv .center-page { padding: 28px; color: var(--muted); text-align: center; }
-.hotel-cctv .center-page, .hotel-cctv .login-page { min-height: 100vh; }
-.hotel-cctv .center-page { display: grid; place-items: center; }
-.hotel-cctv .pager { margin-top: 14px; justify-content: center; }
-.hotel-cctv .check { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.hotel-cctv .check input { width: auto; }
+.banner { padding: 12px 14px; }
+.banner.error { color: #9a3030; background: #fff4f3; border-color: #fecaca; }
+.banner.ok { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+.empty, .center-page { padding: 28px; color: var(--muted); text-align: center; }
+.center-page, .login-page { min-height: 100vh; }
+.center-page { display: grid; place-items: center; }
+.pager { margin-top: 14px; justify-content: center; }
+.check { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.check input { width: auto; }
 
-.hotel-cctv .table-wrap { overflow-x: auto; }
-.hotel-cctv .data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
-.hotel-cctv .data-table th {
+.table-wrap { overflow-x: auto; }
+.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+.data-table th {
   padding: 10px 12px;
   background: #f8fafc;
   color: var(--muted);
   font-weight: 600;
   font-size: 0.78rem;
 }
-.hotel-cctv .data-table td { padding: 12px; border-top: 1px solid #f1f5f9; vertical-align: middle; }
-.hotel-cctv .data-table strong { display: block; }
-.hotel-cctv .cell-sub { display: block; color: var(--muted); font-size: 0.78rem; }
-.hotel-cctv .status-dot {
+.data-table td { padding: 12px; border-top: 1px solid #f1f5f9; vertical-align: middle; }
+.data-table strong { display: block; }
+.cell-sub { display: block; color: var(--muted); font-size: 0.78rem; }
+.status-dot {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   font-size: 0.82rem;
   font-weight: 600;
 }
-.hotel-cctv .status-dot::before {
+.status-dot::before {
   content: "";
   width: 8px;
   height: 8px;
   border-radius: 999px;
   background: #94a3b8;
 }
-.hotel-cctv .status-dot.online { color: #047857; }
-.hotel-cctv .status-dot.online::before { background: var(--green); }
-.hotel-cctv .status-dot.offline { color: #b91c1c; }
-.hotel-cctv .status-dot.offline::before { background: var(--red); }
-.hotel-cctv .status-dot.connecting { color: #b45309; }
-.hotel-cctv .status-dot.connecting::before { background: var(--amber); }
-.hotel-cctv .row-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.hotel-cctv .toggle {
+.status-dot.online { color: #047857; }
+.status-dot.online::before { background: var(--green); }
+.status-dot.offline { color: #b91c1c; }
+.status-dot.offline::before { background: var(--red); }
+.status-dot.connecting { color: #b45309; }
+.status-dot.connecting::before { background: var(--amber); }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.toggle {
   width: 42px;
   height: 24px;
   border: 0;
@@ -861,7 +835,7 @@
   background: #cbd5e1;
   position: relative;
 }
-.hotel-cctv .toggle::after {
+.toggle::after {
   content: "";
   position: absolute;
   top: 3px;
@@ -872,12 +846,12 @@
   background: white;
   transition: transform 0.15s ease;
 }
-.hotel-cctv .toggle.on { background: var(--blue); }
-.hotel-cctv .toggle.on::after { transform: translateX(18px); }
+.toggle.on { background: var(--blue); }
+.toggle.on::after { transform: translateX(18px); }
 
-.hotel-cctv .connect-panel { display: grid; gap: 16px; align-content: start; }
-.hotel-cctv .donut-row { display: flex; align-items: center; gap: 16px; }
-.hotel-cctv .donut {
+.connect-panel { display: grid; gap: 16px; align-content: start; }
+.donut-row { display: flex; align-items: center; gap: 16px; }
+.donut {
   width: 112px;
   height: 112px;
   border-radius: 999px;
@@ -885,7 +859,7 @@
   place-items: center;
   flex: none;
 }
-.hotel-cctv .donut-hole {
+.donut-hole {
   width: 78px;
   height: 78px;
   border-radius: 999px;
@@ -895,21 +869,21 @@
   align-content: center;
   text-align: center;
 }
-.hotel-cctv .donut-hole strong { font-size: 1.15rem; }
-.hotel-cctv .donut-hole span { color: var(--muted); font-size: 0.72rem; }
-.hotel-cctv .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; flex: 1; }
-.hotel-cctv .legend li { display: flex; justify-content: space-between; gap: 12px; font-size: 0.88rem; }
-.hotel-cctv .dot {
+.donut-hole strong { font-size: 1.15rem; }
+.donut-hole span { color: var(--muted); font-size: 0.72rem; }
+.legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; flex: 1; }
+.legend li { display: flex; justify-content: space-between; gap: 12px; font-size: 0.88rem; }
+.dot {
   width: 8px;
   height: 8px;
   border-radius: 999px;
   display: inline-block;
   margin-right: 8px;
 }
-.hotel-cctv .dot.online { background: var(--green); }
-.hotel-cctv .dot.offline { background: var(--red); }
-.hotel-cctv .dot.connecting { background: var(--amber); }
-.hotel-cctv .system-banner {
+.dot.online { background: var(--green); }
+.dot.offline { background: var(--red); }
+.dot.connecting { background: var(--amber); }
+.system-banner {
   display: grid;
   gap: 2px;
   padding: 14px;
@@ -917,12 +891,12 @@
   background: #eff6ff;
   border: 1px solid #dbeafe;
 }
-.hotel-cctv .system-banner.ok { background: #ecfdf5; border-color: #bbf7d0; }
-.hotel-cctv .system-banner strong { font-size: 0.9rem; color: #1d4ed8; }
-.hotel-cctv .system-banner.ok strong { color: #047857; }
-.hotel-cctv .system-banner p { color: var(--muted); font-size: 0.78rem; }
+.system-banner.ok { background: #ecfdf5; border-color: #bbf7d0; }
+.system-banner strong { font-size: 0.9rem; color: #1d4ed8; }
+.system-banner.ok strong { color: #047857; }
+.system-banner p { color: var(--muted); font-size: 0.78rem; }
 
-.hotel-cctv .overlay {
+.overlay {
   position: fixed;
   inset: 0;
   z-index: 30;
@@ -931,21 +905,12 @@
   padding: 16px;
   background: rgba(15, 23, 42, 0.45);
 }
-<<<<<<< HEAD
-.overlay .modal {
-=======
-.hotel-cctv .modal {
->>>>>>> origin/Pet-Transport
+.modal {
   width: min(520px, 100%);
   max-height: calc(100vh - 32px);
   overflow: auto;
   padding: 22px;
 }
-<<<<<<< HEAD
-<<<<<<< HEAD
-.overlay .modal.wide { width: min(900px, 100%); }
-.overlay .modal form, .split form { display: grid; gap: 12px; }
-=======
 .modal.account-modal {
   width: min(640px, calc(100vw - 32px));
   max-height: min(92vh, 780px);
@@ -1080,17 +1045,9 @@
   min-height: 0;
   gap: 0;
 }
->>>>>>> origin/Super-Admin
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .grant-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
 .grant-list li {
-=======
-.hotel-cctv .modal.wide { width: min(900px, 100%); }
-.hotel-cctv .modal form, .hotel-cctv .split form { display: grid; gap: 12px; }
-.hotel-cctv .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.hotel-cctv .grant-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
-.hotel-cctv .grant-list li {
->>>>>>> origin/Pet-Transport
   display: flex;
   justify-content: space-between;
   gap: 12px;
@@ -1100,17 +1057,17 @@
   background: #f8fafc;
 }
 
-.hotel-cctv .access-page { display: grid; gap: 16px; }
-.hotel-cctv .access-create, .hotel-cctv .access-list { display: grid; gap: 14px; }
-.hotel-cctv .access-create-head,
-.hotel-cctv .access-list-head {
+.access-page { display: grid; gap: 16px; }
+.access-create, .access-list { display: grid; gap: 14px; }
+.access-create-head,
+.access-list-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
   flex-wrap: wrap;
 }
-.hotel-cctv .access-step {
+.access-step {
   margin: 0 0 2px;
   color: var(--muted);
   font-size: 0.72rem;
@@ -1118,7 +1075,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.hotel-cctv .access-preview {
+.access-preview {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1129,34 +1086,34 @@
   font-size: 0.82rem;
   font-weight: 600;
 }
-.hotel-cctv .access-preview-sep { color: var(--muted); font-weight: 500; }
-.hotel-cctv .access-form { display: grid; gap: 14px; }
-.hotel-cctv .access-form-grid {
+.access-preview-sep { color: var(--muted); font-weight: 500; }
+.access-form { display: grid; gap: 14px; }
+.access-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-.hotel-cctv .access-field {
+.access-field {
   display: grid;
   gap: 6px;
   margin: 0;
 }
-.hotel-cctv .access-field > span {
+.access-field > span {
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--text);
 }
-.hotel-cctv .access-duration { display: grid; gap: 8px; }
-.hotel-cctv .access-duration-label {
+.access-duration { display: grid; gap: 8px; }
+.access-duration-label {
   font-size: 0.82rem;
   font-weight: 600;
 }
-.hotel-cctv .chip-row {
+.chip-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-.hotel-cctv .chip-btn {
+.chip-btn {
   border: 1px solid var(--line);
   background: #fff;
   color: var(--muted);
@@ -1167,13 +1124,13 @@
   min-height: 0;
   height: auto;
 }
-.hotel-cctv .chip-btn:hover { background: #f8fafc; color: var(--text); }
-.hotel-cctv .chip-btn.active {
+.chip-btn:hover { background: #f8fafc; color: var(--text); }
+.chip-btn.active {
   background: #eff6ff;
   border-color: #bfdbfe;
   color: #1d4ed8;
 }
-.hotel-cctv .access-range {
+.access-range {
   margin: 0;
   padding: 10px 12px;
   border-radius: 12px;
@@ -1181,20 +1138,20 @@
   border: 1px dashed var(--line);
   font-size: 0.84rem;
 }
-.hotel-cctv .access-extra-toggle {
+.access-extra-toggle {
   justify-self: start;
   width: fit-content;
 }
-.hotel-cctv .access-actions { display: grid; }
-.hotel-cctv .access-search { width: 100%; }
-.hotel-cctv .access-empty {
+.access-actions { display: grid; }
+.access-search { width: 100%; }
+.access-empty {
   text-align: center;
   display: grid;
   gap: 6px;
   justify-items: center;
 }
-.hotel-cctv .access-cards { display: grid; gap: 10px; }
-.hotel-cctv .access-card {
+.access-cards { display: grid; gap: 10px; }
+.access-card {
   display: grid;
   gap: 12px;
   padding: 14px;
@@ -1202,44 +1159,44 @@
   border: 1px solid var(--line);
   background: #fff;
 }
-.hotel-cctv .access-card-top,
-.hotel-cctv .access-card-actions {
+.access-card-top,
+.access-card-actions {
   display: flex;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
 }
-.hotel-cctv .access-who {
+.access-who {
   display: flex;
   gap: 10px;
   align-items: center;
   min-width: 0;
 }
-.hotel-cctv .access-who > div {
+.access-who > div {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
-.hotel-cctv .access-who strong,
-.hotel-cctv .access-card-body strong {
+.access-who strong,
+.access-card-body strong {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hotel-cctv .tiny-avatar {
+.tiny-avatar {
   width: 36px;
   height: 36px;
   font-size: 0.85rem;
   flex: none;
 }
-.hotel-cctv .access-card-body {
+.access-card-body {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: 12px;
 }
-.hotel-cctv .access-card-body > div { display: grid; gap: 2px; min-width: 0; }
-.hotel-cctv .access-meta-label {
+.access-card-body > div { display: grid; gap: 2px; min-width: 0; }
+.access-meta-label {
   font-size: 0.72rem;
   color: var(--muted);
   font-weight: 600;
@@ -1247,13 +1204,13 @@
 }
 
 @media (max-width: 900px) {
-  .hotel-cctv .access-form-grid,
-  .hotel-cctv .access-card-body {
+  .access-form-grid,
+  .access-card-body {
     grid-template-columns: 1fr;
   }
 }
-.hotel-cctv .rooms-page { gap: 16px; }
-.hotel-cctv .rooms-stat-pill {
+.rooms-page { gap: 16px; }
+.rooms-stat-pill {
   display: inline-flex;
   align-items: center;
   min-height: 34px;
@@ -1264,15 +1221,15 @@
   font-size: 0.8rem;
   font-weight: 700;
 }
-.hotel-cctv .rooms-stat-pill.soft {
+.rooms-stat-pill.soft {
   background: #f5f9ff;
   color: var(--muted, #7a8a9a);
 }
-.hotel-cctv .rooms-hub {
+.rooms-hub {
   display: grid;
   gap: 0;
 }
-.hotel-cctv .rooms-hub-tabs {
+.rooms-hub-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1284,7 +1241,7 @@
   background: #eef4fb;
   border: 1px solid var(--line, #e0eaf5);
 }
-.hotel-cctv .rooms-hub-tabs button {
+.rooms-hub-tabs button {
   min-height: 36px;
   padding: 0 14px;
   border: 0;
@@ -1296,60 +1253,60 @@
   font-weight: 700;
   cursor: pointer;
 }
-.hotel-cctv .rooms-hub-tabs button.active {
+.rooms-hub-tabs button.active {
   background: #fff;
   color: var(--blue, #4a8ff0);
   box-shadow: 0 1px 4px rgba(74, 143, 240, 0.16);
 }
-.hotel-cctv .access-embedded.page {
+.access-embedded.page {
   padding-top: 0;
 }
-.hotel-cctv .access-embedded > .page-head h1 {
+.access-embedded > .page-head h1 {
   font-size: 1.25rem;
 }
-.hotel-cctv .rooms-empty {
+.rooms-empty {
   display: grid;
   justify-items: center;
   gap: 4px;
   padding: 28px;
   text-align: center;
 }
-.hotel-cctv .rooms-filter-panel {
+.rooms-filter-panel {
   display: grid;
   gap: 12px;
   padding: 14px;
 }
-.hotel-cctv .rooms-filter-search { width: 100%; }
-.hotel-cctv .rooms-filter-empty { margin: 0; }
-.hotel-cctv .room-grid {
+.rooms-filter-search { width: 100%; }
+.rooms-filter-empty { margin: 0; }
+.room-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 14px;
 }
-.hotel-cctv .room-card {
+.room-card {
   display: grid;
   gap: 12px;
   padding: 14px;
 }
-.hotel-cctv .room-card-head {
+.room-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
-.hotel-cctv .room-card-actions {
+.room-card-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   flex: none;
 }
-.hotel-cctv .room-card-title {
+.room-card-title {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
-.hotel-cctv .room-card-mark {
+.room-card-mark {
   width: 40px;
   height: 40px;
   border-radius: 12px;
@@ -1361,11 +1318,11 @@
   font-weight: 700;
   font-size: 1rem;
 }
-.hotel-cctv .room-card-title h2 {
+.room-card-title h2 {
   font-size: 1rem;
   color: var(--text, #3a4a5c);
 }
-.hotel-cctv .room-rename-inline {
+.room-rename-inline {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1375,7 +1332,7 @@
   background: #f5f9ff;
   border: 1px solid var(--line, #e0eaf5);
 }
-.hotel-cctv .room-rename-inline input {
+.room-rename-inline input {
   flex: 1 1 140px;
   min-width: 0;
   min-height: 36px;
@@ -1384,14 +1341,14 @@
   background: #fff;
   padding: 8px 10px;
 }
-.hotel-cctv .room-cam-list {
+.room-cam-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 10px;
 }
-.hotel-cctv .room-cam-list li {
+.room-cam-list li {
   display: grid;
   gap: 10px;
   padding: 12px;
@@ -1399,28 +1356,28 @@
   background: #f8fbff;
   border: 1px solid var(--line, #e0eaf5);
 }
-.hotel-cctv .room-cam-list li.disabled {
+.room-cam-list li.disabled {
   background: #f4f6f8;
 }
-.hotel-cctv .room-cam-list li.disabled .room-cam-main strong {
+.room-cam-list li.disabled .room-cam-main strong {
   color: #8a97a8;
 }
-.hotel-cctv .room-cam-top {
+.room-cam-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
 }
-.hotel-cctv .room-cam-main {
+.room-cam-main {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
-.hotel-cctv .room-cam-main strong {
+.room-cam-main strong {
   color: var(--text, #3a4a5c);
   font-size: 0.94rem;
 }
-.hotel-cctv .room-cam-actions {
+.room-cam-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1429,7 +1386,7 @@
   padding-top: 10px;
   border-top: 1px solid rgba(208, 222, 238, 0.9);
 }
-.hotel-cctv .room-cam-power {
+.room-cam-power {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1444,25 +1401,25 @@
   font-weight: 700;
   cursor: pointer;
 }
-.hotel-cctv .room-cam-power .toggle {
+.room-cam-power .toggle {
   display: inline-block;
   pointer-events: none;
   flex: none;
 }
-.hotel-cctv .room-cam-power:disabled {
+.room-cam-power:disabled {
   opacity: 0.65;
   cursor: wait;
 }
-.hotel-cctv .room-cam-power.on {
+.room-cam-power.on {
   background: #eaf3ff;
   color: var(--blue, #4a8ff0);
 }
-.hotel-cctv .room-cam-tools {
+.room-cam-tools {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.hotel-cctv .room-tool {
+.room-tool {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1478,58 +1435,58 @@
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.hotel-cctv .room-tool svg {
+.room-tool svg {
   width: 14px;
   height: 14px;
   flex: none;
 }
-.hotel-cctv .room-tool:hover:not(:disabled) {
+.room-tool:hover:not(:disabled) {
   background: #f5f9ff;
   border-color: #c9dbf3;
   color: var(--blue, #4a8ff0);
 }
-.hotel-cctv .room-tool:disabled {
+.room-tool:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
-.hotel-cctv .room-tool.danger {
+.room-tool.danger {
   color: #c45b6a;
   border-color: #f0d4da;
   background: #fff7f8;
 }
-.hotel-cctv .room-tool.danger:hover:not(:disabled) {
+.room-tool.danger:hover:not(:disabled) {
   color: #b42318;
   border-color: #f0b6bf;
   background: #fff1f3;
 }
-.hotel-cctv .rooms-edit-modal form { display: grid; gap: 12px; }
-.hotel-cctv .rooms-edit-modal h2 { margin-bottom: 2px; }
-.hotel-cctv .thumb-grid.compact { grid-template-columns: 1fr; }
-.hotel-cctv .narrow-panel { max-width: 480px; }
-.hotel-cctv .kv-list { display: grid; gap: 10px; margin: 12px 0 0; }
-.hotel-cctv .kv-list > div {
+.rooms-edit-modal form { display: grid; gap: 12px; }
+.rooms-edit-modal h2 { margin-bottom: 2px; }
+.thumb-grid.compact { grid-template-columns: 1fr; }
+.narrow-panel { max-width: 480px; }
+.kv-list { display: grid; gap: 10px; margin: 12px 0 0; }
+.kv-list > div {
   display: grid;
   grid-template-columns: 140px 1fr;
   gap: 10px;
   padding: 10px 0;
   border-bottom: 1px solid #f1f5f9;
 }
-.hotel-cctv .kv-list dt { color: var(--muted); }
-.hotel-cctv .kv-list dd { margin: 0; word-break: break-all; }
-.hotel-cctv .plain-list { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; color: var(--muted); }
-.hotel-cctv .ok-text { color: var(--green); }
-.hotel-cctv .bad-text { color: var(--red); }
-.hotel-cctv .pill.care-feed { background: #fff7ed; color: #c2410c; }
-.hotel-cctv .pill.care-water { background: #eff6ff; color: #1d4ed8; }
-.hotel-cctv .pill.care-play { background: #f0fdf4; color: #15803d; }
-.hotel-cctv .pill.care-walk { background: #ecfeff; color: #0e7490; }
-.hotel-cctv .pill.care-clean { background: #f5f3ff; color: #6d28d9; }
-.hotel-cctv .pill.care-health { background: #fdf2f8; color: #be185d; }
-.hotel-cctv .pill.care-custom { background: #eef2ff; color: #4338ca; }
+.kv-list dt { color: var(--muted); }
+.kv-list dd { margin: 0; word-break: break-all; }
+.plain-list { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; color: var(--muted); }
+.ok-text { color: var(--green); }
+.bad-text { color: var(--red); }
+.pill.care-feed { background: #fff7ed; color: #c2410c; }
+.pill.care-water { background: #eff6ff; color: #1d4ed8; }
+.pill.care-play { background: #f0fdf4; color: #15803d; }
+.pill.care-walk { background: #ecfeff; color: #0e7490; }
+.pill.care-clean { background: #f5f3ff; color: #6d28d9; }
+.pill.care-health { background: #fdf2f8; color: #be185d; }
+.pill.care-custom { background: #eef2ff; color: #4338ca; }
 
-.hotel-cctv .gallery-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-.hotel-cctv .room-filters { display: flex; flex-wrap: wrap; gap: 8px; }
-.hotel-cctv .room-filters button {
+.gallery-tools { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.room-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.room-filters button {
   border: 0;
   border-radius: 999px;
   padding: 8px 12px;
@@ -1538,10 +1495,10 @@
   font-weight: 600;
   font-size: 0.82rem;
 }
-.hotel-cctv .room-filters button.active { background: var(--blue); color: white; }
-.hotel-cctv .gallery-tools .search { width: min(280px, 100%); }
+.room-filters button.active { background: var(--blue); color: white; }
+.gallery-tools .search { width: min(280px, 100%); }
 
-.hotel-cctv .watch-overlay {
+.watch-overlay {
   position: fixed;
   inset: 0;
   z-index: 40;
@@ -1560,7 +1517,7 @@
     var(--bg, #f0f7ff);
   color: var(--text, #3a4a5c);
 }
-.hotel-cctv .watch-board.watch-room {
+.watch-board.watch-room {
   width: min(1440px, 100%);
   height: 100%;
   max-height: 100%;
@@ -1572,7 +1529,7 @@
   min-width: 0;
   color: var(--text, #3a4a5c);
 }
-.hotel-cctv .watch-room-header {
+.watch-room-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1582,13 +1539,13 @@
   min-width: 0;
   flex: none;
 }
-.hotel-cctv .watch-room-heading {
+.watch-room-heading {
   display: flex;
   align-items: center;
   gap: 12px;
   min-width: 0;
 }
-.hotel-cctv .watch-back {
+.watch-back {
   width: 40px;
   height: 40px;
   border-radius: 999px;
@@ -1601,29 +1558,29 @@
   padding: 0;
   box-shadow: 0 6px 16px rgba(58, 74, 92, 0.06);
 }
-.hotel-cctv .watch-back:hover { background: #f0f7ff; }
-.hotel-cctv .watch-back svg { width: 16px; height: 16px; }
-.hotel-cctv .watch-room-titles { min-width: 0; }
-.hotel-cctv .watch-room-title-row {
+.watch-back:hover { background: #f0f7ff; }
+.watch-back svg { width: 16px; height: 16px; }
+.watch-room-titles { min-width: 0; }
+.watch-room-title-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
-.hotel-cctv .watch-room-titles h1 {
+.watch-room-titles h1 {
   font-size: clamp(1.05rem, 1.8vw, 1.35rem);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--text, #3a4a5c);
 }
-.hotel-cctv .watch-room-titles p {
+.watch-room-titles p {
   margin-top: 2px;
   color: var(--muted, #7a8a9a);
   font-size: 0.82rem;
 }
-.hotel-cctv .watch-room-titles strong { color: var(--text, #3a4a5c); font-weight: 600; }
-.hotel-cctv .watch-stay { color: var(--muted, #7a8a9a); }
-.hotel-cctv .watch-online-pill {
+.watch-room-titles strong { color: var(--text, #3a4a5c); font-weight: 600; }
+.watch-stay { color: var(--muted, #7a8a9a); }
+.watch-online-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1633,43 +1590,43 @@
   font-weight: 600;
   border: 1px solid transparent;
 }
-.hotel-cctv .watch-online-pill .dot {
+.watch-online-pill .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
 }
-.hotel-cctv .watch-online-pill.on {
+.watch-online-pill.on {
   background: #ecfdf5;
   border-color: #a7f3d0;
   color: #047857;
 }
-.hotel-cctv .watch-online-pill.on .dot {
+.watch-online-pill.on .dot {
   background: #10b981;
   animation: pulseGlow 1.5s infinite;
 }
-.hotel-cctv .watch-online-pill.off {
+.watch-online-pill.off {
   background: #fff1f2;
   border-color: #fecdd3;
   color: #be123c;
 }
-.hotel-cctv .watch-online-pill.off .dot { background: #f43f5e; }
-.hotel-cctv .watch-online-pill.wait {
+.watch-online-pill.off .dot { background: #f43f5e; }
+.watch-online-pill.wait {
   background: #eff6ff;
   border-color: #bfdbfe;
   color: #1d4ed8;
 }
-.hotel-cctv .watch-online-pill.wait .dot {
+.watch-online-pill.wait .dot {
   background: #3b82f6;
   animation: pulseGlow 1.5s infinite;
 }
-.hotel-cctv .watch-date {
+.watch-date {
   position: relative;
   display: inline-flex;
   align-items: center;
   min-width: 0;
   max-width: 100%;
 }
-.hotel-cctv .watch-date svg {
+.watch-date svg {
   position: absolute;
   left: 12px;
   width: 14px;
@@ -1677,7 +1634,7 @@
   color: var(--blue, #4a8ff0);
   pointer-events: none;
 }
-.hotel-cctv .watch-date select {
+.watch-date select {
   appearance: none;
   border: 1px solid var(--line, #e0eaf5);
   background: var(--card, #fff);
@@ -1689,9 +1646,9 @@
   max-width: 100%;
   box-shadow: 0 6px 16px rgba(58, 74, 92, 0.05);
 }
-.hotel-cctv .watch-date select:hover { background: #f8fbff; }
-.hotel-cctv .watch-room-error { margin: 0; flex: none; }
-.hotel-cctv .watch-room-grid {
+.watch-date select:hover { background: #f8fbff; }
+.watch-room-error { margin: 0; flex: none; }
+.watch-room-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(240px, 0.9fr);
   gap: clamp(8px, 1.4vw, 14px);
@@ -1701,8 +1658,8 @@
   height: 100%;
   overflow: hidden;
 }
-.hotel-cctv .watch-room-main,
-.hotel-cctv .watch-room-side {
+.watch-room-main,
+.watch-room-side {
   display: grid;
   gap: clamp(6px, 1vh, 10px);
   min-height: 0;
@@ -1710,13 +1667,13 @@
   height: 100%;
   overflow: hidden;
 }
-.hotel-cctv .watch-room-main {
+.watch-room-main {
   grid-template-rows: minmax(0, 1fr) auto;
 }
-.hotel-cctv .watch-room-side {
+.watch-room-side {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
-.hotel-cctv .watch-camera {
+.watch-camera {
   position: relative;
   min-height: clamp(160px, 28vh, 220px);
   height: 100%;
@@ -1726,21 +1683,21 @@
   overflow: hidden;
   box-shadow: 0 12px 28px rgba(58, 74, 92, 0.1);
 }
-.hotel-cctv .watch-camera .stage {
+.watch-camera .stage {
   position: absolute;
   inset: 0;
   min-height: 0;
   border-radius: 0;
   background: #0f172a;
 }
-.hotel-cctv .watch-camera .stage video {
+.watch-camera .stage video {
   width: 100%;
   height: 100%;
   min-height: 0;
   object-fit: cover;
 }
-.hotel-cctv .watch-camera-empty,
-.hotel-cctv .watch-camera-overlay {
+.watch-camera-empty,
+.watch-camera-overlay {
   position: absolute;
   inset: 0;
   z-index: 4;
@@ -1754,12 +1711,12 @@
   backdrop-filter: blur(4px);
   color: white;
 }
-.hotel-cctv .watch-camera-overlay.soft {
+.watch-camera-overlay.soft {
   background: rgba(15, 23, 42, 0.45);
   pointer-events: none;
 }
-.hotel-cctv .watch-camera-overlay p { color: #cbd5e1; font-size: 0.82rem; margin: 0; }
-.hotel-cctv .watch-camera-overlay .spin {
+.watch-camera-overlay p { color: #cbd5e1; font-size: 0.82rem; margin: 0; }
+.watch-camera-overlay .spin {
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -1768,39 +1725,39 @@
   animation: spin 0.9s linear infinite;
   display: inline-block;
 }
-.hotel-cctv .spin-icon { animation: spin 0.9s linear infinite; }
-.hotel-cctv .pet-ai-overlay {
+.spin-icon { animation: spin 0.9s linear infinite; }
+.pet-ai-overlay {
   position: absolute;
   inset: 0;
   z-index: 3;
   pointer-events: none;
   overflow: hidden;
 }
-.hotel-cctv .pet-box {
+.pet-box {
   fill: transparent;
   stroke-width: 2.5;
 }
-.hotel-cctv .pet-box.cat { stroke: #38bdf8; }
-.hotel-cctv .pet-box.dog { stroke: #fbbf24; }
-.hotel-cctv .pet-label-bg.cat { fill: rgba(14, 165, 233, 0.92); }
-.hotel-cctv .pet-label-bg.dog { fill: rgba(217, 119, 6, 0.92); }
-.hotel-cctv .pet-label-text {
+.pet-box.cat { stroke: #38bdf8; }
+.pet-box.dog { stroke: #fbbf24; }
+.pet-label-bg.cat { fill: rgba(14, 165, 233, 0.92); }
+.pet-label-bg.dog { fill: rgba(217, 119, 6, 0.92); }
+.pet-label-text {
   fill: #fff;
   font-size: 12px;
   font-weight: 700;
   font-family: inherit;
 }
-.hotel-cctv .watch-osd {
+.watch-osd {
   position: absolute;
   z-index: 5;
   pointer-events: none;
 }
-.hotel-cctv .watch-osd.top-left { top: 14px; left: 14px; }
-.hotel-cctv .watch-osd.top-right { top: 14px; right: 14px; pointer-events: auto; }
-.hotel-cctv .watch-osd.bottom-left { bottom: 14px; left: 14px; }
-.hotel-cctv .watch-osd.bottom-right { bottom: 14px; right: 14px; }
-.hotel-cctv .watch-live-badge,
-.hotel-cctv .watch-pill {
+.watch-osd.top-left { top: 14px; left: 14px; }
+.watch-osd.top-right { top: 14px; right: 14px; pointer-events: auto; }
+.watch-osd.bottom-left { bottom: 14px; left: 14px; }
+.watch-osd.bottom-right { bottom: 14px; right: 14px; }
+.watch-live-badge,
+.watch-pill {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1813,18 +1770,18 @@
   font-weight: 600;
   backdrop-filter: blur(8px);
 }
-.hotel-cctv .watch-live-badge .dot {
+.watch-live-badge .dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: #94a3b8;
 }
-.hotel-cctv .watch-live-badge.on .dot {
+.watch-live-badge.on .dot {
   background: #ef4444;
   animation: pulseGlow 1.5s infinite;
 }
-.hotel-cctv .watch-pill.mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-.hotel-cctv .watch-icon-btn {
+.watch-pill.mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.watch-icon-btn {
   width: 36px;
   height: 36px;
   border-radius: 12px;
@@ -1836,21 +1793,21 @@
   padding: 0;
   backdrop-filter: blur(8px);
 }
-.hotel-cctv .watch-icon-btn:hover { background: rgba(15, 23, 42, 0.78); }
-.hotel-cctv .watch-icon-btn.ghost {
+.watch-icon-btn:hover { background: rgba(15, 23, 42, 0.78); }
+.watch-icon-btn.ghost {
   background: transparent;
   border-color: transparent;
   color: var(--muted, #7a8a9a);
 }
-.hotel-cctv .watch-icon-btn.ghost:hover { background: #eef5ff; color: var(--text, #3a4a5c); }
-.hotel-cctv .watch-icon-btn svg { width: 15px; height: 15px; }
-.hotel-cctv .watch-actions {
+.watch-icon-btn.ghost:hover { background: #eef5ff; color: var(--text, #3a4a5c); }
+.watch-icon-btn svg { width: 15px; height: 15px; }
+.watch-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   flex: none;
 }
-.hotel-cctv .watch-btn {
+.watch-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1865,22 +1822,22 @@
   font-weight: 600;
   box-shadow: 0 6px 16px rgba(58, 74, 92, 0.05);
 }
-.hotel-cctv .watch-btn:hover { background: #f8fbff; }
-.hotel-cctv .watch-btn:disabled { opacity: 0.65; cursor: wait; }
-.hotel-cctv .watch-btn svg { width: 14px; height: 14px; }
-.hotel-cctv .watch-btn.primary {
+.watch-btn:hover { background: #f8fbff; }
+.watch-btn:disabled { opacity: 0.65; cursor: wait; }
+.watch-btn svg { width: 14px; height: 14px; }
+.watch-btn.primary {
   border: 0;
   background: linear-gradient(90deg, #76b5ff, #4a8ff0);
   color: white;
   box-shadow: 0 10px 22px rgba(74, 143, 240, 0.28);
 }
-.hotel-cctv .watch-btn.primary:hover { filter: brightness(1.03); }
-.hotel-cctv .watch-btn.danger {
+.watch-btn.primary:hover { filter: brightness(1.03); }
+.watch-btn.danger {
   border-color: #fecdd3;
   background: #fff1f2;
   color: #be123c;
 }
-.hotel-cctv .watch-btn .plus {
+.watch-btn .plus {
   width: 20px;
   height: 20px;
   border-radius: 50%;
@@ -1891,9 +1848,9 @@
   font-size: 0.85rem;
   line-height: 1;
 }
-.hotel-cctv .watch-pet-card,
-.hotel-cctv .watch-care-card,
-.hotel-cctv .watch-note-card {
+.watch-pet-card,
+.watch-care-card,
+.watch-note-card {
   background: var(--card, #fff);
   border: 1px solid var(--line, #e0eaf5);
   border-radius: 16px;
@@ -1901,20 +1858,20 @@
   box-shadow: 0 10px 24px rgba(58, 74, 92, 0.06);
   min-height: 0;
 }
-.hotel-cctv .watch-pet-card {
+.watch-pet-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   flex: none;
 }
-.hotel-cctv .watch-pet-left {
+.watch-pet-left {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
 }
-.hotel-cctv .watch-pet-avatar {
+.watch-pet-avatar {
   width: 44px;
   height: 44px;
   border-radius: 50%;
@@ -1927,22 +1884,22 @@
   color: white;
   flex: none;
 }
-.hotel-cctv .watch-pet-left h2 {
+.watch-pet-left h2 {
   font-size: 1rem;
   color: var(--text, #3a4a5c);
 }
-.hotel-cctv .watch-pet-left p {
+.watch-pet-left p {
   color: var(--muted, #7a8a9a);
   font-size: 0.8rem;
   margin-top: 2px;
 }
-.hotel-cctv .watch-pet-right {
+.watch-pet-right {
   display: grid;
   justify-items: end;
   gap: 6px;
   flex: none;
 }
-.hotel-cctv .watch-stay-pill {
+.watch-stay-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1954,24 +1911,24 @@
   font-size: 0.72rem;
   font-weight: 600;
 }
-.hotel-cctv .watch-room-tag {
+.watch-room-tag {
   color: var(--muted, #7a8a9a);
   font-size: 0.8rem;
   font-weight: 600;
 }
-.hotel-cctv .watch-care-head,
-.hotel-cctv .watch-note-head {
+.watch-care-head,
+.watch-note-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
-.hotel-cctv .watch-care-card {
+.watch-care-card {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   overflow: hidden;
 }
-.hotel-cctv .watch-add-care {
+.watch-add-care {
   margin-top: 8px;
   width: 100%;
   min-height: 36px;
@@ -1982,30 +1939,30 @@
   font-size: 0.82rem;
   font-weight: 700;
 }
-.hotel-cctv .watch-add-care:hover {
+.watch-add-care:hover {
   background: #eaf3ff;
   border-color: #76b5ff;
 }
-.hotel-cctv .watch-care-head h2,
-.hotel-cctv .watch-note-head h3 {
+.watch-care-head h2,
+.watch-note-head h3 {
   color: var(--text, #3a4a5c);
   font-size: 0.92rem;
 }
-.hotel-cctv .watch-care-head span,
-.hotel-cctv .watch-note-head span {
+.watch-care-head span,
+.watch-note-head span {
   font-size: 0.7rem;
   color: var(--blue, #4a8ff0);
   background: #eaf3ff;
   border-radius: 999px;
   padding: 3px 10px;
 }
-.hotel-cctv .watch-period-tabs {
+.watch-period-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
   margin-top: 8px;
 }
-.hotel-cctv .watch-period-tabs button {
+.watch-period-tabs button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2019,14 +1976,14 @@
   font-weight: 600;
   padding: 6px;
 }
-.hotel-cctv .watch-period-tabs button svg { width: 13px; height: 13px; }
-.hotel-cctv .watch-period-tabs button.active {
+.watch-period-tabs button svg { width: 13px; height: 13px; }
+.watch-period-tabs button.active {
   border-color: transparent;
   background: linear-gradient(90deg, #76b5ff, #4a8ff0);
   color: white;
   box-shadow: 0 8px 18px rgba(74, 143, 240, 0.24);
 }
-.hotel-cctv .watch-care-list {
+.watch-care-list {
   display: grid;
   gap: 6px;
   margin-top: 8px;
@@ -2035,7 +1992,7 @@
   padding-right: 2px;
   align-content: start;
 }
-.hotel-cctv .watch-care-item {
+.watch-care-item {
   width: 100%;
   display: flex;
   align-items: center;
@@ -2047,12 +2004,12 @@
   color: inherit;
   padding: 8px 10px;
 }
-.hotel-cctv .watch-care-item.done {
+.watch-care-item.done {
   background: #fff;
   border-color: #d6e8ff;
 }
-.hotel-cctv .watch-care-item:hover { border-color: #76b5ff; }
-.hotel-cctv .watch-care-emoji {
+.watch-care-item:hover { border-color: #76b5ff; }
+.watch-care-emoji {
   position: relative;
   width: 34px;
   height: 34px;
@@ -2063,13 +2020,13 @@
   font-size: 1rem;
   flex: none;
 }
-.hotel-cctv .watch-care-emoji.big {
+.watch-care-emoji.big {
   width: 44px;
   height: 44px;
   border-radius: 14px;
   font-size: 1.35rem;
 }
-.hotel-cctv .watch-care-emoji .check {
+.watch-care-emoji .check {
   position: absolute;
   top: -4px;
   left: -4px;
@@ -2082,34 +2039,34 @@
   display: grid;
   place-items: center;
 }
-.hotel-cctv .watch-care-copy {
+.watch-care-copy {
   flex: 1;
   min-width: 0;
   display: grid;
 }
-.hotel-cctv .watch-care-copy strong {
+.watch-care-copy strong {
   color: var(--text, #3a4a5c);
   font-size: 0.9rem;
 }
-.hotel-cctv .watch-care-copy small { color: var(--muted, #7a8a9a); }
-.hotel-cctv .watch-care-status {
+.watch-care-copy small { color: var(--muted, #7a8a9a); }
+.watch-care-status {
   flex: none;
   border-radius: 999px;
   padding: 5px 10px;
   font-size: 0.72rem;
   font-weight: 700;
 }
-.hotel-cctv .watch-care-status.ok {
+.watch-care-status.ok {
   background: #10b981;
   color: white;
 }
-.hotel-cctv .watch-care-status.wait {
+.watch-care-status.wait {
   background: #fff7ed;
   border: 1px solid #fed7aa;
   color: #c2410c;
 }
-.hotel-cctv .watch-note-card { flex: none; }
-.hotel-cctv .watch-note-box {
+.watch-note-card { flex: none; }
+.watch-note-box {
   margin-top: 8px;
   background: #f5f9ff;
   border: 1px solid var(--line, #e0eaf5);
@@ -2121,7 +2078,7 @@
   max-height: 4.4em;
   overflow: auto;
 }
-.hotel-cctv .watch-modal-backdrop {
+.watch-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 50;
@@ -2136,7 +2093,7 @@
   backdrop-filter: blur(3px);
   overflow: auto;
 }
-.hotel-cctv .watch-modal {
+.watch-modal {
   width: min(420px, 100%);
   max-height: min(90dvh, 680px);
   overflow: auto;
@@ -2147,7 +2104,7 @@
   color: var(--text, #3a4a5c);
   box-shadow: 0 24px 48px rgba(58, 74, 92, 0.16);
 }
-.hotel-cctv .watch-modal-head {
+.watch-modal-head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -2155,73 +2112,73 @@
   padding-bottom: 12px;
   border-bottom: 1px solid var(--line, #e0eaf5);
 }
-.hotel-cctv .watch-modal-title {
+.watch-modal-title {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.hotel-cctv .watch-modal-title h3,
-.hotel-cctv .watch-modal-head h3 {
+.watch-modal-title h3,
+.watch-modal-head h3 {
   color: var(--text, #3a4a5c);
   font-size: 1rem;
 }
-.hotel-cctv .watch-modal-title p { font-size: 0.8rem; margin-top: 2px; }
-.hotel-cctv .watch-modal-title p.ok { color: #047857; }
-.hotel-cctv .watch-modal-title p.wait { color: #c2410c; }
-.hotel-cctv .watch-modal-body {
+.watch-modal-title p { font-size: 0.8rem; margin-top: 2px; }
+.watch-modal-title p.ok { color: #047857; }
+.watch-modal-title p.wait { color: #c2410c; }
+.watch-modal-body {
   display: grid;
   gap: 10px;
   padding: 14px 0;
 }
-.hotel-cctv .watch-modal-body.form label {
+.watch-modal-body.form label {
   display: grid;
   gap: 6px;
   font-size: 0.8rem;
   color: var(--muted, #7a8a9a);
 }
-.hotel-cctv .watch-form-row {
+.watch-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   align-items: end;
 }
-.hotel-cctv .watch-time-fields {
+.watch-time-fields {
   display: grid;
   gap: 6px;
 }
-.hotel-cctv .watch-time-label {
+.watch-time-label {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--muted, #7a8a9a);
 }
-.hotel-cctv .watch-time-selects {
+.watch-time-selects {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.hotel-cctv .watch-time-part {
+.watch-time-part {
   flex: 1;
   min-width: 0;
   display: grid;
   gap: 0;
 }
-.hotel-cctv .watch-time-part select {
+.watch-time-part select {
   text-align: center;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
 }
-.hotel-cctv .watch-time-colon {
+.watch-time-colon {
   font-weight: 700;
   color: var(--text, #3a4a5c);
   padding-bottom: 1px;
 }
-.hotel-cctv .watch-time-suffix {
+.watch-time-suffix {
   flex: none;
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--muted, #7a8a9a);
 }
-.hotel-cctv .sr-only {
+.sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -2233,11 +2190,11 @@
   border: 0;
 }
 @media (max-width: 420px) {
-  .hotel-cctv .watch-form-row { grid-template-columns: 1fr; }
+  .watch-form-row { grid-template-columns: 1fr; }
 }
-.hotel-cctv .watch-modal-body.form input,
-.hotel-cctv .watch-modal-body.form select,
-.hotel-cctv .watch-modal-body.form textarea {
+.watch-modal-body.form input,
+.watch-modal-body.form select,
+.watch-modal-body.form textarea {
   border: 1px solid var(--line, #e0eaf5);
   background: #f8fbff;
   color: var(--text, #3a4a5c);
@@ -2246,16 +2203,16 @@
   width: 100%;
   resize: vertical;
 }
-.hotel-cctv .watch-modal-body.form textarea {
+.watch-modal-body.form textarea {
   min-height: 84px;
   line-height: 1.45;
 }
-.hotel-cctv .watch-note-label {
+.watch-note-label {
   margin: 0 0 6px;
   font-size: 0.78rem;
   color: var(--muted, #7a8a9a);
 }
-.hotel-cctv .watch-kv {
+.watch-kv {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2265,14 +2222,14 @@
   padding: 10px 12px;
   font-size: 0.86rem;
 }
-.hotel-cctv .watch-kv span { color: var(--muted, #7a8a9a); }
-.hotel-cctv .watch-modal-actions {
+.watch-kv span { color: var(--muted, #7a8a9a); }
+.watch-modal-actions {
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
 }
-.hotel-cctv .watch-toast {
+.watch-toast {
   position: fixed;
   left: 50%;
   bottom: 24px;
@@ -2295,124 +2252,124 @@
 }
 /* Tablet / narrow desktop: stack, still fill viewport */
 @media (max-width: 1100px) {
-  .hotel-cctv .watch-room-grid {
+  .watch-room-grid {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(180px, 1.05fr) minmax(0, 1fr);
   }
-  .hotel-cctv .watch-camera {
+  .watch-camera {
     min-height: 160px;
     aspect-ratio: auto;
     max-height: none;
   }
-  .hotel-cctv .watch-room-side {
+  .watch-room-side {
     overflow: hidden;
   }
-  .hotel-cctv .watch-care-list {
+  .watch-care-list {
     max-height: none;
   }
 }
 
 /* Short landscape / laptop short height */
 @media (max-height: 760px) {
-  .hotel-cctv .watch-note-card { display: none; }
-  .hotel-cctv .watch-room-side { grid-template-rows: auto minmax(0, 1fr); }
-  .hotel-cctv .watch-room-titles p .watch-stay { display: none; }
-  .hotel-cctv .watch-camera { min-height: 140px; }
-  .hotel-cctv .watch-back { width: 36px; height: 36px; }
+  .watch-note-card { display: none; }
+  .watch-room-side { grid-template-rows: auto minmax(0, 1fr); }
+  .watch-room-titles p .watch-stay { display: none; }
+  .watch-camera { min-height: 140px; }
+  .watch-back { width: 36px; height: 36px; }
 }
 
 @media (max-height: 760px) and (min-width: 1101px) {
-  .hotel-cctv .watch-room-grid {
+  .watch-room-grid {
     grid-template-columns: minmax(0, 1.8fr) minmax(220px, 0.8fr);
   }
 }
 
 /* Phone width */
 @media (max-width: 720px) {
-  .hotel-cctv .watch-overlay {
+  .watch-overlay {
     padding:
       max(8px, env(safe-area-inset-top))
       max(8px, env(safe-area-inset-right))
       max(8px, env(safe-area-inset-bottom))
       max(8px, env(safe-area-inset-left));
   }
-  .hotel-cctv .watch-room-heading { gap: 8px; }
-  .hotel-cctv .watch-room-titles h1 { font-size: 1.05rem; }
-  .hotel-cctv .watch-room-titles p { font-size: 0.78rem; }
-  .hotel-cctv .watch-date { width: 100%; }
-  .hotel-cctv .watch-date select { width: 100%; }
-  .hotel-cctv .watch-room-grid {
+  .watch-room-heading { gap: 8px; }
+  .watch-room-titles h1 { font-size: 1.05rem; }
+  .watch-room-titles p { font-size: 0.78rem; }
+  .watch-date { width: 100%; }
+  .watch-date select { width: 100%; }
+  .watch-room-grid {
     grid-template-rows: minmax(150px, 0.95fr) minmax(0, 1.05fr);
   }
-  .hotel-cctv .watch-actions { gap: 6px; }
-  .hotel-cctv .watch-btn {
+  .watch-actions { gap: 6px; }
+  .watch-btn {
     flex: 1 1 calc(50% - 6px);
     min-height: 36px;
     padding: 7px 10px;
   }
-  .hotel-cctv .watch-btn.primary { flex: 1 1 100%; }
-  .hotel-cctv .watch-pet-card { padding: 10px; }
-  .hotel-cctv .watch-pet-avatar { width: 40px; height: 40px; font-size: 0.95rem; }
-  .hotel-cctv .watch-care-status { padding: 4px 8px; font-size: 0.68rem; }
-  .hotel-cctv .watch-osd.top-left { top: 10px; left: 10px; }
-  .hotel-cctv .watch-osd.top-right { top: 10px; right: 10px; }
-  .hotel-cctv .watch-osd.bottom-left { bottom: 10px; left: 10px; }
-  .hotel-cctv .watch-osd.bottom-right { bottom: 10px; right: 10px; }
-  .hotel-cctv .watch-live-badge,
-  .hotel-cctv .watch-pill { padding: 5px 9px; font-size: 0.68rem; }
+  .watch-btn.primary { flex: 1 1 100%; }
+  .watch-pet-card { padding: 10px; }
+  .watch-pet-avatar { width: 40px; height: 40px; font-size: 0.95rem; }
+  .watch-care-status { padding: 4px 8px; font-size: 0.68rem; }
+  .watch-osd.top-left { top: 10px; left: 10px; }
+  .watch-osd.top-right { top: 10px; right: 10px; }
+  .watch-osd.bottom-left { bottom: 10px; left: 10px; }
+  .watch-osd.bottom-right { bottom: 10px; right: 10px; }
+  .watch-live-badge,
+  .watch-pill { padding: 5px 9px; font-size: 0.68rem; }
 }
 
 /* Very small phones */
 @media (max-width: 420px) {
-  .hotel-cctv .watch-osd.bottom-left { display: none; }
-  .hotel-cctv .watch-care-status { display: none; }
-  .hotel-cctv .watch-period-tabs button span,
-  .hotel-cctv .watch-period-tabs button { font-size: 0.72rem; }
-  .hotel-cctv .watch-modal { border-radius: 16px; padding: 14px; }
+  .watch-osd.bottom-left { display: none; }
+  .watch-care-status { display: none; }
+  .watch-period-tabs button span,
+  .watch-period-tabs button { font-size: 0.72rem; }
+  .watch-modal { border-radius: 16px; padding: 14px; }
 }
 
 /* Ultra-short screens: allow page scroll as last resort */
 @media (max-height: 520px) {
-  .hotel-cctv .watch-overlay { overflow: auto; }
-  .hotel-cctv .watch-board.watch-room {
+  .watch-overlay { overflow: auto; }
+  .watch-board.watch-room {
     height: auto;
     min-height: 100%;
     max-height: none;
   }
-  .hotel-cctv .watch-room-grid {
+  .watch-room-grid {
     height: auto;
     grid-template-rows: auto auto;
     overflow: visible;
   }
-  .hotel-cctv .watch-room-main,
-  .hotel-cctv .watch-room-side {
+  .watch-room-main,
+  .watch-room-side {
     height: auto;
     overflow: visible;
   }
-  .hotel-cctv .watch-camera {
+  .watch-camera {
     height: auto;
     aspect-ratio: 16 / 10;
     max-height: 42dvh;
     min-height: 120px;
   }
-  .hotel-cctv .watch-care-list { max-height: 180px; }
+  .watch-care-list { max-height: 180px; }
 }
 
-.hotel-cctv .stage {
+.stage {
   position: relative;
   background: #0f172a;
   border-radius: 16px;
   min-height: 280px;
   overflow: hidden;
 }
-.hotel-cctv .stage video {
+.stage video {
   width: 100%;
   height: min(58vh, 560px);
   object-fit: contain;
   background: #0f172a;
   display: block;
 }
-.hotel-cctv .live-pill {
+.live-pill {
   position: absolute;
   top: 14px;
   left: 14px;
@@ -2422,7 +2379,7 @@
   background: #ef4444;
   color: white;
 }
-.hotel-cctv .live-pill::before {
+.live-pill::before {
   content: "";
   width: 8px;
   height: 8px;
@@ -2430,7 +2387,7 @@
   background: white;
   animation: pulse 1.4s infinite;
 }
-.hotel-cctv .stage-message {
+.stage-message {
   position: absolute;
   inset: 0;
   display: grid;
@@ -2442,7 +2399,7 @@
   text-align: center;
   background: rgba(15, 23, 42, 0.35);
 }
-.hotel-cctv .stage-actions {
+.stage-actions {
   position: absolute;
   right: 12px;
   bottom: 12px;
@@ -2450,10 +2407,10 @@
   gap: 8px;
   z-index: 2;
 }
-.hotel-cctv .icon-btn { padding: 8px; }
-.hotel-cctv .icon-btn svg { width: 16px; height: 16px; }
+.icon-btn { padding: 8px; }
+.icon-btn svg { width: 16px; height: 16px; }
 
-.hotel-cctv .login-page {
+.login-page {
   display: grid;
   place-items: center;
   padding: 24px;
@@ -2462,30 +2419,30 @@
     radial-gradient(600px 280px at 100% 100%, #e2e8f0 0%, transparent 55%),
     var(--bg);
 }
-.hotel-cctv .login-card {
+.login-card {
   width: min(420px, 100%);
   padding: 28px;
   display: grid;
   gap: 12px;
 }
-.hotel-cctv .login-brand { margin-bottom: 8px; }
-.hotel-cctv .login-card h1 { font-size: 1.55rem; }
+.login-brand { margin-bottom: 8px; }
+.login-card h1 { font-size: 1.55rem; }
 
 @keyframes pulse {
   50% { opacity: 0.4; }
 }
 
 @media (max-width: 1100px) {
-  .hotel-cctv .stat-row { grid-template-columns: 1fr 1fr; }
-  .hotel-cctv .dash-bottom, .hotel-cctv .split { grid-template-columns: 1fr; }
+  .stat-row { grid-template-columns: 1fr 1fr; }
+  .dash-bottom, .split { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
-  .hotel-cctv .workspace {
+  .workspace {
     grid-template-columns: 1fr;
     height: 100vh;
   }
-  .hotel-cctv .sidebar {
+  .sidebar {
     position: fixed;
     z-index: 20;
     left: 12px;
@@ -2501,20 +2458,20 @@
     gap: 8px;
     overflow: visible;
   }
-  .hotel-cctv .brand, .hotel-cctv .sidebar-foot, .hotel-cctv .who > div, .hotel-cctv .nav-item span { display: none; }
-  .hotel-cctv .sidebar nav { width: 100%; display: flex; gap: 4px; }
-  .hotel-cctv .nav-item { flex: 1; justify-content: center; padding: 10px; }
-  .hotel-cctv .workspace-main {
+  .brand, .sidebar-foot, .who > div, .nav-item span { display: none; }
+  .sidebar nav { width: 100%; display: flex; gap: 4px; }
+  .nav-item { flex: 1; justify-content: center; padding: 10px; }
+  .workspace-main {
     grid-column: 1;
     padding-bottom: 84px;
   }
-  .hotel-cctv .page { padding: 16px; }
-  .hotel-cctv .stat-row, .hotel-cctv .form-row { grid-template-columns: 1fr 1fr; }
-  .hotel-cctv .thumb-grid { grid-template-columns: 1fr; }
+  .page { padding: 16px; }
+  .stat-row, .form-row { grid-template-columns: 1fr 1fr; }
+  .thumb-grid { grid-template-columns: 1fr; }
 }
 
 /* Admin only — design-2 pastel, orange→blue */
-.hotel-cctv .theme-admin {
+.theme-admin {
   --sky: #76b5ff;
   --sky-dark: #4a8ff0;
   --cream: #f0f7ff;
@@ -2532,15 +2489,15 @@
     var(--cream);
   color: var(--ink);
 }
-.hotel-cctv .theme-admin h1,
-.hotel-cctv .theme-admin h2,
-.hotel-cctv .theme-admin h3,
-.hotel-cctv .theme-admin .top-title,
-.hotel-cctv .theme-admin .brand strong {
+.theme-admin h1,
+.theme-admin h2,
+.theme-admin h3,
+.theme-admin .top-title,
+.theme-admin .brand strong {
   font-family: Mitr, Prompt, sans-serif;
   font-weight: 600;
 }
-.hotel-cctv .theme-admin .sidebar {
+.theme-admin .sidebar {
   top: 12px;
   left: 12px;
   width: 236px;
@@ -2553,9 +2510,9 @@
   box-shadow: 0 10px 30px rgba(58, 74, 92, 0.08);
   overflow: hidden;
 }
-.hotel-cctv .theme-admin .brand strong { color: var(--ink); font-size: 1.12rem; }
-.hotel-cctv .theme-admin .brand small { color: var(--muted); }
-.hotel-cctv .theme-admin .brand-mark {
+.theme-admin .brand strong { color: var(--ink); font-size: 1.12rem; }
+.theme-admin .brand small { color: var(--muted); }
+.theme-admin .brand-mark {
   width: 46px;
   height: 46px;
   border-radius: 999px;
@@ -2567,27 +2524,27 @@
     0 8px 18px rgba(74, 143, 240, 0.32),
     0 0 0 1px rgba(74, 143, 240, 0.12);
 }
-.hotel-cctv .theme-admin .brand-mark svg { width: 34px; height: 34px; }
-.hotel-cctv .theme-admin .brand-mark-art {
+.theme-admin .brand-mark svg { width: 34px; height: 34px; }
+.theme-admin .brand-mark-art {
   object-position: center 40%;
 }
-.hotel-cctv .theme-admin .nav-item {
+.theme-admin .nav-item {
   border-radius: 16px;
   color: var(--ink);
 }
-.hotel-cctv .theme-admin .nav-item:hover {
+.theme-admin .nav-item:hover {
   background: var(--cream);
   color: var(--ink);
 }
-.hotel-cctv .theme-admin .nav-item.active {
+.theme-admin .nav-item.active {
   background: var(--mist);
   color: var(--sky-dark);
   font-weight: 600;
   box-shadow: none;
 }
-.hotel-cctv .theme-admin .nav-item svg { color: var(--sky); opacity: 1; }
-.hotel-cctv .theme-admin .nav-item.active svg { color: var(--sky-dark); }
-.hotel-cctv .theme-admin .sidebar-mascot {
+.theme-admin .nav-item svg { color: var(--sky); opacity: 1; }
+.theme-admin .nav-item.active svg { color: var(--sky-dark); }
+.theme-admin .sidebar-mascot {
   height: 118px;
   border-radius: 20px;
   border: 1px solid rgba(214, 232, 255, 0.95);
@@ -2595,15 +2552,15 @@
     0 12px 24px rgba(74, 143, 240, 0.16),
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
-.hotel-cctv .theme-admin .sidebar-user {
+.theme-admin .sidebar-user {
   border-top: 1px solid var(--line);
 }
-.hotel-cctv .theme-admin .sidebar-user small { color: var(--muted); }
-.hotel-cctv .theme-admin .avatar {
+.theme-admin .sidebar-user small { color: var(--muted); }
+.theme-admin .avatar {
   background: var(--sky);
   box-shadow: 0 4px 12px rgba(74, 143, 240, 0.28);
 }
-.hotel-cctv .theme-admin .topbar {
+.theme-admin .topbar {
   margin: 12px 12px 0;
   padding: 10px 18px;
   border: 1px solid rgba(214, 232, 255, 0.95);
@@ -2614,50 +2571,37 @@
   top: 12px;
   backdrop-filter: blur(8px);
 }
-.hotel-cctv .theme-admin .who-btn {
+.theme-admin .who-btn {
   background: var(--cream);
   padding: 4px 12px 4px 4px;
   border-radius: 999px;
 }
-.hotel-cctv .theme-admin .who-btn:hover { background: var(--mist); }
-.hotel-cctv .theme-admin .who .avatar {
+.theme-admin .who-btn:hover { background: var(--mist); }
+.theme-admin .who .avatar {
   background: var(--mist);
   color: var(--sky-dark);
   box-shadow: none;
 }
-<<<<<<< HEAD
 .theme-admin .panel,
 .theme-admin .stat-card,
-.theme-admin .overlay .modal,
+.theme-admin .modal,
 .theme-admin .empty,
 .theme-admin .banner {
-=======
-.hotel-cctv .theme-admin .panel,
-.hotel-cctv .theme-admin .stat-card,
-.hotel-cctv .theme-admin .modal,
-.hotel-cctv .theme-admin .empty,
-.hotel-cctv .theme-admin .banner {
->>>>>>> origin/Pet-Transport
   border-radius: 24px;
   border-color: rgba(214, 232, 255, 0.9);
   box-shadow: 0 10px 30px rgba(58, 74, 92, 0.08);
 }
-.hotel-cctv .theme-admin .button {
+.theme-admin .button {
   border-radius: 999px;
   background: var(--sky);
   box-shadow: 0 6px 16px rgba(74, 143, 240, 0.35);
 }
-.hotel-cctv .theme-admin .button:hover { background: var(--sky-dark); }
-.hotel-cctv .theme-admin .button.ghost {
+.theme-admin .button:hover { background: var(--sky-dark); }
+.theme-admin .button.ghost {
   background: var(--cream);
   color: var(--ink);
   box-shadow: none;
 }
-<<<<<<< HEAD
-.hotel-cctv .theme-admin .button.ghost:hover { background: var(--mist); }
-.hotel-cctv .theme-admin .button.tiny,
-.hotel-cctv .theme-admin .button.ghost.tiny {
-=======
 .theme-admin .button.ghost:hover { background: var(--mist); }
 .theme-admin .button.danger {
   background: #e11d48;
@@ -2667,139 +2611,138 @@
 .theme-admin .button.danger:hover { background: #be123c; }
 .theme-admin .button.tiny,
 .theme-admin .button.ghost.tiny {
->>>>>>> origin/Super-Admin
   border-radius: 999px;
 }
-.hotel-cctv .theme-admin .users-tabs {
+.theme-admin .users-tabs {
   border-radius: 999px;
   background: #fff;
   border-color: var(--mist);
   box-shadow: 0 6px 16px rgba(58, 74, 92, 0.06);
 }
-.hotel-cctv .theme-admin .users-tabs button { border-radius: 999px; color: var(--muted); }
-.hotel-cctv .theme-admin .users-tabs button:hover:not(.active) {
+.theme-admin .users-tabs button { border-radius: 999px; color: var(--muted); }
+.theme-admin .users-tabs button:hover:not(.active) {
   color: var(--ink);
   background: var(--cream);
 }
-.hotel-cctv .theme-admin .users-tabs button span {
+.theme-admin .users-tabs button span {
   background: var(--mist);
   color: var(--sky-dark);
 }
-.hotel-cctv .theme-admin .users-tabs button.active {
+.theme-admin .users-tabs button.active {
   background: var(--sky);
   box-shadow: 0 6px 16px rgba(74, 143, 240, 0.35);
 }
-.hotel-cctv .theme-admin .users-tabs button.active span {
+.theme-admin .users-tabs button.active span {
   background: rgba(255, 255, 255, 0.28);
   color: #fff;
 }
-.hotel-cctv .theme-admin .person-avatar { background: var(--sky); }
-.hotel-cctv .theme-admin .perm-chip {
+.theme-admin .person-avatar { background: var(--sky); }
+.theme-admin .perm-chip {
   background: var(--mist);
   color: var(--sky-dark);
 }
-.hotel-cctv .theme-admin .perm-toggle {
+.theme-admin .perm-toggle {
   border-radius: 16px;
   background: var(--cream);
 }
-.hotel-cctv .theme-admin .perm-toggle.on {
+.theme-admin .perm-toggle.on {
   background: var(--mist);
   border-color: #b7d4ff;
   color: var(--sky-dark);
 }
-.hotel-cctv .theme-admin .search input {
+.theme-admin .search input {
   border-radius: 999px;
   background: #fff;
   border-color: var(--mist);
 }
-.hotel-cctv .theme-admin .search svg { color: var(--sky); }
-.hotel-cctv .theme-admin label input,
-.hotel-cctv .theme-admin label select,
-.hotel-cctv .theme-admin label textarea,
-.hotel-cctv .theme-admin .toolbar input,
-.hotel-cctv .theme-admin .toolbar select {
+.theme-admin .search svg { color: var(--sky); }
+.theme-admin label input,
+.theme-admin label select,
+.theme-admin label textarea,
+.theme-admin .toolbar input,
+.theme-admin .toolbar select {
   border-radius: 16px;
   background: var(--cream);
 }
-.hotel-cctv .theme-admin .camera-filter-search input {
+.theme-admin .camera-filter-search input {
   border-radius: 16px;
   background: var(--cream);
   border-color: rgba(214, 232, 255, 0.95);
 }
-.hotel-cctv .theme-admin .camera-status-chips .chip-btn {
+.theme-admin .camera-status-chips .chip-btn {
   background: #fff;
   border-color: rgba(214, 232, 255, 0.95);
 }
-.hotel-cctv .theme-admin .camera-status-chips .chip-btn.all.active {
+.theme-admin .camera-status-chips .chip-btn.all.active {
   background: var(--mist);
   border-color: #c5dbff;
   color: var(--sky-dark);
 }
-.hotel-cctv .theme-admin .stat-icon.total {
+.theme-admin .stat-icon.total {
   background: var(--sky);
   box-shadow: 0 6px 18px rgba(74, 143, 240, 0.18);
 }
-.hotel-cctv .theme-admin .room-filters button.active {
+.theme-admin .room-filters button.active {
   background: var(--sky);
   box-shadow: 0 6px 16px rgba(74, 143, 240, 0.28);
 }
-.hotel-cctv .theme-admin .system-banner {
+.theme-admin .system-banner {
   border-radius: 18px;
   background: var(--mist);
   border-color: #c5dbff;
 }
-.hotel-cctv .theme-admin .system-banner strong { color: var(--sky-dark); }
-.hotel-cctv .theme-admin .pill { background: var(--cream); color: var(--ink); }
-.hotel-cctv .theme-admin .access-create {
+.theme-admin .system-banner strong { color: var(--sky-dark); }
+.theme-admin .pill { background: var(--cream); color: var(--ink); }
+.theme-admin .access-create {
   border: 1px solid rgba(214, 232, 255, 0.95);
   box-shadow: 0 10px 28px rgba(74, 143, 240, 0.08);
 }
-.hotel-cctv .theme-admin .access-step { color: var(--sky-dark); }
-.hotel-cctv .theme-admin .access-preview {
+.theme-admin .access-step { color: var(--sky-dark); }
+.theme-admin .access-preview {
   background: var(--mist);
   border-color: #c5dbff;
 }
-.hotel-cctv .theme-admin .chip-btn.active {
+.theme-admin .chip-btn.active {
   background: var(--mist);
   border-color: #c5dbff;
   color: var(--sky-dark);
 }
-.hotel-cctv .theme-admin .access-card {
+.theme-admin .access-card {
   border-color: rgba(214, 232, 255, 0.95);
   background: #fff;
 }
-.hotel-cctv .theme-admin .access-range {
+.theme-admin .access-range {
   background: var(--cream);
   border-color: #c5dbff;
 }
-.hotel-cctv .theme-admin .live-stat {
+.theme-admin .live-stat {
   border-color: rgba(214, 232, 255, 0.95);
 }
-.hotel-cctv .theme-admin .live-stat.active {
+.theme-admin .live-stat.active {
   background: var(--mist);
   border-color: #c5dbff;
 }
-.hotel-cctv .theme-admin .live-wall-panel {
+.theme-admin .live-wall-panel {
   border: 1px solid rgba(214, 232, 255, 0.95);
   box-shadow: 0 10px 28px rgba(74, 143, 240, 0.08);
 }
 
-.hotel-cctv .settings-page { display: grid; gap: 14px; }
-.hotel-cctv .settings-admin { display: grid; gap: 12px; }
-.hotel-cctv .settings-status {
+.settings-page { display: grid; gap: 14px; }
+.settings-admin { display: grid; gap: 12px; }
+.settings-status {
   display: grid;
   gap: 14px;
 }
-.hotel-cctv .settings-status.ok { border-color: #bbf7d0; background: linear-gradient(180deg, #f0fdf4, #fff); }
-.hotel-cctv .settings-status.warn { border-color: #fde68a; background: linear-gradient(180deg, #fffbeb, #fff); }
-.hotel-cctv .settings-status.bad { border-color: #fecaca; background: linear-gradient(180deg, #fef2f2, #fff); }
-.hotel-cctv .settings-status-copy h2 { margin-top: 2px; }
-.hotel-cctv .settings-status-metrics {
+.settings-status.ok { border-color: #bbf7d0; background: linear-gradient(180deg, #f0fdf4, #fff); }
+.settings-status.warn { border-color: #fde68a; background: linear-gradient(180deg, #fffbeb, #fff); }
+.settings-status.bad { border-color: #fecaca; background: linear-gradient(180deg, #fef2f2, #fff); }
+.settings-status-copy h2 { margin-top: 2px; }
+.settings-status-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
-.hotel-cctv .settings-status-metrics > div {
+.settings-status-metrics > div {
   display: grid;
   gap: 2px;
   padding: 10px 12px;
@@ -2807,21 +2750,21 @@
   background: rgba(255, 255, 255, 0.8);
   border: 1px solid rgba(226, 232, 240, 0.9);
 }
-.hotel-cctv .settings-status-metrics strong { font-size: 1.2rem; line-height: 1.1; }
-.hotel-cctv .settings-status-metrics span { font-size: 0.74rem; color: var(--muted); font-weight: 600; }
-.hotel-cctv .settings-card-head {
+.settings-status-metrics strong { font-size: 1.2rem; line-height: 1.1; }
+.settings-status-metrics span { font-size: 0.74rem; color: var(--muted); font-weight: 600; }
+.settings-card-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
   margin-bottom: 12px;
 }
-.hotel-cctv .settings-profile {
+.settings-profile {
   display: flex;
   gap: 14px;
   align-items: center;
 }
-.hotel-cctv .settings-profile-mark {
+.settings-profile-mark {
   width: 56px;
   height: 56px;
   border-radius: 999px;
@@ -2830,27 +2773,27 @@
   border: 1.5px solid rgba(255, 255, 255, 0.8);
   box-shadow: 0 8px 18px rgba(74, 143, 240, 0.22);
 }
-.hotel-cctv .settings-profile-mark img {
+.settings-profile-mark img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
-.hotel-cctv .settings-profile-copy {
+.settings-profile-copy {
   display: grid;
   gap: 2px;
   min-width: 0;
 }
-.hotel-cctv .settings-profile-copy strong {
+.settings-profile-copy strong {
   font-size: 1.05rem;
 }
-.hotel-cctv .settings-inline-facts {
+.settings-inline-facts {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-bottom: 12px;
 }
-.hotel-cctv .settings-inline-facts > div {
+.settings-inline-facts > div {
   display: grid;
   gap: 2px;
   padding: 10px 12px;
@@ -2858,12 +2801,12 @@
   background: #f8fafc;
   border: 1px solid var(--line);
 }
-.hotel-cctv .settings-inline-facts span {
+.settings-inline-facts span {
   font-size: 0.74rem;
   color: var(--muted);
   font-weight: 600;
 }
-.hotel-cctv .settings-tags {
+.settings-tags {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -2871,7 +2814,7 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.hotel-cctv .settings-tags li {
+.settings-tags li {
   padding: 6px 10px;
   border-radius: 999px;
   background: #f8fafc;
@@ -2879,9 +2822,9 @@
   font-size: 0.78rem;
   font-weight: 600;
 }
-.hotel-cctv .settings-note { margin: 10px 0 0; }
-.hotel-cctv .settings-advanced { padding: 0; overflow: hidden; }
-.hotel-cctv .settings-advanced-toggle {
+.settings-note { margin: 10px 0 0; }
+.settings-advanced { padding: 0; overflow: hidden; }
+.settings-advanced-toggle {
   width: 100%;
   display: flex;
   justify-content: space-between;
@@ -2894,17 +2837,17 @@
   min-height: 0;
   height: auto;
 }
-.hotel-cctv .settings-advanced-toggle span:first-child {
+.settings-advanced-toggle span:first-child {
   display: grid;
   gap: 2px;
 }
-.hotel-cctv .settings-tech-list {
+.settings-tech-list {
   margin: 0;
   padding: 0 16px 16px;
   display: grid;
   gap: 8px;
 }
-.hotel-cctv .settings-tech-list > div {
+.settings-tech-list > div {
   display: grid;
   grid-template-columns: 120px 1fr;
   gap: 8px;
@@ -2912,47 +2855,23 @@
   border-top: 1px solid #eef2f7;
   font-size: 0.82rem;
 }
-.hotel-cctv .settings-tech-list dt { color: var(--muted); margin: 0; }
-.hotel-cctv .settings-tech-list dd { margin: 0; word-break: break-all; }
+.settings-tech-list dt { color: var(--muted); margin: 0; }
+.settings-tech-list dd { margin: 0; word-break: break-all; }
 
-.hotel-cctv .theme-admin .settings-inline-facts > div,
-.hotel-cctv .theme-admin .settings-tags li {
+.theme-admin .settings-inline-facts > div,
+.theme-admin .settings-tags li {
   background: var(--cream);
   border-color: rgba(214, 232, 255, 0.95);
 }
 
 @media (max-width: 760px) {
-  .hotel-cctv .theme-admin .sidebar {
+  .theme-admin .sidebar {
     margin: 0;
     border-radius: 999px;
   }
-  .hotel-cctv .theme-admin .topbar {
+  .theme-admin .topbar {
     margin: 12px 12px 0;
     border-radius: 22px;
   }
-  .hotel-cctv .theme-admin .nav-item { border-radius: 999px; }
-}
-
-.stay-desk {
-  display: grid;
-}
-
-.stay-desk-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 140px auto;
-  gap: 16px;
-  align-items: center;
-  padding: 16px 0;
-  border-top: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.stay-desk-row:first-child {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.stay-desk-row p {
-  margin: 4px 0 0;
-  color: var(--muted, #64748b);
-  font-size: 0.85rem;
+  .theme-admin .nav-item { border-radius: 999px; }
 }

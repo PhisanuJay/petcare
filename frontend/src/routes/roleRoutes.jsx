@@ -1,5 +1,4 @@
 import { Navigate, Route } from 'react-router-dom';
-
 import RequireStaff from '../features/auth/RequireStaff.jsx';
 
 import PetOwnerDashboardPage from '../features/pet-owner/pages/Dashboard.jsx';
@@ -10,9 +9,11 @@ import ServicesPage from '../features/pet-owner/pages/Services.jsx';
 import BookingPage from '../features/pet-owner/pages/Booking.jsx';
 import MedicalPage from '../features/pet-owner/pages/Medical.jsx';
 import CatHotelPage, { CatHotelBookingsPage, StayBookPage, StayWatchPage } from '../features/pet-owner/pages/CatHotel.jsx';
+import CatHotelReservationPage from '../features/pet-owner/pages/CatHotelReservation.jsx';
 import PaymentPage from '../features/payments/PaymentPage.jsx';
 import BookingHistoryPage from '../features/payments/BookingHistory.jsx';
 import TransportPage from '../features/pet-owner/pages/Transport.jsx';
+import TransportRequestsPage from '../features/pet-owner/pages/TransportRequests.jsx';
 import TransportHistoryPage from '../features/pet-owner/pages/TransportHistory.jsx';
 import TransportDetailPage from '../features/pet-owner/pages/TransportDetail.jsx';
 import PetOwnerAdoptionPage from '../features/pet-owner/pages/Adoption.jsx';
@@ -42,7 +43,6 @@ import ClinicAdminSettingsPage from '../features/clinic-admin/pages/Settings.jsx
 import ClinicAdminReportsPage from '../features/clinic-admin/pages/Reports.jsx';
 
 import PetProfile from '../features/pet-profile/PetProfile.jsx';
-
 import PetHotelDashboardPage from '../features/pet-hotel/pages/Dashboard.jsx';
 import RoomsPage from '../features/pet-hotel/pages/Rooms.jsx';
 import ReservationsPage from '../features/pet-hotel/pages/Reservations.jsx';
@@ -83,38 +83,6 @@ import AdminProvidersPage from '../features/admin/pages/Providers.jsx';
 import AdminBookingsPage from '../features/admin/pages/Bookings.jsx';
 import AdminReportsPage from '../features/admin/pages/Reports.jsx';
 
-/* Super Admin (ฟ่าง) = Pet Hotel CCTV — mounted in App.jsx at /super-admin/* */
-
-import AdminTransportLayout from '../features/pet-transport/admin/AdminTransportLayout.jsx';
-import TransportDashboard from '../features/pet-transport/admin/TransportDashboard.jsx';
-import BookingManagement from '../features/pet-transport/admin/BookingManagement.jsx';
-import BookingAdminDetail from '../features/pet-transport/admin/BookingAdminDetail.jsx';
-import DriversPage from '../features/pet-transport/admin/DriversPage.jsx';
-import PaymentVerification from '../features/pet-transport/admin/PaymentVerification.jsx';
-import CancellationPage from '../features/pet-transport/admin/CancellationPage.jsx';
-import TransportPricingPage from '../features/pet-transport/admin/PricingPage.jsx';
-import HotelsPage from '../features/pet-transport/admin/HotelsPage.jsx';
-
-/**
- * Route map aligned with Page 17 sitemap.
- * Keep each role under its own path prefix so teams do not overlap.
- */
-
-/** Admin Pet Transport booking — nested under `/admin` + StaffShell. */
-export const adminTransportRoutes = (
-  <Route path="transport" element={<AdminTransportLayout />}>
-    <Route index element={<TransportDashboard />} />
-    <Route path="bookings" element={<BookingManagement />} />
-    <Route path="bookings/:bookingId" element={<BookingAdminDetail />} />
-    <Route path="drivers" element={<DriversPage />} />
-    <Route path="payments" element={<PaymentVerification />} />
-    <Route path="cancellations" element={<CancellationPage />} />
-    <Route path="pricing" element={<TransportPricingPage />} />
-    <Route path="hotels" element={<HotelsPage />} />
-  </Route>
-);
-
-/** Pet Owner — มะแอ่ว. Rendered inside CustomerLayout and requires login (see App.jsx). */
 export const petOwnerRoutes = (
   <Route path="pet-owner">
     <Route index element={<PetOwnerDashboardPage />} />
@@ -128,10 +96,12 @@ export const petOwnerRoutes = (
     <Route path="history" element={<BookingHistoryPage />} />
     <Route path="pay/:paymentId" element={<PaymentPage />} />
     <Route path="cat-hotel" element={<CatHotelPage />} />
+    <Route path="cat-hotel/reservations" element={<CatHotelReservationPage />} />
     <Route path="cat-hotel/book" element={<StayBookPage />} />
     <Route path="cat-hotel/bookings" element={<CatHotelBookingsPage />} />
     <Route path="cat-hotel/watch/:cameraId" element={<StayWatchPage />} />
     <Route path="transport" element={<TransportPage />} />
+    <Route path="transport/requests" element={<TransportRequestsPage />} />
     <Route path="transport/history" element={<TransportHistoryPage />} />
     <Route path="transport/:bookingId" element={<TransportDetailPage />} />
     <Route path="adoption" element={<PetOwnerAdoptionPage />} />
@@ -139,8 +109,6 @@ export const petOwnerRoutes = (
   </Route>
 );
 
-<<<<<<< HEAD
-/** Admin routes — nested under `/admin` + StaffShell + RequireRole(admin). */
 export const adminTransportRoutes = (
   <>
     <Route index element={<Navigate to="transport" replace />} />
@@ -152,6 +120,7 @@ export const adminTransportRoutes = (
       <Route path="pricing" element={<TransportPricingPage />} />
       <Route path="hotels" element={<HotelsPage />} />
       <Route path="drivers" element={<DriversPage />} />
+      <Route path="payments" element={<PaymentVerification />} />
     </Route>
     <Route path="users" element={<AdminUsersPage />} />
     <Route path="providers" element={<AdminProvidersPage />} />
@@ -161,7 +130,6 @@ export const adminTransportRoutes = (
   </>
 );
 
-/** Driver routes — nested under `/pet-transport` + StaffShell + RequireRole(driver). */
 export const driverTransportRoutes = (
   <>
     <Route index element={<PetTransportDashboardPage />} />
@@ -176,7 +144,6 @@ export const driverTransportRoutes = (
   </>
 );
 
-/** Finance routes — nested under `/finance` + StaffShell + RequireRole(finance). */
 export const financeRoutes = (
   <>
     <Route index element={<PaymentVerification />} />
@@ -184,9 +151,6 @@ export const financeRoutes = (
   </>
 );
 
-/** Legacy skeleton modules (other teams) — not mounted in App until they add auth. */
-=======
-/** Adoption staff — uses the main PetCare site layout and its existing navbar. */
 export const adoptionStaffRoutes = (
   <>
     <Route path="adoption/login" element={<AdoptionStaffLoginPage />} />
@@ -202,16 +166,9 @@ export const adoptionStaffRoutes = (
   </>
 );
 
-/** Staff role modules — rendered inside the legacy AppShell. */
->>>>>>> origin/Adoption
 export const roleRoutes = (
   <>
-<<<<<<< HEAD
-    <Route path="veterinarian">
-=======
-    {/* Veterinarian — มะแอ่ว */}
     <Route path="veterinarian" element={<RequireStaff role="veterinarian" />}>
->>>>>>> origin/Pet-Owner-Vet
       <Route index element={<VeterinarianDashboardPage />} />
       <Route path="appointments" element={<VetAppointmentsPage />} />
       <Route path="patients" element={<VetPatientsPage />} />
@@ -219,16 +176,6 @@ export const roleRoutes = (
       <Route path="vaccination" element={<VaccinationPage />} />
       <Route path="reports" element={<VetReportsPage />} />
     </Route>
-<<<<<<< HEAD
-    <Route path="medical-assistant">
-      <Route index element={<MedicalAssistantDashboardPage />} />
-      <Route path="appointments" element={<MaAppointmentsPage />} />
-      <Route path="patients" element={<MaPatientsPage />} />
-      <Route path="booking-management" element={<BookingManagementPage />} />
-      <Route path="medical-support" element={<MedicalSupportPage />} />
-=======
-
-    {/* Medical Assistant — เอิร์ท */}
     <Route path="medical-assistant" element={<RequireStaff role="medical_assistant" />}>
       <Route element={<MedicalAssistantLayout />}>
         <Route index element={<MedicalAssistantDashboardPage />} />
@@ -240,8 +187,6 @@ export const roleRoutes = (
         <Route path="medical-support/:appointmentId" element={<SupportCasePage />} />
       </Route>
     </Route>
-
-    {/* Clinic Admin — เอิร์ท */}
     <Route path="clinic-admin" element={<RequireStaff role="clinic_admin" />}>
       <Route element={<ClinicAdminLayout />}>
         <Route index element={<ClinicAdminOverviewPage />} />
@@ -250,7 +195,6 @@ export const roleRoutes = (
         <Route path="settings" element={<ClinicAdminSettingsPage />} />
         <Route path="reports" element={<ClinicAdminReportsPage />} />
       </Route>
->>>>>>> origin/Pet-Owner-Vet
     </Route>
     <Route path="pet-profile" element={<PetProfile />} />
     <Route path="pet-hotel">
@@ -262,47 +206,5 @@ export const roleRoutes = (
       <Route path="care-records" element={<CareRecordsPage />} />
       <Route path="cctv" element={<HotelCctvPage />} />
     </Route>
-<<<<<<< HEAD
-    <Route path="adoption">
-      <Route index element={<AdoptionDashboardPage />} />
-      <Route path="animals" element={<AnimalsPage />} />
-      <Route path="add-animal" element={<AddAnimalPage />} />
-      <Route path="requests" element={<AdoptionRequestsPage />} />
-      <Route path="requests/:requestId" element={<RequestDetailPage />} />
-    </Route>
-    {/* Super Admin CCTV → App.jsx /super-admin/* (HotelCctvMount) */}
-    {/* Admin transport → adminTransportRoutes under StaffShell */}
-=======
-
-    {/* Pet Transport — โมเดล */}
-    <Route path="pet-transport">
-      <Route index element={<PetTransportDashboardPage />} />
-      <Route path="assigned-jobs" element={<AssignedJobsPage />} />
-      <Route path="job-detail" element={<JobDetailPage />} />
-      <Route path="tracking" element={<TrackingPage />} />
-      <Route path="history" element={<HistoryPage />} />
-    </Route>
-
-    {/* Admin — เจ */}
-    <Route path="admin">
-      <Route index element={<AdminDashboardPage />} />
-      <Route path="users" element={<AdminUsersPage />} />
-      <Route path="providers" element={<AdminProvidersPage />} />
-      <Route path="bookings" element={<AdminBookingsPage />} />
-      <Route path="reports" element={<AdminReportsPage />} />
-    </Route>
-
-    {/* Super Admin — ฟ่าง */}
-    <Route path="super-admin">
-      <Route index element={<SuperAdminDashboardPage />} />
-      <Route path="users" element={<SuperAdminUsersPage />} />
-      <Route path="roles-permissions" element={<RolesPermissionsPage />} />
-      <Route path="providers" element={<SuperAdminProvidersPage />} />
-      <Route path="pricing" element={<PricingPage />} />
-      <Route path="promotions" element={<PromotionsPage />} />
-      <Route path="reports" element={<SuperAdminReportsPage />} />
-      <Route path="settings" element={<SettingsPage />} />
-    </Route>
->>>>>>> origin/Adoption
   </>
 );
