@@ -167,6 +167,8 @@ export default function TransportPage() {
         ownerPhone: currentUser.phone || '',
         petId: petId || null,
         petName: petName.trim(),
+        petSpecies: pets.find((pet) => pet.id === petId)?.species || '',
+        petBreed: pets.find((pet) => pet.id === petId)?.breed || '',
         petNotes: petNotes.trim(),
         serviceType,
         from,
