@@ -1,0 +1,489 @@
+/* Clinic Admin module styles — every selector scoped under .ca-shell, using only theme.css variables and #fff */
+
+.ca-shell {
+  margin: -1.5rem;
+  padding: 2rem 0 4rem;
+  min-height: calc(100vh - 56px);
+  overflow-x: clip;
+}
+
+/* Override .app-shell a specificity for buttons & nav links inside .ca-shell */
+.ca-shell a.btn-sky,
+.ca-shell a.btn-sky:hover,
+.ca-shell a.btn-sky:focus {
+  color: #fff;
+}
+
+.ca-shell a.btn-soft,
+.ca-shell a.btn-soft:hover,
+.ca-shell a.btn-soft:focus {
+  color: var(--ink);
+}
+
+.ca-shell .ca-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 992px) {
+  .ca-shell .ca-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+}
+
+.ca-shell .ca-sidebar {
+  background: #fff;
+  border-radius: 28px;
+  padding: 1.4rem 1rem;
+  box-shadow: 0 10px 26px rgba(var(--shadow), 0.07);
+  width: 250px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px;
+}
+
+.ca-shell .ca-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.6rem 1rem;
+  border-bottom: 1.5px solid var(--baby);
+  margin-bottom: 0.85rem;
+}
+
+.ca-shell .ca-brand-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--baby);
+  color: var(--sky-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.ca-shell .ca-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ca-shell .ca-sidebar-footer {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1.5px solid var(--baby);
+  display: grid;
+  gap: 0.55rem;
+}
+
+.ca-shell a.ca-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.94rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ca-shell a.ca-nav-link i {
+  color: var(--sky);
+  font-size: 1.1rem;
+}
+
+.ca-shell a.ca-nav-link:hover {
+  background: var(--cloud);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.ca-shell a.ca-nav-link.active {
+  background: var(--baby);
+  color: var(--sky-dark);
+  font-weight: 500;
+}
+
+.ca-shell a.ca-nav-link.active i {
+  color: var(--sky-dark);
+}
+
+.ca-shell .ca-mobile-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.ca-shell .pill-tabs.ca-mobile-nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+  margin-bottom: 0;
+}
+
+.ca-shell .pill-tabs.ca-mobile-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.ca-shell a.ca-mobile-link {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font-size: 0.88rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.ca-shell a.ca-mobile-link i {
+  color: var(--sky);
+}
+
+.ca-shell a.ca-mobile-link:hover {
+  background: var(--cloud);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.ca-shell a.ca-mobile-link.active {
+  background: var(--baby);
+  color: var(--sky-dark);
+  font-weight: 500;
+}
+
+.ca-shell a.ca-mobile-link.active i {
+  color: var(--sky-dark);
+}
+
+.ca-shell .ca-content {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.ca-shell .stat {
+  background: #fff;
+  border-radius: 22px;
+  box-shadow: 0 10px 26px rgba(var(--shadow), 0.07);
+  padding: 1rem 0.9rem;
+  height: 100%;
+}
+
+.ca-shell .stat.ca-stat-warn {
+  border: 1.5px solid var(--sky);
+  background: var(--cloud);
+}
+
+.ca-shell .ca-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (min-width: 992px) {
+  .ca-shell .ca-stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.ca-shell .ca-stat-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--baby);
+  color: var(--sky-dark);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  margin-bottom: 0.4rem;
+}
+
+.ca-shell .card-soft .pill-tabs {
+  background: var(--cloud);
+  box-shadow: none;
+}
+
+.ca-shell .ca-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ca-shell .ca-filter-bar > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ca-shell .ca-search-group {
+  flex: 1 1 220px;
+}
+
+@media (min-width: 992px) {
+  .ca-shell .ca-search-group {
+    max-width: 280px;
+  }
+}
+
+.ca-shell .pill-tabs.ca-scroll-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+  margin-bottom: 0;
+}
+
+.ca-shell .pill-tabs.ca-scroll-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ca-shell .pill-tabs.ca-scroll-tabs button {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ca-shell .ca-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ca-shell .ca-table thead th {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1.5px solid var(--baby);
+  white-space: nowrap;
+}
+
+.ca-shell .ca-table tbody td {
+  padding: 0.85rem 0.75rem;
+  border-bottom: 1px solid var(--baby);
+  vertical-align: middle;
+}
+
+.ca-shell .ca-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.ca-shell .ca-table .tag {
+  white-space: nowrap;
+}
+
+.ca-shell .ca-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ca-shell .ca-actions .btn-sm {
+  padding: 0.32rem 0.8rem;
+  font-size: 0.82rem;
+  border-radius: 999px;
+}
+
+.ca-shell .ca-staff-card {
+  background: var(--cloud);
+  border-radius: 20px;
+  padding: 1rem;
+}
+
+.ca-shell .ca-list-item {
+  background: var(--cloud);
+  border-radius: 18px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.ca-shell .ca-duty-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1.5px solid var(--baby);
+  background: var(--cloud);
+  color: var(--muted);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.ca-shell .ca-duty-btn.is-on {
+  background: var(--baby);
+  border-color: var(--sky);
+  color: var(--sky-dark);
+}
+
+.ca-shell .ca-duty-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ca-shell .ca-hours-row {
+  background: var(--cloud);
+  border-radius: 18px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+@media (min-width: 768px) {
+  .ca-shell .ca-hours-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.ca-shell .ca-hours-times {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ca-shell .ca-hours-select {
+  width: auto;
+  min-width: 105px;
+}
+
+.ca-shell .ca-bar-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.ca-shell .ca-bar-row {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.ca-shell .ca-bar-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.ca-shell .ca-bar-track-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ca-shell .ca-bar-track {
+  flex: 1;
+  min-width: 0;
+  height: 11px;
+  border-radius: 999px;
+  background: var(--cloud);
+  overflow: hidden;
+}
+
+.ca-shell .ca-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--sky);
+  transition: width 0.25s ease;
+}
+
+.ca-shell .ca-bar-val {
+  min-width: 2.4rem;
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sky-dark);
+}
+
+.ca-shell .ca-quick-link {
+  background: var(--cloud);
+  border-radius: 18px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.ca-shell .ca-quick-link:hover {
+  background: var(--baby);
+  color: var(--sky-dark);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.ca-shell .ca-modal {
+  z-index: 1055;
+  overflow-y: auto;
+}
+
+.ca-shell .ca-modal-backdrop {
+  z-index: 1050;
+}
+
+.ca-shell .ca-modal-card {
+  background: #fff;
+  border-radius: 28px;
+  border: 0;
+  box-shadow: 0 14px 40px rgba(var(--shadow), 0.18);
+  padding: 1.5rem;
+}
+
+.ca-shell .btn-sky:disabled {
+  pointer-events: auto;
+  cursor: not-allowed;
+}
+
+.ca-shell .ca-print-only {
+  display: none;
+}
+
+@media print {
+  .ca-shell {
+    margin: 0;
+    padding: 0;
+    background: #fff;
+  }
+
+  .ca-shell .ca-sidebar,
+  .ca-shell .ca-mobile-header,
+  .ca-shell .ca-mobile-nav,
+  .ca-shell .ca-no-print,
+  .ca-shell .pill-tabs,
+  .ca-shell .btn {
+    display: none !important;
+  }
+
+  .ca-shell .ca-print-only {
+    display: block !important;
+  }
+
+  .ca-shell .card-soft,
+  .ca-shell .stat {
+    box-shadow: none;
+    border: 1px solid var(--baby);
+  }
+}

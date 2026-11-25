@@ -1,97 +1,145 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
+import { STORAGE_KEYS, readJSON } from '../../shared/utils/storage.js';
+import { ownerRequest } from './api.js';
 
-const listeners = new Set();
-let cache = null;
+/* ---------- API ---------- */
 
-function getAll() {
-  if (cache === null) cache = readJSON(STORAGE_KEYS.pets, []);
-  return cache;
+const request = (ownerId, path = '', options = {}) => ownerRequest(ownerId, `/my-pets${path}`, options);
+
+/**
+ * Tell the backend how to reach this owner (name, phone, ...), so the clinic can contact them from the
+ * veterinarian's Customers page. Customer accounts live in the browser, so the backend cannot read them.
+ * Sent again only when something changed; a failure is ignored (it must not block the pets pages).
+ */
+const syncedProfiles = new Map(); // ownerId -> JSON of the last profile that was sent
+function syncOwnerProfile(user) {
+  const profile = {
+    name: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+    phone: user.phone ?? '',
+    email: user.email ?? '',
+    address: user.address ?? '',
+    emergencyName: user.emergencyName ?? '',
+    emergencyPhone: user.emergencyPhone ?? '',
+  };
+  const json = JSON.stringify(profile);
+  if (!profile.name || syncedProfiles.get(user.id) === json) return;
+  syncedProfiles.set(user.id, json);
+  ownerRequest(user.id, '/profile', { method: 'PUT', body: json }).catch(() => syncedProfiles.delete(user.id));
 }
 
-function setAll(next) {
-  writeJSON(STORAGE_KEYS.pets, next);
-  cache = next;
+/* ---------- shared store (one list for the logged-in owner) ---------- */
+
+const listeners = new Set();
+let state = { ownerId: null, pets: [], status: 'idle', error: '' };
+let loadingFor = null;
+
+function setState(patch) {
+  state = { ...state, ...patch };
   listeners.forEach((l) => l());
 }
 
-function subscribe(listener) {
+const subscribe = (listener) => {
   listeners.add(listener);
-  const onStorage = (e) => {
-    if (e.key === STORAGE_KEYS.pets) {
-      cache = null;
-      listener();
+  return () => listeners.delete(listener);
+};
+const getSnapshot = () => state;
+
+/** Pets saved in localStorage by the earlier version are uploaded once, then removed locally. */
+async function migrateLocalPets(ownerId) {
+  const local = readJSON(STORAGE_KEYS.pets, []);
+  const mine = local.filter((p) => p.ownerId === ownerId);
+  if (mine.length === 0) return;
+  const uploaded = [];
+  for (const pet of mine) {
+    try {
+      await request(ownerId, '', { method: 'POST', body: JSON.stringify(pet) });
+      uploaded.push(pet.id);
+    } catch {
+      return; // keep the rest locally and try again next time
     }
-  };
-  window.addEventListener('storage', onStorage);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener('storage', onStorage);
-  };
+  }
+  try {
+    const rest = readJSON(STORAGE_KEYS.pets, []).filter((p) => !uploaded.includes(p.id));
+    localStorage.setItem(STORAGE_KEYS.pets, JSON.stringify(rest));
+  } catch {
+    /* ignore */
+  }
 }
 
-const withIds = (rows = []) => rows.map((r) => (r.id ? r : { ...r, id: newId() }));
+async function load(ownerId) {
+  if (loadingFor === ownerId) return;
+  loadingFor = ownerId;
+  setState({ ownerId, pets: [], status: 'loading', error: '' });
+  try {
+    let pets = await request(ownerId);
+    if (pets.length === 0 && readJSON(STORAGE_KEYS.pets, []).some((p) => p.ownerId === ownerId)) {
+      await migrateLocalPets(ownerId);
+      pets = await request(ownerId);
+    }
+    if (state.ownerId === ownerId) setState({ pets, status: 'ready' });
+  } catch (err) {
+    if (state.ownerId === ownerId) setState({ status: 'error', error: err.message });
+  } finally {
+    if (loadingFor === ownerId) loadingFor = null;
+  }
+}
 
-/** Pets of the logged-in user, persisted in localStorage. */
+/* ---------- hook ---------- */
+
+/**
+ * Pets of the logged-in user, stored by the backend (`/api/pet-owner/my-pets`).
+ * `addPet`, `updatePet` and `deletePet` are async and throw an Error with a Thai message on failure.
+ */
 export function usePets() {
   const { currentUser } = useAuth();
-  const all = useSyncExternalStore(subscribe, getAll);
-  const ownerId = currentUser?.id;
+  const ownerId = currentUser?.id ?? null;
+  const snap = useSyncExternalStore(subscribe, getSnapshot);
 
-  const pets = useMemo(
-    () =>
-      ownerId
-        ? all.filter((p) => p.ownerId === ownerId).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-        : [],
-    [all, ownerId],
-  );
+  useEffect(() => {
+    if (ownerId && snap.ownerId !== ownerId) load(ownerId);
+  }, [ownerId, snap.ownerId]);
+
+  useEffect(() => {
+    if (currentUser) syncOwnerProfile(currentUser);
+  }, [currentUser]);
+
+  const mine = ownerId !== null && snap.ownerId === ownerId;
+  const pets = useMemo(() => (mine ? snap.pets : []), [mine, snap.pets]);
+  const loading = ownerId !== null && (!mine || snap.status === 'loading');
+  const error = mine && snap.status === 'error' ? snap.error : '';
 
   const getPet = useCallback((id) => pets.find((p) => p.id === id) ?? null, [pets]);
 
+  const reload = useCallback(() => {
+    if (ownerId) load(ownerId);
+  }, [ownerId]);
+
   const addPet = useCallback(
-    (data) => {
-      const now = new Date().toISOString();
-      const pet = {
-        ...data,
-        vaccines: withIds(data.vaccines),
-        treatments: withIds(data.treatments),
-        parasites: withIds(data.parasites),
-        id: newId(),
-        ownerId,
-        createdAt: now,
-        updatedAt: now,
-      };
-      setAll([...getAll(), pet]);
+    async (data) => {
+      const pet = await request(ownerId, '', { method: 'POST', body: JSON.stringify(data) });
+      if (state.ownerId === ownerId) setState({ pets: [...state.pets, pet] });
       return pet;
     },
     [ownerId],
   );
 
   const updatePet = useCallback(
-    (id, data) => {
-      setAll(
-        getAll().map((p) =>
-          p.id === id && p.ownerId === ownerId
-            ? {
-                ...p,
-                ...data,
-                vaccines: withIds(data.vaccines ?? p.vaccines),
-                treatments: withIds(data.treatments ?? p.treatments),
-                parasites: withIds(data.parasites ?? p.parasites),
-                updatedAt: new Date().toISOString(),
-              }
-            : p,
-        ),
-      );
+    async (id, data) => {
+      const pet = await request(ownerId, `/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+      if (state.ownerId === ownerId) setState({ pets: state.pets.map((p) => (p.id === id ? pet : p)) });
+      return pet;
     },
     [ownerId],
   );
 
   const deletePet = useCallback(
-    (id) => setAll(getAll().filter((p) => !(p.id === id && p.ownerId === ownerId))),
+    async (id) => {
+      await request(ownerId, `/${id}`, { method: 'DELETE' });
+      if (state.ownerId === ownerId) setState({ pets: state.pets.filter((p) => p.id !== id) });
+    },
     [ownerId],
   );
 
-  return { pets, getPet, addPet, updatePet, deletePet };
+  return { pets, loading, error, reload, getPet, addPet, updatePet, deletePet };
 }

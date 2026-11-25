@@ -1,0 +1,7 @@
+pets.json
+bookings.json
+hotel-reservations.json
+transport-requests.json
+adoption-requests.json
+*.tmp
+owners.json

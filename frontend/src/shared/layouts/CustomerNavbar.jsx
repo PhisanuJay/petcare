@@ -15,7 +15,9 @@ const GUEST_MENU = [
 
 const MEMBER_MENU = [
   { to: '/', label: 'หน้าแรก', icon: 'bi-house-heart', end: true },
-  { to: '/#services', label: 'บริการ', icon: 'bi-grid' },
+  // แก้โดย มะแอ๋ว (Pet Owner): เมนู "บริการ" ของสมาชิกเปลี่ยนจาก '/#services' (เลื่อนไปส่วนบริการในหน้าแรก)
+  // เป็น '/pet-owner/services' (หน้ารวมบริการ) เมนูของแขก (GUEST_MENU) ยังเหมือนเดิม
+  { to: '/pet-owner/services', label: 'บริการ', icon: 'bi-grid' },
   { to: '/pet-owner/booking', label: 'จองนัดหมาย', icon: 'bi-calendar2-plus' },
   { to: '/pet-owner', label: 'นัดหมายของฉัน', icon: 'bi-calendar2-check', end: true },
   { to: '/pet-owner/my-pets', label: 'สัตว์เลี้ยงของฉัน', icon: 'bi-heart' },

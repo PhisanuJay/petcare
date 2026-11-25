@@ -17,6 +17,7 @@ petcare/
 | Pet Owner | มะแอ่ว | `frontend/src/features/pet-owner/` | `backend/src/modules/pet-owner/` |
 | Veterinarian | มะแอ่ว | `frontend/src/features/veterinarian/` | `backend/src/modules/veterinarian/` |
 | Medical Assistant | เอิร์ท | `frontend/src/features/medical-assistant/` | `backend/src/modules/medical-assistant/` |
+| Clinic Admin | เอิร์ท | `frontend/src/features/clinic-admin/` | `backend/src/modules/clinic-admin/` |
 | Pet Profile | เอิร์ท, ปร่ย | `frontend/src/features/pet-profile/` | `backend/src/modules/pet-profile/` |
 | Pet Hotel | ฟ่าง, เจ | `frontend/src/features/pet-hotel/` | `backend/src/modules/pet-hotel/` |
 | Pet Transport | โมเดล | `frontend/src/features/pet-transport/` | `backend/src/modules/pet-transport/` |
