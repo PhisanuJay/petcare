@@ -65,14 +65,17 @@ export function useBookings() {
     [ownerId, currentUser],
   );
 
-  const cancelBooking = useCallback(
-    async (id) => {
-      const booking = await ownerRequest(ownerId, `/bookings/${id}/cancel`, { method: 'POST' });
+  const requestCancel = useCallback(
+    async (id, cancellationId, reason) => {
+      const booking = await ownerRequest(ownerId, `/bookings/${id}/request-cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ cancellationId, reason }),
+      });
       setBookings((list) => list.map((b) => (b.id === id ? booking : b)));
       return booking;
     },
     [ownerId],
   );
 
-  return { bookings, loading, error, reload, addBooking, cancelBooking };
+  return { bookings, loading, error, reload, addBooking, requestCancel };
 }

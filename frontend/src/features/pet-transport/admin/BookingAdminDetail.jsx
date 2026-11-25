@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import PriceQuote from '../components/PriceQuote.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import TripStatusTimeline from '../components/TripStatusTimeline.jsx';
-import { PAYMENT_STATUSES, TRIP_TYPES, ZONES, serviceTypeMeta } from '../constants.js';
+import { PAYMENT_STATUSES, TRIP_TYPES, serviceTypeMeta } from '../constants.js';
 import { formatBaht, subdistrictById } from '../pricing.js';
 import { useTransport } from '../useTransport.js';
 import { bookingBucket, shortBookingId } from './adminBookingUtils.js';
@@ -31,16 +31,11 @@ export default function BookingAdminDetail() {
   const { bookingId } = useParams();
   const {
     getBooking,
-    zones,
     activeDrivers,
-    confirmPrice,
     assignDriver,
-    adminMarkPaid,
     updateTripSchedule,
   } = useTransport();
   const booking = getBooking(bookingId);
-  const [fareZoneId, setFareZoneId] = useState(booking?.fareZoneId || booking?.zoneId || '1');
-  const [customPrice, setCustomPrice] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [confirm, setConfirm] = useState(null);
@@ -61,17 +56,13 @@ export default function BookingAdminDetail() {
   const pay = PAYMENT_STATUSES[booking.paymentStatus] || { label: booking.paymentStatus || '—' };
   const service = serviceTypeMeta(booking.serviceType);
   const bucket = bookingBucket(booking);
-
-  function askConfirmPrice() {
-    setErr('');
-    setConfirm({
-      type: 'price',
-      title: 'ยืนยันราคา?',
-      body: `บันทึกราคา Zone ${fareZoneId}${customPrice !== '' ? ` / กำหนดเอง ฿${customPrice}` : ''} สำหรับ ${booking.petName}`,
-    });
-  }
+  const isPaid = booking.paymentStatus === 'paid';
 
   function askAssign(tripId) {
+    if (!isPaid) {
+      setErr('รอฝ่ายบัญชียืนยันการชำระเงินก่อนมอบหมายคนขับ');
+      return;
+    }
     const trip = booking.trips.find((t) => t.id === tripId);
     const driverId = assignDraft[tripId] ?? trip?.driverId;
     if (!driverId) {
@@ -89,16 +80,11 @@ export default function BookingAdminDetail() {
     });
   }
 
-  function askMarkPaid() {
-    setErr('');
-    setConfirm({
-      type: 'paid',
-      title: 'ยืนยันชำระแล้ว?',
-      body: `${booking.petName} · ${formatBaht(booking.quote?.total)} — คนขับจะเริ่มงานได้หลังยืนยัน`,
-    });
-  }
-
   function askSchedule(tripId) {
+    if (!isPaid) {
+      setErr('รอฝ่ายบัญชียืนยันการชำระเงินก่อนจัดการทริป');
+      return;
+    }
     const trip = booking.trips.find((t) => t.id === tripId);
     const next = scheduleDraft[tripId] || toLocalInput(trip?.pickupTime);
     if (!next) {
@@ -119,18 +105,9 @@ export default function BookingAdminDetail() {
   async function runConfirm() {
     if (!confirm) return;
     try {
-      if (confirm.type === 'price') {
-        await confirmPrice(booking.id, {
-          fareZoneId,
-          customPerTrip: customPrice !== '' ? customPrice : null,
-        });
-        setMsg('ยืนยันราคาแล้ว');
-      } else if (confirm.type === 'assign') {
+      if (confirm.type === 'assign') {
         await assignDriver(confirm.tripId, confirm.driverId);
         setMsg('มอบหมายคนขับแล้ว');
-      } else if (confirm.type === 'paid') {
-        await adminMarkPaid(booking.id);
-        setMsg('ยืนยันชำระแล้ว — คนขับเริ่มงานได้');
       } else if (confirm.type === 'schedule') {
         await updateTripSchedule(confirm.tripId, { pickupTime: confirm.pickupTime });
         setMsg('เปลี่ยนเวลานัดรับแล้ว — แจ้งคนขับแล้ว');
@@ -146,8 +123,8 @@ export default function BookingAdminDetail() {
     <div className="tp-booking-detail">
       <div className="tp-detail-top">
         <div>
-          <Link className="tp-back" to="/admin/transport/bookings">← กลับรายการ Booking</Link>
-          <h1>รายละเอียด Booking</h1>
+          <Link className="tp-back" to="/admin/transport/bookings">← กลับรายการจอง</Link>
+          <h1>รายละเอียดการจอง</h1>
           <p className="tp-lead">
             <code className="tp-code" title={booking.id}>{shortBookingId(booking.id)}</code>
             {' · '}
@@ -200,51 +177,20 @@ export default function BookingAdminDetail() {
           </div>
         </div>
         <p className="tp-muted" style={{ marginTop: '0.75rem' }}>
-          ลำดับงาน: ยืนยันราคา → มอบหมายคนขับ → ยืนยันชำระเงิน → คนขับอัปเดตสถานะ
-          {bucket === 'awaiting_price' ? ' · ตอนนี้อยู่ขั้นยืนยันราคา' : ''}
-          {bucket === 'awaiting_assign' ? ' · ตอนนี้อยู่ขั้น Assign' : ''}
-          {bucket === 'awaiting_payment' ? ' · ตอนนี้อยู่ขั้นรอชำระ' : ''}
+          ลำดับงาน: ลูกค้าส่งสลิป → ฝ่ายบัญชียืนยันชำระเงิน → Admin มอบหมายคนขับ → คนขับอัปเดตสถานะ
+          {!isPaid ? ' · รอฝ่ายบัญชียืนยันชำระเงิน' : ''}
+          {isPaid && bucket === 'awaiting_assign' ? ' · ยืนยันชำระแล้ว รอมอบหมายคนขับ' : ''}
         </p>
       </div>
 
-      <div className="tp-grid tp-grid--2" style={{ marginTop: '1rem' }}>
-        <div className="tp-card">
-          <h3>1) ยืนยันราคา</h3>
-          <div className="tp-form">
-            <div className="field">
-              <label htmlFor="zone">คิดตาม Zone</label>
-              <select id="zone" value={fareZoneId} onChange={(e) => setFareZoneId(e.target.value)}>
-                {(zones.length ? zones : ZONES).map((z) => (
-                  <option key={z.id} value={z.id}>
-                    {z.label} {z.price != null ? `(฿${z.price}/เที่ยว)` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="custom">ราคา/เที่ยว (ถ้าต้องกำหนดเอง)</label>
-              <input
-                id="custom"
-                type="number"
-                min="0"
-                value={customPrice}
-                onChange={(e) => setCustomPrice(e.target.value)}
-                placeholder="เว้นว่างเพื่อใช้ราคา Zone"
-              />
-            </div>
-          </div>
-          <div className="tp-actions">
-            <button type="button" className="btn btn-sky" onClick={askConfirmPrice}>
-              ยืนยันราคา
-            </button>
-            {booking.paymentStatus !== 'paid' ? (
-              <button type="button" className="btn btn-soft" onClick={askMarkPaid}>
-                3) ยืนยันชำระแล้ว
-              </button>
-            ) : null}
-          </div>
+      {!isPaid ? (
+        <div className="tp-alert tp-alert--info" role="status">
+          รายการนี้จะแสดงให้ Admin มอบหมายคนขับหลังฝ่ายบัญชียืนยันสลิปแล้ว
         </div>
-        <PriceQuote quote={booking.quote} title={booking.finalQuote ? 'ราคาสุดท้าย' : 'ราคาก่อนยืนยัน'} />
+      ) : null}
+
+      <div className="tp-card" style={{ marginTop: '1rem' }}>
+        <PriceQuote quote={booking.quote} title={booking.finalQuote ? 'ยอดชำระแล้ว' : 'ยอดประเมิน'} />
       </div>
 
       <div className="tp-grid tp-grid--2" style={{ marginTop: '1rem' }}>
@@ -256,55 +202,66 @@ export default function BookingAdminDetail() {
               เวลารับ: {formatWhen(trip.pickupTime)}
               {trip.dropoffTime ? ` · เวลาส่ง: ${formatWhen(trip.dropoffTime)}` : ''}
             </p>
-            <div className="tp-form">
-              <div className="field">
-                <label htmlFor={`pick-${trip.id}`}>เปลี่ยนเวลานัดรับ</label>
-                <input
-                  id={`pick-${trip.id}`}
-                  type="datetime-local"
-                  value={scheduleDraft[trip.id] ?? toLocalInput(trip.pickupTime)}
-                  onChange={(e) => setScheduleDraft((d) => ({ ...d, [trip.id]: e.target.value }))}
-                />
-              </div>
-            </div>
-            <div className="tp-actions" style={{ marginTop: '0.35rem' }}>
-              <button type="button" className="btn btn-soft" onClick={() => askSchedule(trip.id)}>
-                บันทึกเวลาใหม่
-              </button>
-            </div>
-            <div className="tp-form">
-              <div className="field">
-                <label htmlFor={`drv-${trip.id}`}>2) มอบหมายคนขับ</label>
-                <select
-                  id={`drv-${trip.id}`}
-                  value={assignDraft[trip.id] ?? trip.driverId ?? ''}
-                  onChange={(e) => setAssignDraft((d) => ({ ...d, [trip.id]: e.target.value }))}
-                >
-                  <option value="">— เลือกคนขับ —</option>
-                  {activeDrivers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} · {d.vehicle || 'ไม่ระบุรถ'}
-                    </option>
-                  ))}
-                </select>
-                {!activeDrivers.length ? (
-                  <p className="tp-muted">ยังไม่มีบัญชีคนขับ — สร้างที่เมนูจัดการคนขับ</p>
-                ) : null}
-                {trip.driver?.name ? (
-                  <p className="tp-muted">ปัจจุบัน: {trip.driver.name}</p>
-                ) : null}
-              </div>
-            </div>
-            <div className="tp-actions" style={{ marginTop: '0.5rem' }}>
-              <button
-                type="button"
-                className="btn btn-sky"
-                disabled={!activeDrivers.length}
-                onClick={() => askAssign(trip.id)}
-              >
-                ยืนยัน Assign
-              </button>
-            </div>
+            {isPaid ? (
+              <>
+                <div className="tp-form">
+                  <div className="field">
+                    <label htmlFor={`pick-${trip.id}`}>เปลี่ยนเวลานัดรับ</label>
+                    <input
+                      id={`pick-${trip.id}`}
+                      type="datetime-local"
+                      value={scheduleDraft[trip.id] ?? toLocalInput(trip.pickupTime)}
+                      onChange={(e) => setScheduleDraft((d) => ({ ...d, [trip.id]: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                <div className="tp-actions" style={{ marginTop: '0.35rem' }}>
+                  <button type="button" className="btn btn-soft" onClick={() => askSchedule(trip.id)}>
+                    บันทึกเวลาใหม่
+                  </button>
+                </div>
+                <div className="tp-form">
+                  <div className="field">
+                    <label htmlFor={`drv-${trip.id}`}>มอบหมายคนขับ</label>
+                    <select
+                      id={`drv-${trip.id}`}
+                      value={assignDraft[trip.id] ?? trip.driverId ?? ''}
+                      onChange={(e) => setAssignDraft((d) => ({ ...d, [trip.id]: e.target.value }))}
+                    >
+                      <option value="">— เลือกคนขับ —</option>
+                      {trip.driverId && !activeDrivers.some((driver) => driver.id === trip.driverId) ? (
+                        <option value={trip.driverId} disabled>
+                          คนขับเดิม · รหัส {shortBookingId(trip.driverId)}
+                        </option>
+                      ) : null}
+                      {activeDrivers.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} · {d.vehicle || 'ไม่ระบุรถ'}
+                        </option>
+                      ))}
+                    </select>
+                    {!activeDrivers.length ? (
+                      <p className="tp-muted">ยังไม่มีบัญชีคนขับ — สร้างที่เมนูจัดการคนขับ</p>
+                    ) : null}
+                    {trip.driverId ? (
+                      <p className="tp-muted">
+                        ปัจจุบัน: {trip.driver?.name || `รหัส ${shortBookingId(trip.driverId)}`}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="tp-actions" style={{ marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-sky"
+                    disabled={!activeDrivers.length}
+                    onClick={() => askAssign(trip.id)}
+                  >
+                    ยืนยันมอบหมาย
+                  </button>
+                </div>
+              </>
+            ) : null}
             <TripStatusTimeline status={trip.status} />
           </div>
         ))}

@@ -217,6 +217,7 @@ export const BOOKING_STATUS = {
   completed: { label: 'เสร็จสิ้น', tone: 'sky' },
   no_show: { label: 'ไม่มาตามนัด', tone: 'danger' },
   rejected: { label: 'คลินิกไม่สามารถรับนัดได้', tone: 'danger' },
+  cancel_requested: { label: 'รอแอดมินพิจารณายกเลิก', tone: 'warn' },
   cancelled: { label: 'ยกเลิกแล้ว', tone: '' },
 };
 

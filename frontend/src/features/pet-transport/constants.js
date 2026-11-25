@@ -55,7 +55,7 @@ export const BOOKING_STATUSES = {
 export const PAYMENT_STATUSES = {
   unpaid: { id: 'unpaid', label: 'ยังไม่ชำระ' },
   owner_confirmed: { id: 'owner_confirmed', label: 'Owner ยืนยันว่าชำระแล้ว' },
-  paid: { id: 'paid', label: 'Admin ยืนยันชำระแล้ว' },
+  paid: { id: 'paid', label: 'ฝ่ายบัญชียืนยันชำระแล้ว' },
 };
 
 export const SERVICE_TYPES = [

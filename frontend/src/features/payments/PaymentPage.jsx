@@ -14,8 +14,8 @@ function baht(value) {
 export default function PaymentPage() {
   const { paymentId } = useParams();
   const { currentUser } = useAuth();
-  const { all } = usePayments();
-  const payment = all.find((row) => row.id === paymentId) || getPayment(paymentId);
+  const { all } = usePayments(currentUser?.id);
+  const payment = all.find((row) => row.id === paymentId) || getPayment(paymentId, currentUser?.id);
   const [qr, setQr] = useState('');
   const [slip, setSlip] = useState('');
   const [error, setError] = useState('');
@@ -59,7 +59,11 @@ export default function PaymentPage() {
     );
   }
 
-  const locked = payment.status === PAY_STATUS.approved || payment.status === PAY_STATUS.review;
+  const locked = [
+    PAY_STATUS.approved,
+    PAY_STATUS.review,
+    PAY_STATUS.cancelled,
+  ].includes(payment.status);
   const preview = slip || payment.slip;
 
   async function onFile(event) {
@@ -74,11 +78,11 @@ export default function PaymentPage() {
     }
   }
 
-  function onSubmit(event) {
+  async function onSubmit(event) {
     event.preventDefault();
     setError('');
     try {
-      submitSlip(payment.id, currentUser.id, slip || payment.slip);
+      await submitSlip(payment.id, currentUser.id, slip || payment.slip);
     } catch (err) {
       setError(err.message);
     }
@@ -126,6 +130,13 @@ export default function PaymentPage() {
                 <p>สถานะตอนนี้คือ ยังไม่อนุมัติ จนกว่าฝ่ายบัญชีจะตรวจยอด</p>
                 {payment.slip ? <img src={payment.slip} alt="สลิปที่ส่งแล้ว" /> : null}
                 <Link className="btn btn-soft" to="/pet-owner/history">ไปหน้าประวัติ</Link>
+              </div>
+            ) : null}
+            {payment.status === PAY_STATUS.cancelled ? (
+              <div className="pay-done">
+                <h2>รายการชำระเงินถูกยกเลิก</h2>
+                <p>คำขอยกเลิกการจองอยู่ระหว่างดำเนินการ</p>
+                <Link className="btn btn-soft" to="/pet-owner/history">ไปประวัติการจอง</Link>
               </div>
             ) : null}
             {!locked || payment.status === PAY_STATUS.rejected ? (

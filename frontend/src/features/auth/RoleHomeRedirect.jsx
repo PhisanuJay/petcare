@@ -11,7 +11,6 @@ export default function RoleHomeRedirect() {
     currentUser?.role === ROLES.admin
     || currentUser?.role === ROLES.driver
     || currentUser?.role === ROLES.accountant
-    || currentUser?.role === ROLES.finance
   ) {
     return <Navigate to={homePathForRole(currentUser.role)} replace />;
   }

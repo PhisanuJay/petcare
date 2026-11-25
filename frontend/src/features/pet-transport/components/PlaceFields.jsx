@@ -32,13 +32,7 @@ export function placeFromCatalog(item, kind = 'facility') {
     zoneId: item.zoneId || zoneIdFromSubdistrict(item.subdistrictId) || null,
     address: item.address || '',
     mapUrl: item.mapUrl || '',
-    catalogType: item.catalogType || null,
   };
-}
-
-/** Partner places for booking = clinics only */
-export function mergeFacilities(clinics = [], _hotels = []) {
-  return clinics.map((c) => ({ ...c, catalogType: 'clinic' }));
 }
 
 export default function PlaceFields({
@@ -46,7 +40,6 @@ export default function PlaceFields({
   value,
   onChange,
   clinics = [],
-  hotels = [],
   allowedKinds = null,
   locked = false,
 }) {
@@ -58,7 +51,7 @@ export default function PlaceFields({
   const zoneMeta = ZONES.find((z) => z.id === value.zoneId);
   const kind = normalizePlaceKind(value.kind || 'custom');
   const catalogLocked = isFacilityKind(kind);
-  const facilities = mergeFacilities(clinics, hotels);
+  const facilities = clinics;
   const subMeta = value.subdistrictId ? subdistrictById(value.subdistrictId) : null;
   const forceFacilityUi = locked && allowedKinds?.length === 1 && allowedKinds[0] === 'facility';
   const showClinicReadonly = forceFacilityUi || (locked && catalogLocked);

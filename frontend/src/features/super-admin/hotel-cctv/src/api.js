@@ -1,5 +1,19 @@
 export async function api(path, options = {}) {
-  const response = await fetch(path, {
+  let requestPath = path;
+  const pathname = path.split('?')[0];
+  if (path.startsWith('/api/auth/')) {
+    requestPath = path.replace('/api/auth/', '/api/cctv-auth/');
+  } else if (
+    pathname === '/api/admin/rooms'
+    || pathname === '/api/admin/rooms/rename'
+    || pathname === '/api/admin/customers'
+    || pathname === '/api/admin/grants'
+    || /^\/api\/admin\/grants\/\d+$/.test(pathname)
+    || /^\/api\/admin\/cameras(?:\/\d+(?:\/(?:toggle|recheck|grants))?)?$/.test(pathname)
+  ) {
+    requestPath = path.replace('/api/admin/', '/api/cctv-admin/');
+  }
+  const response = await fetch(requestPath, {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',

@@ -17,6 +17,7 @@ export const ROLE_LABELS = {
   veterinarian: 'สัตวแพทย์',
   medical_assistant: 'ผู้ช่วยสัตวแพทย์',
   clinic_admin: 'แอดมินคลินิก',
+  accountant: 'ฝ่ายบัญชี',
 };
 
 export const ROLE_TAG_CLASS = {

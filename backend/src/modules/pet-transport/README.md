@@ -16,7 +16,7 @@ npm run dev
 
 - `GET /api/pet-transport/state` — snapshot ทั้งระบบ
 - `POST /api/pet-transport/bookings` — สร้างการจอง
-- workflow อื่น: confirm-price, assign-driver, payment, trip status, cancel, hotels, zones
+- workflow อื่น: confirm-price, assign-driver, payment, trip status, cancel, zones
 ใช้ built-in `node:sqlite` (Node 22+) — ไม่ต้องติดตั้ง DB server
 
 ## รัน
@@ -32,7 +32,7 @@ Health: `GET http://localhost:3001/health`
 
 | Method | Path | คำอธิบาย |
 |--------|------|----------|
-| GET | `/catalog` | zones, clinics, hotels |
+| GET | `/catalog` | zones and clinics; existing hotel rows are retained for historical trip locations |
 | GET | `/snapshot` | ทั้งระบบ (bookings + trips) |
 | GET | `/bookings` | รายการจอง |
 | POST | `/bookings` | สร้างจอง + ทริป |

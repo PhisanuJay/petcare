@@ -1,4 +1,4 @@
-import { exec, queryOne, run } from './db.js';
+import { exec, queryAll, queryOne, run } from './db.js';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS zones (
@@ -27,6 +27,13 @@ CREATE TABLE IF NOT EXISTS hotels (
   map_url TEXT
 );
 
+CREATE TABLE IF NOT EXISTS hotel_room_prices (
+  room_id TEXT PRIMARY KEY,
+  label TEXT NOT NULL,
+  price REAL NOT NULL,
+  sort_order INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS bookings (
   id TEXT PRIMARY KEY,
   owner_id TEXT,
@@ -34,6 +41,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   owner_phone TEXT,
   pet_id TEXT,
   pet_name TEXT NOT NULL,
+  pet_species TEXT DEFAULT '',
   pet_notes TEXT DEFAULT '',
   service_type TEXT NOT NULL,
   from_zone_id TEXT,
@@ -46,6 +54,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   status TEXT NOT NULL,
   payment_status TEXT NOT NULL DEFAULT 'unpaid',
   payment_note TEXT DEFAULT '',
+  payment_slip TEXT NOT NULL DEFAULT '',
   cancel_request_json TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
@@ -122,25 +131,10 @@ export const SEED_CLINICS = [
   },
 ];
 
-export const SEED_HOTELS = [
-  {
-    id: 'hotel-1',
-    name: 'PetCare Hotel ลาดยาว',
-    address: '45 ถ.วิภาวดี แขวงลาดยาว',
-    district_id: 'chatuchak',
-    subdistrict_id: 'latyao',
-    zone_id: '2',
-    map_url: null,
-  },
-  {
-    id: 'hotel-2',
-    name: 'Cat Nest จันทรเกษม',
-    address: '12 ถ.ประดิพัทธ์ แขวงจันทรเกษม',
-    district_id: 'chatuchak',
-    subdistrict_id: 'chantharakasem',
-    zone_id: '2',
-    map_url: null,
-  },
+export const SEED_HOTEL_ROOM_PRICES = [
+  { id: 'standard', label: 'Standard', price: 450, sortOrder: 1 },
+  { id: 'deluxe', label: 'Deluxe', price: 750, sortOrder: 2 },
+  { id: 'suite', label: 'Suite', price: 1200, sortOrder: 3 },
 ];
 
 function seedCatalogIfEmpty() {
@@ -162,13 +156,12 @@ function seedCatalogIfEmpty() {
     }
   }
 
-  const hotelCount = queryOne('SELECT COUNT(*) AS c FROM hotels')?.c ?? 0;
-  if (hotelCount === 0) {
-    for (const h of SEED_HOTELS) {
+  const hotelPriceCount = queryOne('SELECT COUNT(*) AS c FROM hotel_room_prices')?.c ?? 0;
+  if (hotelPriceCount === 0) {
+    for (const room of SEED_HOTEL_ROOM_PRICES) {
       run(
-        `INSERT INTO hotels (id, name, address, district_id, subdistrict_id, zone_id, map_url)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [h.id, h.name, h.address, h.district_id, h.subdistrict_id, h.zone_id, h.map_url],
+        'INSERT INTO hotel_room_prices (room_id, label, price, sort_order) VALUES (?, ?, ?, ?)',
+        [room.id, room.label, room.price, room.sortOrder],
       );
     }
   }
@@ -176,6 +169,13 @@ function seedCatalogIfEmpty() {
 
 export function migrate() {
   exec(SCHEMA);
+  const bookingColumns = queryAll('PRAGMA table_info(bookings)');
+  if (!bookingColumns.some((column) => column.name === 'pet_species')) {
+    exec("ALTER TABLE bookings ADD COLUMN pet_species TEXT DEFAULT ''");
+  }
+  if (!bookingColumns.some((column) => column.name === 'payment_slip')) {
+    exec("ALTER TABLE bookings ADD COLUMN payment_slip TEXT NOT NULL DEFAULT ''");
+  }
   seedCatalogIfEmpty();
 }
 
@@ -201,18 +201,15 @@ export function reseedsCatalog() {
       [c.id, c.name, c.address, c.district_id, c.subdistrict_id, c.zone_id, c.map_url],
     );
   }
-  for (const h of SEED_HOTELS) {
+  for (const room of SEED_HOTEL_ROOM_PRICES) {
     run(
-      `INSERT INTO hotels (id, name, address, district_id, subdistrict_id, zone_id, map_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET
-         name = excluded.name,
-         address = excluded.address,
-         district_id = excluded.district_id,
-         subdistrict_id = excluded.subdistrict_id,
-         zone_id = excluded.zone_id,
-         map_url = excluded.map_url`,
-      [h.id, h.name, h.address, h.district_id, h.subdistrict_id, h.zone_id, h.map_url],
+      `INSERT INTO hotel_room_prices (room_id, label, price, sort_order)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(room_id) DO UPDATE SET
+         label = excluded.label,
+         price = excluded.price,
+         sort_order = excluded.sort_order`,
+      [room.id, room.label, room.price, room.sortOrder],
     );
   }
 }

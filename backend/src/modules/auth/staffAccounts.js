@@ -9,11 +9,11 @@ import { httpError } from '../pet-owner/jsonCollection.js';
  * DEVELOPMENT SEED ONLY — initial accounts below seed `DEV_PASSWORD` hashed with scrypt when no
  * file exists yet. Replace with production provisioning before live deployment.
  *
- * `role` decides which pages a staff member may open: 'veterinarian', 'medical_assistant', or 'clinic_admin'.
+ * `role` decides which staff pages and protected APIs a staff member may use.
  */
 const DEV_PASSWORD = 'vet12345';
 
-export const ROLES = ['veterinarian', 'medical_assistant', 'clinic_admin'];
+export const ROLES = ['veterinarian', 'medical_assistant', 'clinic_admin', 'accountant'];
 
 const DEV_STAFF = [
   { id: 'staff-vet-1', name: 'สพ.ญ.ณัฐชา ใจดี', email: 'vet1@petcare.clinic', role: 'veterinarian' },
@@ -23,6 +23,7 @@ const DEV_STAFF = [
   { id: 'staff-ma-1', name: 'สมใจ ช่วยดี', email: 'ma1@petcare.clinic', role: 'medical_assistant' },
   { id: 'staff-ma-2', name: 'กมล ใส่ใจ', email: 'ma2@petcare.clinic', role: 'medical_assistant' },
   { id: 'staff-admin-1', name: 'ผู้ดูแลคลินิก', email: 'admin@petcare.clinic', role: 'clinic_admin' },
+  { id: 'staff-accountant-1', name: 'ฝ่ายบัญชี', email: 'accountant@petcare.local', role: 'accountant', password: 'Account1234' },
 ];
 
 const staffFile = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'staff.json');
@@ -33,13 +34,13 @@ const hashPasswordHex = (password, saltHex) =>
 
 function createSeedAccounts() {
   const now = new Date().toISOString();
-  return DEV_STAFF.map((staff) => {
+  return DEV_STAFF.map(({ password = DEV_PASSWORD, ...staff }) => {
     const salt = randomBytes(16).toString('hex');
     return {
       ...staff,
       active: true,
       salt,
-      passwordHash: hashPasswordHex(DEV_PASSWORD, salt),
+      passwordHash: hashPasswordHex(password, salt),
       createdAt: now,
       updatedAt: now,
     };
@@ -71,6 +72,16 @@ const staffStore = createSyncJsonStore(staffFile, {
 
 // Ensure staff.json is created on startup when missing
 staffStore.get();
+
+const accountantSeed = createSeedAccounts().find((staff) => staff.role === 'accountant');
+if (!staffStore.get().some((staff) => staff.email === accountantSeed.email)) {
+  await staffStore.update((accounts) => ({
+    value: accounts.some((staff) => staff.email === accountantSeed.email)
+      ? accounts
+      : [...accounts, accountantSeed],
+    result: null,
+  }));
+}
 
 /** What the frontend may know about a staff member (never salt or passwordHash). */
 export const toPublicStaff = ({ id, name, email, role, active = true }) => ({

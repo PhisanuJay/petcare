@@ -4,7 +4,6 @@ import {
   DEMO_ACCOUNTANT_LOGIN,
   DEMO_ADMIN_LOGIN,
   DEMO_DRIVER_LOGIN,
-  DEMO_FINANCE_LOGIN,
   DEMO_OWNER_LOGIN,
   useAuth,
 } from '../AuthContext.jsx';
@@ -60,58 +59,83 @@ export default function LoginPage() {
     }
 
     setSubmitting(true);
-    let customerError;
     try {
-      const user = await login(form.email, form.password, form.remember);
-      const role = normalizeRole(user.role);
-      const destination =
-        requestedNext && canAccessPath(role, requestedNext)
-          ? requestedNext
-          : homePathForRole(role);
-      navigate(destination, { replace: true });
-      return;
-    } catch (loginError) {
-      customerError = loginError;
-    }
+      let cctvError = '';
+      const email = form.email.trim().toLowerCase();
+      if (email === 'admin@petcare.local') {
+        try {
+          const response = await fetch('/api/cctv-auth/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: form.password }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (response.ok) {
+            navigate('/super-admin', { replace: true });
+            return;
+          }
+          if (response.status !== 401) {
+            cctvError = result.error?.message || 'เข้าสู่ระบบ CCTV ไม่สำเร็จ';
+          }
+        } catch {
+          cctvError = 'เชื่อมต่อระบบ CCTV ไม่ได้ กรุณาตรวจสอบว่า Backend ทำงานอยู่';
+        }
+      }
 
-    let adoptionError = '';
-    try {
-      const response = await fetch(`${ADOPTION_API_URL}/staff/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: form.email, password: form.password }),
-      });
-      const result = await response.json();
-      if (response.ok) {
-        sessionStorage.setItem(ADOPTION_STAFF_TOKEN_KEY, result.token);
-        navigate('/adoption', { replace: true });
+      let customerError;
+      try {
+        const user = await login(form.email, form.password, form.remember);
+        const role = normalizeRole(user.role);
+        const destination =
+          requestedNext && canAccessPath(role, requestedNext)
+            ? requestedNext
+            : homePathForRole(role);
+        navigate(destination, { replace: true });
         return;
+      } catch (loginError) {
+        customerError = loginError;
       }
-      if (response.status !== 401) {
-        adoptionError = result.error || 'เข้าสู่ระบบพนักงานไม่สำเร็จ';
-      }
-    } catch (requestError) {
-      adoptionError = requestError instanceof TypeError
-        ? 'เชื่อมต่อระบบพนักงานไม่ได้ กรุณาตรวจสอบว่า Backend ทำงานอยู่'
-        : requestError.message || 'เข้าสู่ระบบพนักงานไม่สำเร็จ';
-    }
 
-    try {
-      const staff = await staffLogin(form.email, form.password, form.remember);
-      navigate(staffDestination(staff, next), { replace: true });
-    } catch (staffError) {
-      setError(
-        adoptionError
-          ? `${adoptionError} (${customerError.message})`
-          : staffError.message || customerError.message,
-      );
+      let adoptionError = '';
+      try {
+        const response = await fetch(`${ADOPTION_API_URL}/staff/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email, password: form.password }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+          sessionStorage.setItem(ADOPTION_STAFF_TOKEN_KEY, result.token);
+          navigate('/adoption', { replace: true });
+          return;
+        }
+        if (response.status !== 401) {
+          adoptionError = result.error || 'เข้าสู่ระบบพนักงานไม่สำเร็จ';
+        }
+      } catch (requestError) {
+        adoptionError = requestError instanceof TypeError
+          ? 'เชื่อมต่อระบบพนักงานไม่ได้ กรุณาตรวจสอบว่า Backend ทำงานอยู่'
+          : requestError.message || 'เข้าสู่ระบบพนักงานไม่สำเร็จ';
+      }
+
+      try {
+        const staff = await staffLogin(form.email, form.password, form.remember);
+        navigate(staffDestination(staff, next), { replace: true });
+      } catch (staffError) {
+        setError(
+          adoptionError
+            ? `${adoptionError} (${customerError.message})`
+            : cctvError || staffError.message || customerError.message,
+        );
+      }
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ / บัญชี / การเงิน)">
+    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ / บัญชี)">
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <div className="alert-soft danger mb-3">
@@ -190,7 +214,9 @@ export default function LoginPage() {
         </p>
         <p className="text-center small text-muted mt-1 mb-0">
           บัญชี: {DEMO_ACCOUNTANT_LOGIN.email} / {DEMO_ACCOUNTANT_LOGIN.password}
-          {' · '}การเงิน: {DEMO_FINANCE_LOGIN.email} / {DEMO_FINANCE_LOGIN.password}
+        </p>
+        <p className="text-center small text-muted mt-1 mb-0">
+          Super Admin CCTV: admin@petcare.local / 1234
         </p>
       </form>
     </AuthCard>

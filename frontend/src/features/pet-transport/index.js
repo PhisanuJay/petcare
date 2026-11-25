@@ -12,8 +12,6 @@ export { default as AdminTransportLayout } from './admin/AdminTransportLayout.js
 export { default as TransportDashboard } from './admin/TransportDashboard.jsx';
 export { default as BookingManagement } from './admin/BookingManagement.jsx';
 export { default as BookingAdminDetail } from './admin/BookingAdminDetail.jsx';
-export { default as PaymentVerification } from './admin/PaymentVerification.jsx';
 export { default as CancellationPage } from './admin/CancellationPage.jsx';
 export { default as TransportPricingPage } from './admin/PricingPage.jsx';
-export { default as HotelsPage } from './admin/HotelsPage.jsx';
 export { default as DriversPage } from './admin/DriversPage.jsx';

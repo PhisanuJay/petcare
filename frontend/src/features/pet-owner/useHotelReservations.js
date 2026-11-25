@@ -39,14 +39,17 @@ export function useHotelReservations() {
     [ownerId],
   );
 
-  const cancelReservation = useCallback(
-    async (id) => {
-      const reservation = await ownerRequest(ownerId, `/cat-hotel/reservations/${id}/cancel`, { method: 'POST' });
+  const requestCancel = useCallback(
+    async (id, cancellationId, reason) => {
+      const reservation = await ownerRequest(ownerId, `/cat-hotel/reservations/${id}/request-cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ cancellationId, reason }),
+      });
       setReservations((list) => list.map((r) => (r.id === id ? reservation : r)));
       return reservation;
     },
     [ownerId],
   );
 
-  return { reservations, loading, error, reload, addReservation, cancelReservation };
+  return { reservations, loading, error, reload, addReservation, requestCancel };
 }

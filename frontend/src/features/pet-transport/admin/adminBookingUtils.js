@@ -2,7 +2,10 @@
 export function bookingBucket(b) {
   if (b.status === 'cancelled' || b.status === 'cancel_requested') return 'cancelled';
   if (b.status === 'completed') return 'completed';
-  if (b.status === 'in_progress' || b.status === 'paid') return 'in_progress';
+  if (b.paymentStatus === 'paid') {
+    if ((b.trips || []).some((trip) => !trip.driverId)) return 'awaiting_assign';
+    return 'in_progress';
+  }
   if (
     b.status === 'awaiting_payment'
     || b.paymentStatus === 'owner_confirmed'
@@ -10,6 +13,7 @@ export function bookingBucket(b) {
   ) {
     return 'awaiting_payment';
   }
+  if (b.status === 'in_progress' || b.status === 'paid') return 'in_progress';
   if (b.status === 'price_confirmed') return 'awaiting_assign';
   if (b.status === 'submitted') return 'awaiting_price';
   const needsDriver = (b.trips || []).some((t) => !t.driverId);

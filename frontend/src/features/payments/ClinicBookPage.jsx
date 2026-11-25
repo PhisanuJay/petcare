@@ -21,7 +21,7 @@ export default function ClinicBookPage() {
     [serviceId],
   );
 
-  function onSubmit(event) {
+  async function onSubmit(event) {
     event.preventDefault();
     setError('');
     const pet = pets.find((item) => item.id === petId);
@@ -32,7 +32,7 @@ export default function ClinicBookPage() {
         when,
         note,
       });
-      const payment = createPayment({
+      const payment = await createPayment({
         kind: PAY_KIND.clinic,
         refId: booking.id,
         ownerId: currentUser.id,

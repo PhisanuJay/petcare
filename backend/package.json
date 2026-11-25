@@ -10,6 +10,7 @@
     "db:path": "node -e \"import('./src/db/sqlite.js').then(m=>console.log(m.dbPath()))\""
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "express": "^5.0.0"
   }

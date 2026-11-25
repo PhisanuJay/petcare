@@ -297,7 +297,7 @@ function ProfileModal({ session, roleLabel, onClose, onSaved }) {
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal profile-modal" onClick={(event) => event.stopPropagation()}>
+      <div className="cctv-modal profile-modal" onClick={(event) => event.stopPropagation()}>
         <div className="card-top">
           <div className="profile-head">
             <span className="avatar lg">{initial(session.user.displayName)}</span>

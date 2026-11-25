@@ -11,6 +11,8 @@ import adoptionRouter from '../modules/adoption/routes.js';
 import adminRouter from '../modules/admin/routes.js';
 import clinicAdminRouter from '../modules/clinic-admin/routes.js';
 import superAdminRouter from '../modules/super-admin/routes.js';
+import cctvAuthRouter from '../modules/super-admin/cctvAuth.js';
+import cctvAdminRouter from '../modules/super-admin/cctvAdmin.js';
 
 /**
  * Mount each role module under its own API prefix.
@@ -28,7 +30,9 @@ export function registerRoutes(app) {
   api.use('/pet-transport', petTransportRouter);
   api.use('/adoption', adoptionRouter);
   api.use('/admin', adminRouter);
+  api.use('/cctv-admin', cctvAdminRouter);
   api.use('/clinic-admin', clinicAdminRouter);
+  api.use('/cctv-auth', cctvAuthRouter);
   api.use('/super-admin', superAdminRouter);
 
   app.use('/api', api);

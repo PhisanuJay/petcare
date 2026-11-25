@@ -1,6 +1,9 @@
-import { HOTEL_PERKS, HOTEL_ROOMS } from '../../data/homeContent.js';
+import { HOTEL_PERKS } from '../../data/homeContent.js';
+import { useHotelPricing } from '../../../features/pet-owner/useHotelPricing.js';
 
 export default function HotelSection({ go }) {
+  const { rooms, loading, error } = useHotelPricing();
+
   return (
     <section id="hotel" className="pc-section" style={{ background: 'linear-gradient(180deg, var(--cloud), #e4f1ff)' }}>
       <div className="container">
@@ -11,7 +14,7 @@ export default function HotelSection({ go }) {
         </div>
 
         <div className="row g-4 mb-4">
-          {HOTEL_ROOMS.map((room) => (
+          {rooms.map((room) => (
             <div className="col-md-4" key={room.name}>
               <div className={`hotel-card ${room.featured ? 'featured' : ''}`}>
                 {room.featured && <span className="ribbon">ยอดนิยม</span>}
@@ -40,6 +43,8 @@ export default function HotelSection({ go }) {
             </div>
           ))}
         </div>
+        {loading ? <p className="hotel-pricing-note" role="status">กำลังโหลดราคาห้องพัก</p> : null}
+        {error ? <p className="hotel-pricing-error" role="alert">{error}</p> : null}
 
         <div className="row g-3">
           {HOTEL_PERKS.map((perk) => (

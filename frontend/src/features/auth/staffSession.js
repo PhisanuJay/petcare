@@ -1,10 +1,26 @@
 import { readJSON, writeJSON } from '../../shared/utils/storage.js';
 
 /**
- * Staff (veterinarian) login session: `{ token, staff }` from POST /api/auth/staff/login.
+ * Authenticated staff session: `{ token, staff }` from POST /api/auth/staff/login.
  * Kept apart from the customer session, which the customer login code owns.
  */
 const STAFF_SESSION_KEY = 'petcare_staff_session';
+export const STAFF_SESSION_CHANGED = 'petcare:staff-session-changed';
+
+function removeSavedSession() {
+  try {
+    localStorage.removeItem(STAFF_SESSION_KEY);
+    sessionStorage.removeItem(STAFF_SESSION_KEY);
+  } catch {
+    /* storage unavailable: nothing to clear */
+  }
+}
+
+function notifySessionChanged() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(STAFF_SESSION_CHANGED));
+  }
+}
 
 export function readStaffSession() {
   const session = readJSON(STAFF_SESSION_KEY, null) ?? readJSON(STAFF_SESSION_KEY, null, sessionStorage);
@@ -12,17 +28,14 @@ export function readStaffSession() {
 }
 
 export function saveStaffSession(session, remember) {
-  clearStaffSession();
+  removeSavedSession();
   writeJSON(STAFF_SESSION_KEY, session, remember ? localStorage : sessionStorage);
+  notifySessionChanged();
 }
 
 export function clearStaffSession() {
-  try {
-    localStorage.removeItem(STAFF_SESSION_KEY);
-    sessionStorage.removeItem(STAFF_SESSION_KEY);
-  } catch {
-    /* storage unavailable: nothing to clear */
-  }
+  removeSavedSession();
+  notifySessionChanged();
 }
 
 /** Window event: the backend rejected the saved session (expired or the backend restarted). */

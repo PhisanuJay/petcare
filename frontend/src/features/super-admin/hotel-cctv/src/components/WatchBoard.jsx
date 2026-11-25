@@ -458,7 +458,7 @@ export default function WatchBoard({ camera, mode, onClose, canLog: canLogProp }
   }
 
   return (
-    <div className="watch-board watch-room">
+    <div className={`watch-board watch-room${error ? ' has-error' : ''}`}>
       <header className="watch-room-header">
         <div className="watch-room-heading">
           {onClose ? (

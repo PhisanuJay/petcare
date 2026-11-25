@@ -11,7 +11,7 @@ import {
 } from './mappers.js';
 import { isRoundTrip, quotePrice } from './pricing.js';
 import { resolveOtherService } from './serviceCatalog.js';
-import { reseedsCatalog } from './migrate.js';
+import { reseedsCatalog, SEED_HOTEL_ROOM_PRICES } from './migrate.js';
 
 const UPCOMING_WINDOW_MS = 2 * 60 * 60 * 1000;
 const MAX_NOTIFICATIONS = 120;
@@ -44,6 +44,22 @@ function canOwnerRequestCancel(booking, trips) {
   return related.every((t) => tripStatusMeta(t.status).step < 4);
 }
 
+function notifyCancelledDrivers(bookingId, booking, adminNote, resolvedAt) {
+  tripsForBooking(bookingId)
+    .filter((trip) => trip.driverId)
+    .forEach((trip) => {
+      pushDriverNotification({
+        driverId: trip.driverId,
+        type: 'cancelled',
+        title: 'งานถูกยกเลิก',
+        body: `${booking.petName || 'สัตว์เลี้ยง'} · เวลารับ ${formatNotifyWhen(trip.pickupTime)}${adminNote ? ` — ${adminNote}` : ''}`,
+        tripId: trip.id,
+        bookingId,
+        dedupeKey: `cancelled:${bookingId}:${trip.driverId}:${resolvedAt}`,
+      });
+    });
+}
+
 function formatNotifyWhen(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -66,6 +82,12 @@ function listClinics() {
 
 function listHotels() {
   return queryAll('SELECT * FROM hotels ORDER BY name').map(mapHotel);
+}
+
+export function getHotelRoomPrices() {
+  return queryAll(
+    'SELECT room_id AS id, label, price FROM hotel_room_prices ORDER BY sort_order',
+  ).map((room) => ({ ...room, price: Number(room.price) }));
 }
 
 function listBookings() {
@@ -178,16 +200,27 @@ function insertTrip({ bookingId, type, from, to, pickupTime, dropoffTime }) {
   return id;
 }
 
-export function getState() {
+export function getState({ includePaymentDetails = false } = {}) {
+  const bookings = listBookings();
   return {
     zones: listZones(),
+    hotelRoomPrices: getHotelRoomPrices(),
     clinics: listClinics(),
     hotels: listHotels(),
-    bookings: listBookings(),
+    bookings: includePaymentDetails
+      ? bookings
+      : bookings.map((booking) => ({ ...booking, paymentSlip: '' })),
     trips: listTrips(),
     issues: listIssues(),
     notifications: listNotifications(),
     seeded: true,
+  };
+}
+
+export function getPricing() {
+  return {
+    zones: listZones(),
+    hotelRoomPrices: getHotelRoomPrices(),
   };
 }
 
@@ -224,11 +257,11 @@ export function createBooking(input) {
   return transaction(() => {
     run(
       `INSERT INTO bookings (
-         id, owner_id, owner_name, owner_phone, pet_id, pet_name, pet_notes, service_type,
+         id, owner_id, owner_name, owner_phone, pet_id, pet_name, pet_species, pet_notes, service_type,
          from_zone_id, to_zone_id, return_from_zone_id, return_to_zone_id, fare_zone_id,
          estimated_quote_json, final_quote_json, status, payment_status, payment_note,
          cancel_request_json, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'submitted', 'unpaid', '', NULL, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'submitted', 'unpaid', '', NULL, ?, ?)`,
       [
         bookingId,
         input.ownerId || null,
@@ -236,6 +269,7 @@ export function createBooking(input) {
         input.ownerPhone || '',
         input.petId || null,
         input.petName,
+        input.petSpecies || '',
         input.petNotes || '',
         input.serviceType,
         from.zoneId,
@@ -303,6 +337,7 @@ export function setBookingOtherService(bookingId, { otherServiceId = null, hotel
         place: facilityPlace,
         otherServiceId,
         hotelNights,
+        hotelRooms: getHotelRoomPrices(),
       })
       : null;
     if (otherServiceId && !otherService) {
@@ -371,6 +406,9 @@ export function assignDriver(tripId, driverId, driverLabel = '') {
     const trip = mapTrip(tripRow, historyForTrip(tripId));
     const bookingRow = getBookingRow(trip.bookingId);
     const booking = mapBooking(bookingRow);
+    if (booking?.paymentStatus !== 'paid') {
+      throw new Error('รอฝ่ายบัญชียืนยันการชำระเงินก่อนมอบหมายคนขับ');
+    }
     const prevDriverId = trip.driverId;
     const petName = booking?.petName || 'สัตว์เลี้ยง';
 
@@ -453,7 +491,7 @@ export function updateTripSchedule(tripId, { pickupTime, dropoffTime } = {}) {
   });
 }
 
-export function ownerConfirmPayment(bookingId, note = '') {
+export function ownerConfirmPayment(bookingId, slip) {
   return transaction(() => {
     const row = getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
@@ -461,24 +499,56 @@ export function ownerConfirmPayment(bookingId, note = '') {
     if (!['submitted', 'awaiting_payment', 'driver_assigned', 'price_confirmed'].includes(b.status)) {
       throw new Error('ยังไม่ถึงขั้นตอนชำระเงิน');
     }
+    if (b.paymentStatus === 'owner_confirmed') {
+      throw new Error('ส่งสลิปแล้ว กรุณารอฝ่ายบัญชีตรวจสอบ');
+    }
+    if (typeof slip !== 'string' || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(slip)) {
+      throw new Error('กรุณาแนบสลิปเป็นไฟล์รูปภาพ');
+    }
+    if (slip.length > 8 * 1024 * 1024) {
+      throw new Error('ไฟล์สลิปมีขนาดใหญ่เกินไป กรุณาเลือกรูปที่เล็กลง');
+    }
     run(
-      `UPDATE bookings SET payment_status = 'owner_confirmed', payment_note = ?,
+      `UPDATE bookings SET payment_status = 'owner_confirmed', payment_note = '', payment_slip = ?,
          status = 'awaiting_payment', updated_at = ? WHERE id = ?`,
-      [note || '', new Date().toISOString(), bookingId],
+      [slip, new Date().toISOString(), bookingId],
     );
     return { state: getState() };
   });
 }
 
-export function adminMarkPaid(bookingId) {
+export function approveTransportPayment(bookingId) {
   return transaction(() => {
     const row = getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
+    const booking = mapBooking(row);
+    if (booking.status === 'cancelled') throw new Error('รายการนี้ถูกยกเลิกแล้ว');
+    if (booking.paymentStatus !== 'owner_confirmed' || !booking.paymentSlip) {
+      throw new Error('ยังไม่มีสลิปที่รอตรวจสอบ');
+    }
     run(
       `UPDATE bookings SET payment_status = 'paid', status = 'paid', updated_at = ? WHERE id = ?`,
       [new Date().toISOString(), bookingId],
     );
-    return { state: getState() };
+    return { state: getState({ includePaymentDetails: true }) };
+  });
+}
+
+export function rejectTransportPayment(bookingId, note = '') {
+  return transaction(() => {
+    const row = getBookingRow(bookingId);
+    if (!row) throw new Error('ไม่พบการจอง');
+    const booking = mapBooking(row);
+    if (booking.status === 'cancelled') throw new Error('รายการนี้ถูกยกเลิกแล้ว');
+    if (booking.paymentStatus !== 'owner_confirmed' || !booking.paymentSlip) {
+      throw new Error('ยังไม่มีสลิปที่รอตรวจสอบ');
+    }
+    run(
+      `UPDATE bookings SET payment_status = 'unpaid', payment_note = ?, status = 'awaiting_payment',
+         updated_at = ? WHERE id = ?`,
+      [String(note || '').trim().slice(0, 500), new Date().toISOString(), bookingId],
+    );
+    return { state: getState({ includePaymentDetails: true }) };
   });
 }
 
@@ -494,12 +564,12 @@ export function advanceTripStatus(tripId, note = '') {
       && booking.status !== 'in_progress'
       && booking.status !== 'paid'
     ) {
-      throw new Error('ต้องชำระเงินและ Admin ยืนยันก่อนเริ่มงาน');
+      throw new Error('ต้องชำระเงินและฝ่ายบัญชียืนยันก่อนเริ่มงาน');
     }
     const next = nextTripStatus(trip.status);
     if (!next) throw new Error('ทริปเสร็จแล้ว');
     if (trip.status === 'assigned' && booking?.paymentStatus !== 'paid') {
-      throw new Error('รอ Admin Mark as Paid ก่อน');
+      throw new Error('รอฝ่ายบัญชียืนยันชำระเงินก่อน');
     }
 
     run('UPDATE trips SET status = ? WHERE id = ?', [next.id, tripId]);
@@ -536,16 +606,28 @@ export function attachEvidence(tripId, kind, dataUrl) {
   });
 }
 
-export function requestCancel(bookingId, reason) {
+export function requestCancel(bookingId, ownerId, cancellationId, reason) {
   return transaction(() => {
     const row = getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const booking = mapBooking(row);
+    if (!ownerId || booking.ownerId !== ownerId) {
+      throw new Error('ไม่สามารถยกเลิกรายการนี้ได้');
+    }
+    const text = String(reason || '').trim();
+    if (text.length < 3 || text.length > 500) throw new Error('กรุณาระบุเหตุผล 3 ถึง 500 ตัวอักษร');
+    if (!cancellationId) throw new Error('ข้อมูลคำขอยกเลิกไม่ถูกต้อง');
     const trips = tripsForBooking(bookingId);
     if (!canOwnerRequestCancel(booking, trips)) {
       throw new Error('ยกเลิกเองไม่ได้แล้ว ต้องติดต่อ Admin');
     }
-    const cancelRequest = { reason, at: new Date().toISOString(), status: 'pending' };
+    const cancelRequest = {
+      id: cancellationId,
+      reason: text,
+      requestedAt: new Date().toISOString(),
+      status: 'pending',
+      previousStatus: booking.status,
+    };
     run(
       `UPDATE bookings SET cancel_request_json = ?, status = 'cancel_requested', updated_at = ?
        WHERE id = ?`,
@@ -555,42 +637,38 @@ export function requestCancel(bookingId, reason) {
   });
 }
 
-export function resolveCancel(bookingId, approve, adminNote = '') {
+export function resolveCancel(bookingId, cancellationId, approve, adminNote = '') {
   return transaction(() => {
     const row = getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const booking = mapBooking(row);
-    if (!booking.cancelRequest) throw new Error('ไม่มีคำขอยกเลิก');
+    if (
+      booking.status !== 'cancel_requested'
+      || !booking.cancelRequest
+      || booking.cancelRequest.status !== 'pending'
+      || booking.cancelRequest.id !== cancellationId
+    ) {
+      throw new Error('คำขอนี้ไม่อยู่ในสถานะรอพิจารณา');
+    }
+    const resolvedAt = new Date().toISOString();
     const cancelRequest = {
       ...booking.cancelRequest,
       status: approve ? 'approved' : 'rejected',
-      adminNote,
-      resolvedAt: new Date().toISOString(),
+      adminNote: String(adminNote || '').trim().slice(0, 500),
+      resolvedAt,
     };
+    const previousStatus = booking.cancelRequest.previousStatus
+      || (booking.paymentStatus === 'paid' ? 'paid' : 'awaiting_payment');
     run(
       `UPDATE bookings SET cancel_request_json = ?, status = ?, updated_at = ? WHERE id = ?`,
       [
         stringifyJson(cancelRequest),
-        approve ? 'cancelled' : 'paid',
-        new Date().toISOString(),
+        approve ? 'cancelled' : previousStatus,
+        resolvedAt,
         bookingId,
       ],
     );
-    if (approve) {
-      tripsForBooking(bookingId)
-        .filter((t) => t.driverId)
-        .forEach((trip) => {
-          pushDriverNotification({
-            driverId: trip.driverId,
-            type: 'cancelled',
-            title: 'งานถูกยกเลิก',
-            body: `${booking.petName || 'สัตว์เลี้ยง'} · เวลารับ ${formatNotifyWhen(trip.pickupTime)}${adminNote ? ` — ${adminNote}` : ''}`,
-            tripId: trip.id,
-            bookingId,
-            dedupeKey: `cancelled:${bookingId}:${trip.driverId}:${cancelRequest.resolvedAt}`,
-          });
-        });
-    }
+    if (approve) notifyCancelledDrivers(bookingId, booking, adminNote, cancelRequest.resolvedAt);
     return { state: getState() };
   });
 }
@@ -629,21 +707,32 @@ export function updateZones(zones) {
   });
 }
 
-export function addHotel({ name, address }) {
-  return transaction(() => {
-    const id = newId();
-    run(
-      `INSERT INTO hotels (id, name, address, district_id, subdistrict_id, zone_id, map_url)
-       VALUES (?, ?, ?, NULL, NULL, NULL, NULL)`,
-      [id, String(name || '').trim(), String(address || '').trim()],
-    );
-    return { state: getState() };
-  });
-}
+export function updateHotelRoomPrices(rooms) {
+  if (!Array.isArray(rooms) || rooms.length !== SEED_HOTEL_ROOM_PRICES.length) {
+    throw new Error('กรุณาระบุราคาห้องพักให้ครบทุกประเภท');
+  }
 
-export function removeHotel(id) {
+  const expectedRooms = new Map(SEED_HOTEL_ROOM_PRICES.map((room) => [room.id, room]));
+  const normalized = rooms.map((room) => {
+    const definition = expectedRooms.get(room?.id);
+    const price = Number(room?.price);
+    if (!definition || !Number.isSafeInteger(price) || price < 1 || price > 1000000) {
+      throw new Error('ราคาห้องพักต้องเป็นจำนวนเต็มตั้งแต่ 1 ถึง 1,000,000 บาท');
+    }
+    expectedRooms.delete(room.id);
+    return { ...definition, price };
+  });
+  if (expectedRooms.size) throw new Error('กรุณาระบุราคาห้องพักให้ครบทุกประเภท');
+
   return transaction(() => {
-    run('DELETE FROM hotels WHERE id = ?', [id]);
+    for (const room of normalized) {
+      run(
+        `INSERT INTO hotel_room_prices (room_id, label, price, sort_order)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(room_id) DO UPDATE SET price = excluded.price`,
+        [room.id, room.label, room.price, room.sortOrder],
+      );
+    }
     return { state: getState() };
   });
 }

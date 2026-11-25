@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import { usePets } from '../usePets.js';
 import { useBookings } from '../useBookings.js';
+import { useHotelBookings } from '../useHotelBookings.js';
+import CancellationRequestForm from '../../cancellations/CancellationRequestForm.jsx';
+import CancellationSummary from '../../cancellations/CancellationSummary.jsx';
+import {
+  cancellationFor,
+  createCancellationRequest,
+  removeCancellationRequest,
+  useCancellationRequests,
+} from '../../cancellations/store.js';
+import { PAY_KIND } from '../../payments/store.js';
 import {
   BOOKING_SERVICES,
   BOOKING_STATUS,
@@ -250,7 +261,7 @@ function BookingForm({ pets, defaultPetId, defaultService, onSubmit }) {
   );
 }
 
-function BookingItem({ booking, onCancel, busy }) {
+function BookingItem({ booking, onCancel, busy, cancellation, cancelFormOpen, onOpenCancel, onCloseCancel }) {
   const status = BOOKING_STATUS[booking.status] ?? BOOKING_STATUS.pending;
   const service = BOOKING_SERVICES.find((s) => s.value === booking.service);
   const canCancel = OWNER_CANCELLABLE.includes(booking.status) && booking.date >= todayString();
@@ -275,15 +286,25 @@ function BookingItem({ booking, onCancel, busy }) {
           จากคลินิก: {booking.clinicNote}
         </div>
       )}
+      <CancellationSummary request={cancellation} />
       {canCancel && (
-        <button
-          type="button"
-          className="btn btn-sm btn-soft-danger mt-2"
-          disabled={busy}
-          onClick={() => onCancel(booking)}
-        >
-          ยกเลิกนัด
-        </button>
+        cancelFormOpen ? (
+          <CancellationRequestForm
+            idPrefix={`clinic-cancel-${booking.id}`}
+            initialPhone={booking.ownerPhone || ''}
+            onSubmit={(details) => onCancel(booking, details)}
+            onCancel={onCloseCancel}
+          />
+        ) : (
+          <button
+            type="button"
+            className="btn btn-sm btn-soft-danger mt-2"
+            disabled={busy}
+            onClick={onOpenCancel}
+          >
+            ขอยกเลิกนัด
+          </button>
+        )
       )}
     </div>
   );
@@ -291,25 +312,56 @@ function BookingItem({ booking, onCancel, busy }) {
 
 export default function BookingPage() {
   const [params] = useSearchParams();
+  const { currentUser } = useAuth();
   const { pets, loading: petsLoading, error: petsError } = usePets();
-  const { bookings, loading, error, reload, addBooking, cancelBooking } = useBookings();
-  const [cancelError, setCancelError] = useState('');
+  const { bookings, loading, error, reload, addBooking, requestCancel } = useBookings();
+  const { bookings: hotelBookings, linkRelatedBooking } = useHotelBookings();
+  const cancellations = useCancellationRequests(currentUser?.id);
+  const hotelBookingId = params.get('hotelBookingId');
   const [busyId, setBusyId] = useState('');
+  const [cancelTargetId, setCancelTargetId] = useState('');
+
+  async function addClinicBooking(data) {
+    if (hotelBookingId && !hotelBookings.some((booking) => booking.id === hotelBookingId)) {
+      throw new Error('ไม่พบการจองโรงแรมที่ต้องการเชื่อม');
+    }
+    const booking = await addBooking(data);
+    if (hotelBookingId) {
+      linkRelatedBooking(hotelBookingId, {
+        kind: 'clinic',
+        id: booking.id,
+        label: `${booking.serviceName || 'นัดคลินิก'} · ${booking.date || data.date}`,
+      });
+    }
+    return booking;
+  }
 
   const today = todayString();
   const isOpen = (b) => OWNER_CANCELLABLE.includes(b.status) && b.date >= today;
   const upcoming = bookings.filter(isOpen);
   const history = bookings.filter((b) => !isOpen(b)).reverse();
 
-  async function handleCancel(booking) {
-    const text = `ยกเลิกนัดของ "${booking.petName}" วันที่ ${formatDate(booking.date)} เวลา ${booking.time} น.?`;
-    if (!window.confirm(text)) return;
+  async function handleCancel(booking, details) {
+    let cancellation;
     setBusyId(booking.id);
-    setCancelError('');
     try {
-      await cancelBooking(booking.id);
+      cancellation = await createCancellationRequest({
+        ...details,
+        kind: PAY_KIND.clinic,
+        source: 'clinic',
+        refId: booking.id,
+        ownerId: currentUser.id,
+        ownerName: booking.ownerName || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim(),
+        ownerEmail: currentUser.email || '',
+        petName: booking.petName,
+        title: booking.serviceLabel || booking.service,
+        bookingDate: `${booking.date} ${booking.time}`,
+      });
+      await requestCancel(booking.id, cancellation.id, cancellation.reason);
+      setCancelTargetId('');
     } catch (err) {
-      setCancelError(err.message);
+      if (cancellation) await removeCancellationRequest(cancellation.id, currentUser.id);
+      throw err;
     } finally {
       setBusyId('');
     }
@@ -345,7 +397,15 @@ export default function BookingPage() {
         ) : (
           <div className="row g-4">
             <div className="col-lg-6">
-              <BookingForm pets={pets} defaultPetId={params.get('petId')} defaultService={params.get('service')} onSubmit={addBooking} />
+              {hotelBookingId && (
+                <div className="alert-soft mb-3">
+                  กำลังเพิ่มนัดคลินิกให้การจองโรงแรมนี้
+                  <Link className="ms-2" to={`/pet-owner/cat-hotel/bookings/${hotelBookingId}`}>
+                    กลับรายละเอียดโรงแรม
+                  </Link>
+                </div>
+              )}
+              <BookingForm pets={pets} defaultPetId={params.get('petId')} defaultService={params.get('service')} onSubmit={addClinicBooking} />
             </div>
 
             <div className="col-lg-6">
@@ -354,7 +414,6 @@ export default function BookingPage() {
                   <i className="bi bi-calendar-event" />
                   นัดที่กำลังจะถึง ({upcoming.length})
                 </div>
-                {cancelError && <div className="alert alert-danger py-2">{cancelError}</div>}
                 {loading ? (
                   <div className="empty-box py-3">กำลังโหลด...</div>
                 ) : upcoming.length === 0 ? (
@@ -365,7 +424,16 @@ export default function BookingPage() {
                 ) : (
                   <div className="timeline">
                     {upcoming.map((b) => (
-                      <BookingItem key={b.id} booking={b} onCancel={handleCancel} busy={busyId === b.id} />
+                      <BookingItem
+                        key={b.id}
+                        booking={b}
+                        onCancel={handleCancel}
+                        busy={busyId === b.id}
+                        cancellation={cancellationFor(PAY_KIND.clinic, b.id, cancellations)}
+                        cancelFormOpen={cancelTargetId === b.id}
+                        onOpenCancel={() => setCancelTargetId(b.id)}
+                        onCloseCancel={() => setCancelTargetId('')}
+                      />
                     ))}
                   </div>
                 )}
@@ -379,7 +447,16 @@ export default function BookingPage() {
                   </div>
                   <div className="timeline">
                     {history.map((b) => (
-                      <BookingItem key={b.id} booking={b} onCancel={handleCancel} busy={false} />
+                      <BookingItem
+                        key={b.id}
+                        booking={b}
+                        onCancel={handleCancel}
+                        busy={false}
+                        cancellation={cancellationFor(PAY_KIND.clinic, b.id, cancellations)}
+                        cancelFormOpen={cancelTargetId === b.id}
+                        onOpenCancel={() => setCancelTargetId(b.id)}
+                        onCloseCancel={() => setCancelTargetId('')}
+                      />
                     ))}
                   </div>
                 </div>

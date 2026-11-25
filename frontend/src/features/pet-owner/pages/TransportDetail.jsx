@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { fileToResizedDataUrl } from '../../../shared/utils/storage.js';
 import PaymentQr from '../../pet-transport/components/PaymentQr.jsx';
 import PriceQuote from '../../pet-transport/components/PriceQuote.jsx';
 import StatusBadge from '../../pet-transport/components/StatusBadge.jsx';
@@ -16,15 +17,24 @@ import {
   catalogOptionsForPlace,
   otherServiceKindForPlace,
 } from '../../pet-transport/serviceCatalog.js';
+import { useHotelBookings } from '../useHotelBookings.js';
 import { useTransport } from '../../pet-transport/useTransport.js';
+import CancellationRequestForm from '../../cancellations/CancellationRequestForm.jsx';
+import CancellationSummary from '../../cancellations/CancellationSummary.jsx';
+import {
+  cancellationFor,
+  createCancellationRequest,
+  hasOpenCancellation,
+  removeCancellationRequest,
+  useCancellationRequests,
+} from '../../cancellations/store.js';
+import { PAY_KIND } from '../../payments/store.js';
 import '../../pet-transport/transport.css';
 
 const OWNER_NAV = [
   { to: '/pet-owner/transport', label: 'จองรับ–ส่ง', icon: 'bi-plus-circle', end: true },
   { to: '/pet-owner/transport/history', label: 'ประวัติการจอง', icon: 'bi-clock-history' },
 ];
-
-const CANCEL_MAX = 200;
 
 function formatPickupThai(iso, { short = false } = {}) {
   if (!iso) return 'ยังไม่ระบุ';
@@ -71,10 +81,12 @@ export default function TransportDetailPage() {
     requestCancel,
     setBookingOtherService,
     trips,
+    hotelRoomPrices,
   } = useTransport();
+  const { bookings: hotelBookings } = useHotelBookings();
+  const cancellations = useCancellationRequests(currentUser?.id);
   const booking = getBooking(bookingId);
-  const [note, setNote] = useState('');
-  const [cancelReason, setCancelReason] = useState('');
+  const [slip, setSlip] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [showQr, setShowQr] = useState(false);
@@ -87,8 +99,8 @@ export default function TransportDetailPage() {
   const facilityPlace = primaryTrip?.to || null;
   const otherKind = otherServiceKindForPlace(facilityPlace);
   const otherOptions = useMemo(
-    () => catalogOptionsForPlace(facilityPlace),
-    [facilityPlace],
+    () => catalogOptionsForPlace(facilityPlace, hotelRoomPrices),
+    [facilityPlace, hotelRoomPrices],
   );
 
   useEffect(() => {
@@ -118,14 +130,33 @@ export default function TransportDetailPage() {
 
   const canPay = !['paid', 'owner_confirmed'].includes(booking.paymentStatus)
     && !['cancelled', 'cancel_requested', 'completed'].includes(booking.status);
-  const canCancel = canOwnerRequestCancel(booking, trips);
+  const cancellation = cancellationFor(PAY_KIND.transport, booking.id, cancellations);
+  const canCancel = canOwnerRequestCancel(booking, trips)
+    && !hasOpenCancellation(PAY_KIND.transport, booking.id, cancellations);
   const canAddServices = booking.serviceType !== 'inbound'
     && !['paid', 'owner_confirmed'].includes(booking.paymentStatus)
     && !['cancelled', 'cancel_requested', 'completed'].includes(booking.status);
+  const showOtherServiceOptions = otherOptions.length > 0
+    && (otherKind !== 'hotel' || Boolean(booking.quote?.otherService));
+  const linkedHotel = hotelBookings.find((item) =>
+    item.linkedBookings?.some((linked) => linked.kind === 'transport' && linked.id === booking.id));
   const svc = serviceTypeMeta(booking.serviceType);
   const primaryPickup = primaryTrip?.pickupTime;
   const quote = booking.quote;
   const payAmount = quote?.total;
+
+  async function onSlipFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setErr('');
+    setSlip('');
+    try {
+      setSlip(await fileToResizedDataUrl(file, 960, 0.82));
+    } catch (error) {
+      setErr(error.message);
+    }
+  }
 
   async function saveOtherService() {
     setErr('');
@@ -166,25 +197,41 @@ export default function TransportDetailPage() {
 
   async function pay() {
     setErr('');
+    if (!slip) {
+      setErr('กรุณาแนบสลิปก่อนส่งให้ฝ่ายบัญชีตรวจสอบ');
+      return;
+    }
     try {
-      await ownerConfirmPayment(booking.id, note);
-      setMsg('');
+      await ownerConfirmPayment(booking.id, slip);
+      setMsg('ส่งสลิปแล้ว รอฝ่ายบัญชีตรวจสอบ');
+      setSlip('');
       setShowQr(false);
     } catch (e) {
       setErr(e.message);
     }
   }
 
-  async function cancel() {
-    setErr('');
-    if (!cancelReason.trim()) return setErr('กรุณาระบุเหตุผล');
+  async function cancel(details) {
+    let cancellationRequest;
     try {
-      await requestCancel(booking.id, cancelReason.trim());
+      cancellationRequest = await createCancellationRequest({
+        ...details,
+        kind: PAY_KIND.transport,
+        source: 'transport',
+        refId: booking.id,
+        ownerId: booking.ownerId,
+        ownerName: booking.ownerName || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim(),
+        ownerEmail: currentUser?.email || '',
+        petName: booking.petName,
+        title: 'จองรับ–ส่งสัตว์เลี้ยง',
+        bookingDate: primaryPickup || '',
+      });
+      await requestCancel(booking.id, currentUser.id, cancellationRequest.id, cancellationRequest.reason);
       setMsg('ส่งคำขอยกเลิกแล้ว รอ Admin อนุมัติ');
     } catch (e) {
-      setErr(e.message);
+      if (cancellationRequest) await removeCancellationRequest(cancellationRequest.id, booking.ownerId);
+      throw e;
     }
-    return undefined;
   }
 
   return (
@@ -236,11 +283,7 @@ export default function TransportDetailPage() {
             {booking.petNotes && (
               <p className="tp-muted tp-summary-card__note">หมายเหตุ: {booking.petNotes}</p>
             )}
-            {booking.cancelRequest && (
-              <div className="tp-alert tp-alert--info tp-summary-card__note">
-                คำขอยกเลิก: {booking.cancelRequest.reason} ({booking.cancelRequest.status})
-              </div>
-            )}
+            {cancellation ? <CancellationSummary request={cancellation} /> : null}
           </div>
 
           <div className="tp-detail-layout">
@@ -318,98 +361,131 @@ export default function TransportDetailPage() {
             </aside>
           </div>
 
-          {canAddServices && otherOptions.length > 0 && (
+          {canAddServices && (
             <div className="tp-card" style={{ marginTop: '1rem' }}>
-              <div className="tp-add-service-head">
-                <div>
-                  <h3 className="tp-section-title" style={{ marginBottom: 0 }}>
-                    เพิ่มบริการ
-                  </h3>
-                  <p className="tp-muted" style={{ margin: '0.35rem 0 0' }}>
-                    ไม่บังคับ — กด + เมื่อต้องการเพิ่มคลินิก/โรงแรม หรือข้ามไปชำระค่ารถอย่างเดียว
-                  </p>
-                  {quote?.otherService && !wantExtra && (
-                    <p style={{ margin: '0.5rem 0 0' }}>
-                      เพิ่มแล้ว: <strong>{quote.otherService.label}</strong>
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className={`tp-add-service-btn ${wantExtra ? 'is-open' : ''}`}
-                  aria-expanded={wantExtra}
-                  aria-label={wantExtra ? 'ปิดฟอร์มเพิ่มบริการ' : 'เพิ่มบริการคลินิกหรือโรงแรม'}
-                  title={wantExtra ? 'ปิด' : 'เพิ่มบริการ'}
-                  onClick={async () => {
-                    if (wantExtra) {
-                      setWantExtra(false);
-                      setOtherServiceId(quote?.otherService?.id || '');
-                    } else {
-                      setWantExtra(true);
-                      setOtherServiceId(quote?.otherService?.id || otherOptions[0]?.id || '');
-                    }
-                  }}
-                >
-                  <i className={`bi ${wantExtra ? 'bi-x-lg' : 'bi-plus-lg'}`} />
-                </button>
-              </div>
-
-              {wantExtra && (
+              {showOtherServiceOptions ? (
                 <>
-                  <div className="tp-form" style={{ marginTop: '0.85rem' }}>
-                    <div className="field">
-                      <label htmlFor="detail-other-service">
-                        {otherKind === 'hotel' ? 'เลือกห้อง' : 'เลือกบริการ'}
-                      </label>
-                      <select
-                        id="detail-other-service"
-                        value={otherServiceId}
-                        onChange={(e) => setOtherServiceId(e.target.value)}
-                      >
-                        {otherOptions.map((opt) => (
-                          <option key={opt.id} value={opt.id}>
-                            {opt.label} — ฿{Number(opt.price).toLocaleString('th-TH')}
-                            {opt.unit ? ` / ${opt.unit}` : ''}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="tp-add-service-head">
+                    <div>
+                      <h3 className="tp-section-title" style={{ marginBottom: 0 }}>
+                        เพิ่มบริการ
+                      </h3>
+                      <p className="tp-muted" style={{ margin: '0.35rem 0 0' }}>
+                        เพิ่มค่าบริการสถานที่ในยอดรับ–ส่ง ส่วนการจองห้องพักจริงจะแยกใบจองและชำระแยก
+                      </p>
+                      {quote?.otherService && !wantExtra && (
+                        <p style={{ margin: '0.5rem 0 0' }}>
+                          เพิ่มแล้ว: <strong>{quote.otherService.label}</strong>
+                        </p>
+                      )}
                     </div>
-                    {otherKind === 'hotel' && otherServiceId && (
-                      <div className="field">
-                        <label htmlFor="detail-hotel-nights">จำนวนคืน</label>
-                        <input
-                          id="detail-hotel-nights"
-                          type="number"
-                          min={1}
-                          max={30}
-                          value={hotelNights}
-                          onChange={(e) => setHotelNights(Math.max(1, Number(e.target.value) || 1))}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <div className="tp-actions">
                     <button
                       type="button"
-                      className="btn btn-sky"
-                      disabled={savingService || !otherServiceId}
-                      onClick={saveOtherService}
+                      className={`tp-add-service-btn ${wantExtra ? 'is-open' : ''}`}
+                      aria-expanded={wantExtra}
+                      aria-label={wantExtra ? 'ปิดฟอร์มเพิ่มบริการ' : 'เพิ่มบริการคลินิกหรือโรงแรม'}
+                      title={wantExtra ? 'ปิด' : 'เพิ่มบริการ'}
+                      onClick={() => {
+                        if (wantExtra) {
+                          setWantExtra(false);
+                          setOtherServiceId(quote?.otherService?.id || '');
+                        } else {
+                          setWantExtra(true);
+                          setOtherServiceId(quote?.otherService?.id || otherOptions[0]?.id || '');
+                        }
+                      }}
                     >
-                      บันทึกบริการ
+                      <i className={`bi ${wantExtra ? 'bi-x-lg' : 'bi-plus-lg'}`} />
                     </button>
-                    {quote?.otherService && (
-                      <button
-                        type="button"
-                        className="btn btn-soft"
-                        disabled={savingService}
-                        onClick={clearOtherService}
-                      >
-                        ลบบริการเพิ่ม
-                      </button>
-                    )}
                   </div>
+
+                  {wantExtra && (
+                    <>
+                      <div className="tp-form" style={{ marginTop: '0.85rem' }}>
+                        <div className="field">
+                          <label htmlFor="detail-other-service">
+                            {otherKind === 'hotel' ? 'เลือกห้อง' : 'เลือกบริการ'}
+                          </label>
+                          <select
+                            id="detail-other-service"
+                            value={otherServiceId}
+                            onChange={(e) => setOtherServiceId(e.target.value)}
+                          >
+                            {otherOptions.map((opt) => (
+                              <option key={opt.id} value={opt.id}>
+                                {opt.label} — ฿{Number(opt.price).toLocaleString('th-TH')}
+                                {opt.unit ? ` / ${opt.unit}` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {otherKind === 'hotel' && otherServiceId && (
+                          <div className="field">
+                            <label htmlFor="detail-hotel-nights">จำนวนคืน</label>
+                            <input
+                              id="detail-hotel-nights"
+                              type="number"
+                              min={1}
+                              max={30}
+                              value={hotelNights}
+                              onChange={(e) => setHotelNights(Math.max(1, Number(e.target.value) || 1))}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="tp-actions">
+                        <button
+                          type="button"
+                          className="btn btn-sky"
+                          disabled={savingService || !otherServiceId}
+                          onClick={saveOtherService}
+                        >
+                          บันทึกบริการ
+                        </button>
+                        {quote?.otherService && (
+                          <button
+                            type="button"
+                            className="btn btn-soft"
+                            disabled={savingService}
+                            onClick={clearOtherService}
+                          >
+                            ลบบริการเพิ่ม
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </>
+              ) : (
+                <div>
+                  <h3 className="tp-section-title" style={{ marginBottom: 0 }}>เพิ่มบริการ</h3>
+                  <p className="tp-muted" style={{ margin: '0.35rem 0 0' }}>
+                    สร้างใบจองโรงแรมแยกจากรายการรับ–ส่ง
+                  </p>
+                </div>
               )}
+              <div className="tp-actions" style={{ marginTop: '0.75rem' }}>
+                <Link
+                  className="btn btn-soft"
+                  to={`/pet-owner/cat-hotel/book?transportBookingId=${encodeURIComponent(booking.id)}${booking.petId ? `&petId=${encodeURIComponent(booking.petId)}` : ''}`}
+                >
+                  <i className="bi bi-building me-1" />
+                  สร้างใบจองโรงแรมแยก
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {linkedHotel && (
+            <div className="tp-card" style={{ marginTop: '1rem' }}>
+              <h3 className="tp-section-title">
+                <i className="bi bi-building" />
+                รายการโรงแรมที่เชื่อมไว้
+              </h3>
+              <p className="tp-muted">{linkedHotel.petName} · {linkedHotel.checkIn} – {linkedHotel.checkOut}</p>
+              <Link className="btn btn-soft" to={`/pet-owner/cat-hotel/bookings/${linkedHotel.id}`}>
+                ดูรายละเอียดการจองโรงแรม
+              </Link>
             </div>
           )}
 
@@ -429,6 +505,12 @@ export default function TransportDetailPage() {
             </div>
           )}
 
+          {booking.paymentStatus === 'unpaid' && booking.paymentNote ? (
+            <div className="tp-alert tp-alert--danger" role="status">
+              ฝ่ายบัญชีไม่อนุมัติสลิป: {booking.paymentNote} กรุณาแนบสลิปใหม่
+            </div>
+          ) : null}
+
           {canPay && (
             <div className="tp-card" style={{ marginTop: '1rem' }}>
               <h3 className="tp-section-title">
@@ -436,7 +518,7 @@ export default function TransportDetailPage() {
                 ชำระเงิน
               </h3>
               <p className="tp-muted">
-                กดปุ่มด้านล่างเพื่อแสดง QR Code สแกนด้วยแอปธนาคาร แล้วกดยืนยันว่าชำระแล้ว
+                สแกน QR ด้วยแอปธนาคาร แล้วแนบสลิปเพื่อส่งให้ฝ่ายบัญชีตรวจสอบ
               </p>
 
               {!showQr ? (
@@ -451,18 +533,25 @@ export default function TransportDetailPage() {
                   <PaymentQr bookingId={booking.id} amount={payAmount} visible />
                   <div className="tp-form">
                     <div className="field">
-                      <label htmlFor="pay-note">หมายเหตุการชำระ</label>
+                      <label htmlFor="pay-slip">สลิปการโอนเงิน (จำเป็น)</label>
                       <input
-                        id="pay-note"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        placeholder="เช่น โอนแล้วเมื่อ 15:00"
+                        id="pay-slip"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={onSlipFile}
                       />
                     </div>
+                    {slip ? (
+                      <img
+                        src={slip}
+                        alt="ตัวอย่างสลิปที่แนบ"
+                        style={{ display: 'block', maxWidth: '240px', maxHeight: '240px', objectFit: 'contain', marginTop: '0.5rem' }}
+                      />
+                    ) : null}
                   </div>
                   <div className="tp-actions">
-                    <button type="button" className="btn btn-sky" onClick={pay}>
-                      ยืนยันว่าชำระแล้ว
+                    <button type="button" className="btn btn-sky" onClick={pay} disabled={!slip}>
+                      ส่งสลิปให้ฝ่ายบัญชีตรวจสอบ
                     </button>
                     <button type="button" className="btn btn-soft" onClick={() => setShowQr(false)}>
                       ปิด QR
@@ -470,6 +559,22 @@ export default function TransportDetailPage() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+          {booking.paymentStatus === 'owner_confirmed' && (
+            <div className="tp-card" style={{ marginTop: '1rem' }}>
+              <h3 className="tp-section-title">
+                <i className="bi bi-hourglass-split" />
+                รอตรวจสอบการชำระเงิน
+              </h3>
+              <p className="tp-muted">ส่งสลิปให้ฝ่ายบัญชีแล้ว รอการตรวจสอบ</p>
+              {booking.paymentSlip ? (
+                <img
+                  src={booking.paymentSlip}
+                  alt="สลิปที่ส่งให้ฝ่ายบัญชี"
+                  style={{ display: 'block', maxWidth: '240px', maxHeight: '240px', objectFit: 'contain' }}
+                />
+              ) : null}
             </div>
           )}
 
@@ -480,30 +585,13 @@ export default function TransportDetailPage() {
                 ขอยกเลิกการจอง
               </h3>
               <p className="tp-muted">
-                ยกเลิกเองได้ก่อนสถานะ “รับสัตว์แล้ว” — Admin เป็นผู้อนุมัติ
+                Admin จะพิจารณาคำขอก่อนส่งต่อให้ฝ่ายบัญชี
               </p>
-              <div className="tp-form">
-                <div className="field">
-                  <label htmlFor="cancel">เหตุผลในการยกเลิก</label>
-                  <textarea
-                    id="cancel"
-                    rows={3}
-                    maxLength={CANCEL_MAX}
-                    value={cancelReason}
-                    onChange={(e) => setCancelReason(e.target.value)}
-                    placeholder="ระบุเหตุผลที่ต้องการยกเลิก"
-                  />
-                  <p className="tp-char-count">
-                    {cancelReason.length}/{CANCEL_MAX}
-                  </p>
-                </div>
-              </div>
-              <div className="tp-actions tp-actions--end">
-                <button type="button" className="btn btn-soft-danger" onClick={cancel}>
-                  <i className="bi bi-trash" />
-                  ส่งคำขอยกเลิก
-                </button>
-              </div>
+              <CancellationRequestForm
+                idPrefix={`transport-cancel-${booking.id}`}
+                initialPhone={currentUser?.phone || booking.ownerPhone || ''}
+                onSubmit={cancel}
+              />
             </div>
           )}
 

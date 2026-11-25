@@ -18,6 +18,7 @@ export const MAX_HOTEL_NIGHTS = 30;
 export const RESERVATION_STATUS = {
   pending: { label: 'รอยืนยัน', tone: 'warn' },
   confirmed: { label: 'ยืนยันแล้ว', tone: 'ok' },
+  cancel_requested: { label: 'รอแอดมินพิจารณายกเลิก', tone: 'warn' },
   cancelled: { label: 'ยกเลิกแล้ว', tone: '' },
 };
 

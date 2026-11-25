@@ -2,6 +2,9 @@ import { Router } from 'express';
 import { openDatabase } from './db.js';
 import { migrate } from './migrate.js';
 import * as service from './service.js';
+import { bearerToken, requireStaff } from '../auth/middleware.js';
+import { findStaffById } from '../auth/staffAccounts.js';
+import { sessionStaffId } from '../auth/sessions.js';
 
 openDatabase();
 migrate();
@@ -20,9 +23,20 @@ router.get('/', (_req, res) => {
   ok(res, { module: 'pet-transport', owner: 'โมเดล', status: 'ready', db: true });
 });
 
-router.get('/state', (_req, res) => {
+router.get('/state', (req, res) => {
   try {
-    ok(res, service.getState());
+    const token = bearerToken(req);
+    const staff = token ? findStaffById(sessionStaffId(token)) : null;
+    if (token && !staff) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบพนักงานใหม่' });
+    ok(res, service.getState({ includePaymentDetails: staff?.role === 'accountant' }));
+  } catch (error) {
+    fail(res, error, 500);
+  }
+});
+
+router.get('/pricing', (_req, res) => {
+  try {
+    ok(res, service.getPricing());
   } catch (error) {
     fail(res, error, 500);
   }
@@ -54,15 +68,23 @@ router.post('/bookings/:id/other-service', (req, res) => {
 
 router.post('/bookings/:id/owner-confirm-payment', (req, res) => {
   try {
-    ok(res, service.ownerConfirmPayment(req.params.id, req.body?.note || ''));
+    ok(res, service.ownerConfirmPayment(req.params.id, req.body?.slip || ''));
   } catch (error) {
     fail(res, error);
   }
 });
 
-router.post('/bookings/:id/admin-mark-paid', (req, res) => {
+router.post('/bookings/:id/approve-payment', requireStaff('accountant'), (req, res) => {
   try {
-    ok(res, service.adminMarkPaid(req.params.id));
+    ok(res, service.approveTransportPayment(req.params.id));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
+router.post('/bookings/:id/reject-payment', requireStaff('accountant'), (req, res) => {
+  try {
+    ok(res, service.rejectTransportPayment(req.params.id, req.body?.note || ''));
   } catch (error) {
     fail(res, error);
   }
@@ -70,7 +92,12 @@ router.post('/bookings/:id/admin-mark-paid', (req, res) => {
 
 router.post('/bookings/:id/request-cancel', (req, res) => {
   try {
-    ok(res, service.requestCancel(req.params.id, req.body?.reason || ''));
+    ok(res, service.requestCancel(
+      req.params.id,
+      req.body?.ownerId,
+      req.body?.cancellationId,
+      req.body?.reason || '',
+    ));
   } catch (error) {
     fail(res, error);
   }
@@ -78,7 +105,12 @@ router.post('/bookings/:id/request-cancel', (req, res) => {
 
 router.post('/bookings/:id/resolve-cancel', (req, res) => {
   try {
-    ok(res, service.resolveCancel(req.params.id, Boolean(req.body?.approve), req.body?.adminNote || ''));
+    ok(res, service.resolveCancel(
+      req.params.id,
+      req.body?.cancellationId,
+      Boolean(req.body?.approve),
+      req.body?.adminNote || '',
+    ));
   } catch (error) {
     fail(res, error);
   }
@@ -164,17 +196,9 @@ router.put('/zones', (req, res) => {
   }
 });
 
-router.post('/hotels', (req, res) => {
+router.put('/hotel-room-prices', (req, res) => {
   try {
-    ok(res, service.addHotel(req.body || {}));
-  } catch (error) {
-    fail(res, error);
-  }
-});
-
-router.delete('/hotels/:id', (req, res) => {
-  try {
-    ok(res, service.removeHotel(req.params.id));
+    ok(res, service.updateHotelRoomPrices(req.body?.rooms));
   } catch (error) {
     fail(res, error);
   }

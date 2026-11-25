@@ -12,7 +12,7 @@ import { ROLES } from './features/auth/roles.js';
 import ProfilePage from './features/profile/pages/Profile.jsx';
 import AccountingPage from './features/accounting/AccountingPage.jsx';
 import HotelCctvMount from './features/super-admin/HotelCctvMount.jsx';
-import { adoptionStaffRoutes, adminTransportRoutes, driverTransportRoutes, financeRoutes, petOwnerRoutes, roleRoutes } from './routes/roleRoutes.jsx';
+import { adoptionStaffRoutes, adminTransportRoutes, driverTransportRoutes, petOwnerRoutes, roleRoutes } from './routes/roleRoutes.jsx';
 
 export default function App() {
   return (
@@ -46,11 +46,6 @@ export default function App() {
         <Route element={<RequireRole roles={[ROLES.driver]} />}>
           <Route path="pet-transport" element={<StaffShell variant="driver" />}>
             {driverTransportRoutes}
-          </Route>
-        </Route>
-        <Route element={<RequireRole roles={[ROLES.finance]} />}>
-          <Route path="finance" element={<StaffShell variant="finance" />}>
-            {financeRoutes}
           </Route>
         </Route>
       </Route>

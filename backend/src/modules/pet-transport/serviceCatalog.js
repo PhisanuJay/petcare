@@ -4,9 +4,9 @@
  */
 
 export const HOTEL_ROOMS = [
-  { id: 'standard', label: 'โรงแรม · Standard', price: 450 },
-  { id: 'deluxe', label: 'โรงแรม · Deluxe', price: 750 },
-  { id: 'suite', label: 'โรงแรม · Suite', price: 1200 },
+  { id: 'standard', label: 'Standard', price: 450 },
+  { id: 'deluxe', label: 'Deluxe', price: 750 },
+  { id: 'suite', label: 'Suite', price: 1200 },
 ];
 
 export const CLINIC_SERVICES = [
@@ -21,19 +21,25 @@ export function otherServiceKindForPlace(place) {
   return null;
 }
 
-export function resolveOtherService({ serviceType, place, otherServiceId, hotelNights = 1 }) {
+export function resolveOtherService({
+  serviceType,
+  place,
+  otherServiceId,
+  hotelNights = 1,
+  hotelRooms = HOTEL_ROOMS,
+}) {
   if (serviceType === 'inbound') return null;
   const kind = otherServiceKindForPlace(place);
   if (!kind || !otherServiceId) return null;
 
   if (kind === 'hotel') {
-    const room = HOTEL_ROOMS.find((r) => r.id === otherServiceId);
+    const room = hotelRooms.find((r) => r.id === otherServiceId);
     if (!room) return null;
     const nights = Math.max(1, Number(hotelNights) || 1);
     return {
       kind: 'hotel',
       id: room.id,
-      label: `${room.label} × ${nights} คืน`,
+      label: `โรงแรม · ${room.label} × ${nights} คืน`,
       unitPrice: room.price,
       nights,
       amount: room.price * nights,

@@ -34,13 +34,14 @@ export function clinicServiceById(id) {
   return CLINIC_SERVICES.find((s) => s.id === id) || null;
 }
 
-export function hotelServiceById(id) {
+export function hotelServiceById(id, hotelRoomPrices = []) {
   const room = hotelRoomByValue(id);
   if (!room) return null;
+  const currentPrice = hotelRoomPrices.find((item) => item.id === id)?.price;
   return {
     id: room.value,
     label: `โรงแรม · ${room.label}`,
-    price: room.price,
+    price: Number.isFinite(Number(currentPrice)) ? Number(currentPrice) : room.price,
     icon: room.icon,
     unit: 'คืน',
   };
@@ -59,13 +60,19 @@ export function otherServiceKindForPlace(place) {
  * Resolve add-on line for outbound / round_trip.
  * inbound → always null (transport only).
  */
-export function resolveOtherService({ serviceType, place, otherServiceId, hotelNights = 1 }) {
+export function resolveOtherService({
+  serviceType,
+  place,
+  otherServiceId,
+  hotelNights = 1,
+  hotelRoomPrices = [],
+}) {
   if (serviceType === 'inbound') return null;
   const kind = otherServiceKindForPlace(place);
   if (!kind || !otherServiceId) return null;
 
   if (kind === 'hotel') {
-    const room = hotelServiceById(otherServiceId);
+    const room = hotelServiceById(otherServiceId, hotelRoomPrices);
     if (!room) return null;
     const nights = Math.max(1, Number(hotelNights) || 1);
     return {
@@ -90,9 +97,14 @@ export function resolveOtherService({ serviceType, place, otherServiceId, hotelN
   };
 }
 
-export function catalogOptionsForPlace(place) {
+export function catalogOptionsForPlace(place, hotelRoomPrices = []) {
   const kind = otherServiceKindForPlace(place);
-  if (kind === 'hotel') return HOTEL_SERVICES;
+  if (kind === 'hotel') {
+    return HOTEL_SERVICES.map((room) => ({
+      ...room,
+      price: hotelServiceById(room.id, hotelRoomPrices)?.price ?? room.price,
+    }));
+  }
   if (kind === 'clinic') return CLINIC_SERVICES;
   return [];
 }

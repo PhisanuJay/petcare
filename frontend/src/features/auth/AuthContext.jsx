@@ -49,15 +49,6 @@ const SEED_ACCOUNTANT = {
   phone: '0200000001',
 };
 
-const SEED_FINANCE = {
-  id: 'finance-seed',
-  email: 'finance@petcare.local',
-  password: 'Finance1234',
-  firstName: 'กานต์',
-  lastName: 'การเงิน',
-  phone: '0211112222',
-};
-
 const usersListeners = new Set();
 
 function notifyUsers() {
@@ -144,6 +135,16 @@ async function ensureUsersBootstrapped() {
   let users = loadUsersRaw();
   let changed = false;
 
+  const withoutFinanceSeed = users.filter(
+    (user) => user.id !== 'finance-seed' && user.email !== 'finance@petcare.local',
+  );
+  if (withoutFinanceSeed.length !== users.length) changed = true;
+  users = withoutFinanceSeed.map((user) => {
+    if (user.role !== 'finance') return user;
+    changed = true;
+    return { ...user, role: ROLES.owner };
+  });
+
   users = users.map((user) => {
     if (user.role) return user;
     changed = true;
@@ -154,7 +155,6 @@ async function ensureUsersBootstrapped() {
   if (await upsertSeedUser(users, SEED_OWNER, ROLES.owner)) changed = true;
   if (await upsertSeedUser(users, SEED_DRIVER, ROLES.driver)) changed = true;
   if (await upsertSeedUser(users, SEED_ACCOUNTANT, ROLES.accountant)) changed = true;
-  if (await upsertSeedUser(users, SEED_FINANCE, ROLES.finance)) changed = true;
 
   if (changed) saveUsers(users);
   return users;
@@ -169,6 +169,19 @@ function bootUsers() {
     });
   }
   return bootPromise;
+}
+
+export async function listLocalOwnerAccounts() {
+  await bootUsers();
+  return loadUsers()
+    .filter((user) => user.role === ROLES.owner && user.active !== false)
+    .map((user) => ({
+      id: user.id,
+      email: user.email,
+      displayName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+      isActive: true,
+    }))
+    .sort((left, right) => left.displayName.localeCompare(right.displayName, 'th'));
 }
 
 function loadStoredSession() {
@@ -205,6 +218,25 @@ function localUserFromServer(serverUser, existingUser) {
     id: existingUser?.id ?? serverUser.id,
     role: ROLES.owner,
   };
+}
+
+async function requestAccountantSession(email, password) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE}/api/auth/staff/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+  } catch {
+    throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบว่า backend ทำงานอยู่');
+  }
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+  if (body.staff?.role !== ROLES.accountant) {
+    throw new Error('บัญชีนี้ไม่มีสิทธิ์ตรวจสอบการชำระเงิน');
+  }
+  return body;
 }
 
 async function requestAuth(path, { token, ...options } = {}) {
@@ -280,9 +312,11 @@ export function AuthProvider({ children }) {
     const user = localUserFromServer(result.user, existing);
     saveUsers([...users.filter((item) => item.id !== user.id), user]);
     bumpUsers();
+    clearStaffSession();
+    setCurrentStaff(null);
     startSession(user, true, result.token);
     return toPublicUser(user);
-  }, [bumpUsers, startSession]);
+  }, [bumpUsers, setCurrentStaff, startSession]);
 
   const login = useCallback(async (email, password, remember = true) => {
     await bootUsers();
@@ -302,6 +336,14 @@ export function AuthProvider({ children }) {
           saveUsers(users.map((item) => (item.id === user.id ? user : item)));
           bumpUsers();
         }
+        if (user.role === ROLES.accountant) {
+          const staffSession = await requestAccountantSession(normalizedEmail, password);
+          saveStaffSession({ token: staffSession.token, staff: staffSession.staff }, remember);
+          setCurrentStaff(staffSession.staff);
+        } else {
+          clearStaffSession();
+          setCurrentStaff(null);
+        }
         startSession(user, remember);
         return toPublicUser(user);
       }
@@ -317,13 +359,17 @@ export function AuthProvider({ children }) {
     const user = localUserFromServer(result.user, existing);
     saveUsers([...users.filter((item) => item.id !== user.id), user]);
     bumpUsers();
+    clearStaffSession();
+    setCurrentStaff(null);
     startSession(user, remember, result.token);
     return toPublicUser(user);
-  }, [bumpUsers, startSession]);
+  }, [bumpUsers, setCurrentStaff, startSession]);
 
   const logout = useCallback(() => {
     localStorage.removeItem(STORAGE_KEYS.session);
     sessionStorage.removeItem(STORAGE_KEYS.session);
+    clearStaffSession();
+    setCurrentStaff(null);
     setAuthState({ currentUser: null, authToken: '' });
   }, []);
 
@@ -533,4 +579,3 @@ export const DEMO_OWNER_LOGIN = { email: SEED_OWNER.email, password: SEED_OWNER.
 export const DEMO_ADMIN_LOGIN = { email: SEED_ADMIN.email, password: SEED_ADMIN.password };
 export const DEMO_DRIVER_LOGIN = { email: SEED_DRIVER.email, password: SEED_DRIVER.password };
 export const DEMO_ACCOUNTANT_LOGIN = { email: SEED_ACCOUNTANT.email, password: SEED_ACCOUNTANT.password };
-export const DEMO_FINANCE_LOGIN = { email: SEED_FINANCE.email, password: SEED_FINANCE.password };

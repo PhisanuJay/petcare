@@ -1,7 +1,16 @@
-import { useCallback, useMemo, useSyncExternalStore } from 'react';
-import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
-import { adminMarkPaid } from '../pet-transport/store.js';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { newId } from '../../shared/utils/storage.js';
+import {
+  cancelStaffPayment,
+  createOwnerPayment,
+  listOwnerPayments,
+  listStaffPayments,
+  reviewStaffPayment,
+  submitOwnerPayment,
+} from './api.js';
+import { approveTransportPayment } from '../pet-transport/store.js';
 import { depositOf } from './promptpay.js';
+import { CANCELLATION_STATUS, cancellationFor, listCancellationRequests } from '../cancellations/store.js';
 
 export const PAY_KIND = {
   hotel: 'hotel',
@@ -20,6 +29,7 @@ export const PAY_STATUS = {
   review: 'pending_review',
   approved: 'approved',
   rejected: 'rejected',
+  cancelled: 'cancelled',
 };
 
 export const PAY_STATUS_LABEL = {
@@ -27,58 +37,79 @@ export const PAY_STATUS_LABEL = {
   pending_review: 'ยังไม่อนุมัติ',
   approved: 'อนุมัติแล้ว',
   rejected: 'ยังไม่อนุมัติ',
+  cancelled: 'ยกเลิกการชำระ',
 };
 
+const EMPTY = [];
 const listeners = new Set();
-let cache = null;
+const caches = new Map();
+const loads = new Map();
 
-function emit() {
+function scopeKey(scope) {
+  return scope === 'accountant' || scope === 'clinic_admin'
+    ? `staff:${scope}`
+    : `owner:${scope || ''}`;
+}
+
+function readCache(key) {
+  return caches.get(key) || EMPTY;
+}
+
+function replaceCache(key, rows) {
+  caches.set(key, rows);
   listeners.forEach((listener) => listener());
 }
 
-function read() {
-  if (cache === null) cache = readJSON(STORAGE_KEYS.payments, []);
-  return cache;
-}
-
-function write(next) {
-  cache = next;
-  writeJSON(STORAGE_KEYS.payments, next);
-  emit();
-}
-
-function subscribe(listener) {
-  listeners.add(listener);
-  const onStorage = (event) => {
-    if (event.key === STORAGE_KEYS.payments) {
-      cache = null;
-      listener();
+function replaceRecord(row) {
+  for (const [key, rows] of caches) {
+    const index = rows.findIndex((item) => item.id === row.id);
+    if (index >= 0) {
+      const next = rows.slice();
+      next[index] = row;
+      caches.set(key, next);
     }
-  };
-  window.addEventListener('storage', onStorage);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener('storage', onStorage);
-  };
+  }
+  const ownerKey = scopeKey(row.ownerId);
+  const ownerRows = readCache(ownerKey);
+  if (!ownerRows.some((item) => item.id === row.id)) {
+    caches.set(ownerKey, [row, ...ownerRows]);
+  }
+  listeners.forEach((listener) => listener());
 }
 
-export function listPayments() {
-  return read();
+async function load(scope) {
+  if (!scope) return EMPTY;
+  const key = scopeKey(scope);
+  if (loads.has(key)) return loads.get(key);
+  const operation = (scope === 'accountant' || scope === 'clinic_admin'
+    ? listStaffPayments(scope)
+    : listOwnerPayments(scope))
+    .then((rows) => {
+      replaceCache(key, Array.isArray(rows) ? rows : []);
+      return readCache(key);
+    })
+    .finally(() => loads.delete(key));
+  loads.set(key, operation);
+  return operation;
 }
 
-export function getPayment(id) {
-  return read().find((row) => row.id === id) || null;
+export function listPayments(scope) {
+  return readCache(scopeKey(scope));
 }
 
-export function paymentFor(kind, refId) {
-  return read().find((row) => row.kind === kind && row.refId === refId) || null;
+export function getPayment(id, ownerId) {
+  const rows = ownerId ? readCache(scopeKey(ownerId)) : [...caches.values()].flat();
+  return rows.find((row) => row.id === id && (!ownerId || row.ownerId === ownerId)) || null;
 }
 
-/**
- * Shared deposit for hotel, transport, and clinic.
- * The booking itself stays in its own store. This record is only the money.
- */
-export function createPayment(input) {
+export function paymentFor(kind, refId, ownerId) {
+  const rows = ownerId ? readCache(scopeKey(ownerId)) : [...caches.values()].flat();
+  return rows.find((row) => row.kind === kind && row.refId === refId
+    && (!ownerId || row.ownerId === ownerId)) || null;
+}
+
+/** Shared deposit for hotel, transport, and clinic. The booking itself stays in its own store. */
+export async function createPayment(input) {
   const total = Number(input.total);
   const payment = {
     id: newId(),
@@ -98,56 +129,76 @@ export function createPayment(input) {
     submittedAt: '',
     reviewedAt: '',
   };
-  write([payment, ...read()]);
-  return payment;
+  const saved = await createOwnerPayment(input.ownerId, payment);
+  replaceRecord(saved);
+  return saved;
 }
 
-export function submitSlip(id, ownerId, slip) {
-  const row = read().find((item) => item.id === id && item.ownerId === ownerId);
+export async function submitSlip(id, ownerId, slip) {
+  await load(ownerId);
+  const row = getPayment(id, ownerId);
   if (!row) throw new Error('ไม่พบรายการชำระเงิน');
+  const cancellation = cancellationFor(row.kind, row.refId, listCancellationRequests(ownerId));
+  if (cancellation && cancellation.status !== CANCELLATION_STATUS.rejected) {
+    throw new Error('รายการนี้มีคำขอยกเลิกที่กำลังดำเนินการ ไม่สามารถส่งสลิปได้');
+  }
+  if (row.status === PAY_STATUS.cancelled) throw new Error('รายการชำระเงินนี้ถูกยกเลิกแล้ว');
   if (row.status === PAY_STATUS.approved) throw new Error('รายการนี้อนุมัติแล้ว');
   if (!slip) throw new Error('กรุณาแนบสลิป');
-  const next = {
-    ...row,
-    slip,
-    status: PAY_STATUS.review,
-    note: '',
-    submittedAt: new Date().toISOString(),
-  };
-  write(read().map((item) => (item.id === id ? next : item)));
-  return next;
+  const updated = await submitOwnerPayment(ownerId, id, slip);
+  replaceRecord(updated);
+  return updated;
 }
 
-export function reviewPayment(id, decision, note = '') {
-  const row = read().find((item) => item.id === id);
+export async function reviewPayment(id, decision, note = '') {
+  await load('accountant');
+  const row = getPayment(id);
   if (!row) throw new Error('ไม่พบรายการชำระเงิน');
   if (row.status !== PAY_STATUS.review) throw new Error('รายการนี้ไม่ได้อยู่ระหว่างตรวจสลิป');
+  const cancellation = cancellationFor(
+    row.kind,
+    row.refId,
+    listCancellationRequests('accountant'),
+  );
+  if (
+    cancellation
+    && cancellation.status !== CANCELLATION_STATUS.pendingAdmin
+    && cancellation.status !== CANCELLATION_STATUS.rejected
+  ) throw new Error('รายการนี้ยกเลิกแล้ว ไม่สามารถอนุมัติสลิปได้');
   if (decision !== PAY_STATUS.approved && decision !== PAY_STATUS.rejected) {
     throw new Error('คำตัดสินไม่ถูกต้อง');
   }
-  const next = {
-    ...row,
-    status: decision,
-    note: String(note || '').trim(),
-    reviewedAt: new Date().toISOString(),
-  };
-  write(read().map((item) => (item.id === id ? next : item)));
   if (decision === PAY_STATUS.approved && row.kind === PAY_KIND.transport) {
-    try {
-      adminMarkPaid(row.refId);
-    } catch {
-      /* transport row may already be paid */
-    }
+    await approveTransportPayment(row.refId);
   }
-  return next;
+  const updated = await reviewStaffPayment(id, decision, note);
+  replaceRecord(updated);
+  return updated;
 }
 
-export function usePayments() {
-  const all = useSyncExternalStore(subscribe, read);
-  const mine = useCallback((ownerId) => all.filter((row) => row.ownerId === ownerId), [all]);
-  const pending = useMemo(
-    () => all.filter((row) => row.status === PAY_STATUS.review),
-    [all],
+export async function cancelPendingPayment(kind, refId) {
+  await load('clinic_admin');
+  const row = paymentFor(kind, refId);
+  if (!row || [PAY_STATUS.approved, PAY_STATUS.cancelled].includes(row.status)) return row;
+  const updated = await cancelStaffPayment(row.id);
+  replaceRecord(updated);
+  return updated;
+}
+
+export function usePayments(scope) {
+  const key = scopeKey(scope);
+  const all = useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => readCache(key),
+    () => EMPTY,
   );
+  useEffect(() => {
+    if (scope) load(scope).catch(() => {});
+  }, [scope]);
+  const mine = useCallback((ownerId) => all.filter((row) => row.ownerId === ownerId), [all]);
+  const pending = useMemo(() => all.filter((row) => row.status === PAY_STATUS.review), [all]);
   return { all, mine, pending };
 }

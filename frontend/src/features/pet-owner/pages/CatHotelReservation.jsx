@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePets } from '../usePets.js';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import { useHotelReservations } from '../useHotelReservations.js';
 import {
-  HOTEL_ROOMS,
   HOTEL_SPECIES,
   MAX_HOTEL_NIGHTS,
   RESERVATION_STATUS,
@@ -11,8 +11,18 @@ import {
   formatBaht,
   nightsBetween,
 } from '../hotelOptions.js';
+import { useHotelPricing } from '../useHotelPricing.js';
 import { todayString } from '../bookingOptions.js';
 import { formatDate } from '../petUtils.js';
+import CancellationRequestForm from '../../cancellations/CancellationRequestForm.jsx';
+import CancellationSummary from '../../cancellations/CancellationSummary.jsx';
+import {
+  cancellationFor,
+  createCancellationRequest,
+  removeCancellationRequest,
+  useCancellationRequests,
+} from '../../cancellations/store.js';
+import { PAY_KIND } from '../../payments/store.js';
 
 /**
  * Cat Hotel — Role: Pet Owner (มะแอ่ว)
@@ -22,6 +32,7 @@ import { formatDate } from '../petUtils.js';
  */
 
 function ReservationForm({ cats, onSubmit }) {
+  const { rooms: hotelRooms, loading: pricingLoading, error: pricingError } = useHotelPricing();
   const [form, setForm] = useState({
     petId: cats[0]?.id ?? '',
     roomType: 'deluxe',
@@ -33,7 +44,7 @@ function ReservationForm({ cats, onSubmit }) {
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
 
-  const room = HOTEL_ROOMS.find((r) => r.value === form.roomType);
+  const room = hotelRooms.find((r) => r.value === form.roomType);
   const nights = nightsBetween(form.checkIn, form.checkOut);
   const validNights = nights >= 1 && nights <= MAX_HOTEL_NIGHTS;
 
@@ -51,6 +62,10 @@ function ReservationForm({ cats, onSubmit }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (pricingLoading || pricingError) {
+      setError(pricingError || 'กำลังโหลดราคาห้องพัก กรุณาลองอีกครั้ง');
+      return;
+    }
     if (!form.checkIn) return setError('กรุณาเลือกวันเช็คอิน');
     if (!form.checkOut) return setError('กรุณาเลือกวันเช็คเอาท์');
     if (!validNights) return setError(`ฝากได้ 1 ถึง ${MAX_HOTEL_NIGHTS} คืนต่อครั้ง`);
@@ -76,6 +91,8 @@ function ReservationForm({ cats, onSubmit }) {
 
       {error && <div className="alert alert-danger py-2">{error}</div>}
       {done && <div className="alert alert-success py-2">ส่งคำขอจองแล้ว รอการยืนยันจากโรงแรม</div>}
+      {pricingLoading ? <p className="hotel-pricing-note" role="status">กำลังโหลดราคาห้องพัก</p> : null}
+      {pricingError ? <p className="hotel-pricing-error" role="alert">{pricingError}</p> : null}
 
       <div className="row g-3">
         <div className="col-12">
@@ -90,7 +107,7 @@ function ReservationForm({ cats, onSubmit }) {
         <div className="col-12">
           <div className="form-label">ประเภทห้อง</div>
           <div className="row g-2">
-            {HOTEL_ROOMS.map((r) => (
+            {hotelRooms.map((r) => (
               <div className="col-md-4" key={r.value}>
                 <label
                   className="d-block h-100 p-2 rounded-3 border"
@@ -174,7 +191,7 @@ function ReservationForm({ cats, onSubmit }) {
       )}
 
       <div className="text-end mt-3">
-        <button type="submit" className="btn btn-sky" disabled={saving}>
+        <button type="submit" className="btn btn-sky" disabled={saving || pricingLoading || Boolean(pricingError)}>
           <i className="bi bi-check2 me-1" />
           {saving ? 'กำลังส่ง...' : 'ยืนยันการจอง'}
         </button>
@@ -183,9 +200,10 @@ function ReservationForm({ cats, onSubmit }) {
   );
 }
 
-function ReservationItem({ reservation: r, onCancel, busy }) {
+function ReservationItem({ reservation: r, onCancel, busy, cancellation }) {
+  const [showCancelForm, setShowCancelForm] = useState(false);
   const status = RESERVATION_STATUS[r.status] ?? RESERVATION_STATUS.pending;
-  const canCancel = r.status !== 'cancelled' && r.checkOut > todayString();
+  const canCancel = ['pending', 'confirmed'].includes(r.status) && r.checkOut > todayString();
 
   return (
     <div className="tl-item">
@@ -202,24 +220,34 @@ function ReservationItem({ reservation: r, onCancel, busy }) {
       </div>
       <div className="small mt-1">รวม {formatBaht(r.totalPrice)}</div>
       {r.note && <div className="small text-muted">{r.note}</div>}
+      <CancellationSummary request={cancellation} />
       {canCancel && (
-        <button
-          type="button"
-          className="btn btn-sm btn-soft-danger mt-2"
-          disabled={busy}
-          onClick={() => onCancel(r)}
-        >
-          ยกเลิกการจอง
-        </button>
+        showCancelForm ? (
+          <CancellationRequestForm
+            idPrefix={`hotel-reservation-cancel-${r.id}`}
+            onSubmit={(details) => onCancel(r, details)}
+            onCancel={() => setShowCancelForm(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            className="btn btn-sm btn-soft-danger mt-2"
+            disabled={busy}
+            onClick={() => setShowCancelForm(true)}
+          >
+            ขอยกเลิกการจอง
+          </button>
+        )
       )}
     </div>
   );
 }
 
 export default function CatHotelReservationPage() {
+  const { currentUser } = useAuth();
   const { pets, loading: petsLoading, error: petsError } = usePets();
-  const { reservations, loading, error, reload, addReservation, cancelReservation } = useHotelReservations();
-  const [cancelError, setCancelError] = useState('');
+  const { reservations, loading, error, reload, addReservation, requestCancel } = useHotelReservations();
+  const cancellations = useCancellationRequests(currentUser?.id);
   const [busyId, setBusyId] = useState('');
 
   const cats = pets.filter((p) => p.species === HOTEL_SPECIES);
@@ -227,15 +255,26 @@ export default function CatHotelReservationPage() {
   const current = reservations.filter((r) => r.status !== 'cancelled' && r.checkOut > today);
   const history = reservations.filter((r) => r.status === 'cancelled' || r.checkOut <= today).reverse();
 
-  async function handleCancel(r) {
-    const text = `ยกเลิกการจองของ "${r.petName}" ${formatDate(r.checkIn)} - ${formatDate(r.checkOut)}?`;
-    if (!window.confirm(text)) return;
+  async function handleCancel(r, details) {
+    let cancellation;
     setBusyId(r.id);
-    setCancelError('');
     try {
-      await cancelReservation(r.id);
+      cancellation = await createCancellationRequest({
+        ...details,
+        kind: PAY_KIND.hotel,
+        source: 'hotel_reservation',
+        refId: r.id,
+        ownerId: currentUser.id,
+        ownerName: r.ownerName || `${currentUser.firstName || ''} ${currentUser.lastName || ''}`.trim(),
+        ownerEmail: currentUser.email || '',
+        petName: r.petName,
+        title: `โรงแรมแมว · ${r.roomLabel}`,
+        bookingDate: r.checkIn,
+      });
+      await requestCancel(r.id, cancellation.id, cancellation.reason);
     } catch (err) {
-      setCancelError(err.message);
+      if (cancellation) await removeCancellationRequest(cancellation.id, currentUser.id);
+      throw err;
     } finally {
       setBusyId('');
     }
@@ -280,7 +319,6 @@ export default function CatHotelReservationPage() {
                   <i className="bi bi-calendar-event" />
                   การจองปัจจุบัน ({current.length})
                 </div>
-                {cancelError && <div className="alert alert-danger py-2">{cancelError}</div>}
                 {loading ? (
                   <div className="empty-box py-3">กำลังโหลด...</div>
                 ) : current.length === 0 ? (
@@ -291,7 +329,13 @@ export default function CatHotelReservationPage() {
                 ) : (
                   <div className="timeline">
                     {current.map((r) => (
-                      <ReservationItem key={r.id} reservation={r} onCancel={handleCancel} busy={busyId === r.id} />
+                      <ReservationItem
+                        key={r.id}
+                        reservation={r}
+                        onCancel={handleCancel}
+                        busy={busyId === r.id}
+                        cancellation={cancellationFor(PAY_KIND.hotel, r.id, cancellations)}
+                      />
                     ))}
                   </div>
                 )}
@@ -305,7 +349,13 @@ export default function CatHotelReservationPage() {
                   </div>
                   <div className="timeline">
                     {history.map((r) => (
-                      <ReservationItem key={r.id} reservation={r} onCancel={handleCancel} busy={false} />
+                      <ReservationItem
+                        key={r.id}
+                        reservation={r}
+                        onCancel={handleCancel}
+                        busy={false}
+                        cancellation={cancellationFor(PAY_KIND.hotel, r.id, cancellations)}
+                      />
                     ))}
                   </div>
                 </div>

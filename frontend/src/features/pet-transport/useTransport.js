@@ -9,7 +9,8 @@ import {
   setBookingOtherService,
   assignDriver as assignDriverStore,
   ownerConfirmPayment,
-  adminMarkPaid,
+  approveTransportPayment,
+  rejectTransportPayment,
   advanceTripStatus,
   attachEvidence,
   requestCancel,
@@ -22,8 +23,7 @@ import {
   markAllNotificationsRead,
   ensureUpcomingReminders,
   updateZones,
-  addHotel,
-  removeHotel,
+  updateHotelRoomPrices,
   resetTransportDemo,
   purgeDemoDriverJobs,
   toAssignDriver,
@@ -56,7 +56,8 @@ export function useTransport() {
   const tripsForDriver = useCallback(
     (driverId) =>
       state.trips
-        .filter((t) => t.driverId === driverId)
+        .filter((t) => t.driverId === driverId
+          && state.bookings.some((booking) => booking.id === t.bookingId && booking.status !== 'cancelled'))
         .map((t) => {
           const booking = enrichBooking(
             state.bookings.find((b) => b.id === t.bookingId),
@@ -101,7 +102,8 @@ export function useTransport() {
     setBookingOtherService,
     assignDriver,
     ownerConfirmPayment,
-    adminMarkPaid,
+    approveTransportPayment,
+    rejectTransportPayment,
     advanceTripStatus,
     attachEvidence,
     requestCancel,
@@ -112,8 +114,7 @@ export function useTransport() {
     markAllNotificationsRead,
     ensureUpcomingReminders,
     updateZones,
-    addHotel,
-    removeHotel,
+    updateHotelRoomPrices,
     resetTransportDemo,
     purgeDemoDriverJobs,
   };

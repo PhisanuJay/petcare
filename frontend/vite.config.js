@@ -1,13 +1,15 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Super Admin = Pet Hotel CCTV — proxy API to hotel-cctv backend (port 3000).
+// CCTV auth and camera management use PetCare backend; remaining CCTV APIs use port 3000.
 export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
     port: 5177,
     proxy: {
+      '/api/cctv-auth': 'http://localhost:3001',
+      '/api/cctv-admin': 'http://localhost:3001',
       '/api/pet-transport': 'http://localhost:3001',
       '/api': 'http://localhost:3000',
     },

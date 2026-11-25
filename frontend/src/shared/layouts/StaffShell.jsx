@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext.jsx';
-import { ROLE_LABELS, ROLES, homePathForRole } from '../../features/auth/roles.js';
+import { ROLES } from '../../features/auth/roles.js';
 import { useTransport } from '../../features/pet-transport/useTransport.js';
 import '../../features/pet-transport/transport.css';
 import '../../features/pet-transport/driver-refresh.css';
+import './admin-shell.css';
 
 function ScheduleIcon() {
   return (
@@ -42,73 +43,74 @@ function BellIcon() {
   );
 }
 
-/**
- * Minimal shell for Admin / Driver / Finance after login (not the customer site).
- */
+const ADMIN_LINKS = [
+  { to: '/admin/transport', label: 'ภาพรวม', icon: 'bi-speedometer2', end: true },
+  { to: '/admin/transport/bookings', label: 'รายการจอง', icon: 'bi-journal-text' },
+  { to: '/admin/transport/drivers', label: 'จัดการคนขับ', icon: 'bi-person-badge' },
+  { to: '/admin/transport/cancellations', label: 'คำขอยกเลิก', icon: 'bi-x-circle' },
+  { to: '/admin/transport/pricing', label: 'ตั้งราคา', icon: 'bi-tag' },
+];
+
 export default function StaffShell({ variant }) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const path = useLocation().pathname;
   const isAdmin = variant === 'admin' || currentUser?.role === ROLES.admin;
-  const isFinance = variant === 'finance' || currentUser?.role === ROLES.finance;
 
-  const adminLinks = [
-    { to: '/admin/transport', label: 'Transport Dashboard' },
-    { to: '/admin/transport/bookings', label: 'Bookings' },
-    { to: '/admin/transport/drivers', label: 'จัดการคนขับ' },
-    { to: '/admin/transport/pricing', label: 'Pricing' },
-  ];
-
-  const financeLinks = [
-    { to: '/finance', label: 'ตรวจชำระเงิน' },
-  ];
-
-  if (!isAdmin && !isFinance) {
+  if (!isAdmin) {
     return <DriverShell currentUser={currentUser} path={path} logout={logout} navigate={navigate} />;
   }
 
-  const links = isFinance ? financeLinks : adminLinks;
+  const name = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'แอดมิน';
+
+  function doLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
 
   return (
-    <div className="app-shell">
-      <header style={{ padding: '0.75rem 1.25rem', borderBottom: '1px solid #e2e8f0', background: '#fff' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem 1.25rem', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem 1rem', alignItems: 'center' }}>
-            <strong>
-              PetCare · {ROLE_LABELS[currentUser?.role] || 'Staff'}
-            </strong>
-            <nav aria-label="Staff">
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexWrap: 'wrap', gap: '0.65rem 1rem' }}>
-                {links.map((l) => (
-                  <li key={l.to}>
-                    <Link to={l.to}>{l.label}</Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          </div>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <span className="small text-muted">
-              {currentUser?.firstName} {currentUser?.lastName}
-            </span>
-            <button
-              type="button"
-              className="btn btn-sm btn-outline-secondary"
-              onClick={() => {
-                logout();
-                navigate('/login', { replace: true });
-              }}
+    <div className="admin-shell">
+      <aside className="admin-shell__sidebar">
+        <Link className="admin-shell__brand" to="/admin/transport">
+          <span className="admin-shell__brand-mark"><i className="bi bi-balloon-heart-fill" aria-hidden="true" /></span>
+          <span>
+            <strong>PetCare</strong>
+            <small>จัดการบริการรับส่ง</small>
+          </span>
+        </Link>
+
+        <nav className="admin-shell__nav" aria-label="เมนูผู้ดูแลระบบ">
+          <p>การรับส่งสัตว์</p>
+          {ADMIN_LINKS.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) => `admin-shell__link${isActive ? ' is-active' : ''}`}
             >
-              ออกจากระบบ
-            </button>
-            <Link className="small" to={homePathForRole(currentUser?.role)}>
-              หน้าหลัก
-            </Link>
+              <i className={`bi ${item.icon}`} aria-hidden="true" />
+              <span>{item.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+
+        <div className="admin-shell__account">
+          <div className="admin-shell__user">
+            <span className="admin-shell__avatar" aria-hidden="true">{name.slice(0, 1)}</span>
+            <span className="admin-shell__user-copy">
+              <strong>{name}</strong>
+              <small>ผู้ดูแลระบบ</small>
+            </span>
           </div>
+          <button type="button" className="admin-shell__logout" onClick={doLogout}>
+            <i className="bi bi-box-arrow-right" aria-hidden="true" />
+            ออกจากระบบ
+          </button>
         </div>
-      </header>
-      <main>
-        <Outlet />
+      </aside>
+
+      <main className="admin-shell__main">
+        <div className="admin-shell__content"><Outlet /></div>
       </main>
     </div>
   );

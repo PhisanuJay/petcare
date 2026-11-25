@@ -4,6 +4,9 @@ import StatusBadge from '../../pet-transport/components/StatusBadge.jsx';
 import TransportSubnav from '../../pet-transport/components/TransportSubnav.jsx';
 import { formatBaht } from '../../pet-transport/pricing.js';
 import { useTransport } from '../../pet-transport/useTransport.js';
+import CancellationSummary from '../../cancellations/CancellationSummary.jsx';
+import { cancellationFor, useCancellationRequests } from '../../cancellations/store.js';
+import { PAY_KIND } from '../../payments/store.js';
 import '../../pet-transport/transport.css';
 
 const OWNER_NAV = [
@@ -14,6 +17,7 @@ const OWNER_NAV = [
 export default function TransportHistoryPage() {
   const { currentUser } = useAuth();
   const { bookings } = useTransport();
+  const cancellations = useCancellationRequests(currentUser?.id);
   const mine = bookings.filter((b) => b.ownerId === currentUser?.id);
 
   return (
@@ -36,29 +40,41 @@ export default function TransportHistoryPage() {
           )}
 
           <div className="tp-list">
-            {mine.map((b) => (
-              <Link key={b.id} className="tp-list-item" to={`/pet-owner/transport/${b.id}`}>
-                <div>
-                  <strong>{b.petName}</strong>
-                  <div className="tp-list-item__meta">
-                    {{
-                      outbound: 'ไปส่ง',
-                      inbound: 'รับกลับ',
-                      round_trip: 'ไป–กลับ',
-                      one_way: 'ไปส่ง',
-                    }[b.serviceType] || b.serviceType}
-                    {' · '}
-                    Zone {b.fromZoneId || '?'}→{b.toZoneId || '?'}
-                    {' · '}
-                    {formatBaht(b.quote?.total)}
+            {mine.map((b) => {
+              const cancellation = cancellationFor(PAY_KIND.transport, b.id, cancellations);
+              const paymentStatus = b.paymentStatus === 'paid'
+                ? { label: 'ชำระแล้ว', tone: 'ok' }
+                : b.paymentStatus === 'owner_confirmed'
+                  ? { label: 'รอตรวจสอบการชำระ', tone: 'info' }
+                  : { label: 'ยังไม่ชำระเงิน', tone: 'warn' };
+              return (
+                <div key={b.id} className="tp-list-item">
+                  <Link className="tp-list-item__link" to={`/pet-owner/transport/${b.id}`}>
+                    <strong>{b.petName}</strong>
+                    <div className="tp-list-item__meta">
+                      {{
+                        outbound: 'ไปส่ง',
+                        inbound: 'รับกลับ',
+                        round_trip: 'ไป–กลับ',
+                        one_way: 'ไปส่ง',
+                      }[b.serviceType] || b.serviceType}
+                      {' · '}
+                      Zone {b.fromZoneId || '?'}→{b.toZoneId || '?'}
+                      {' · '}
+                      {formatBaht(b.quote?.total)}
+                    </div>
+                    <div className="tp-list-item__meta">
+                      {new Date(b.createdAt).toLocaleString('th-TH')}
+                    </div>
+                  </Link>
+                  <div className="d-flex flex-column align-items-end gap-2">
+                    <StatusBadge label={b.statusMeta.label} tone={b.statusMeta.tone} />
+                    <StatusBadge label={paymentStatus.label} tone={paymentStatus.tone} />
                   </div>
-                  <div className="tp-list-item__meta">
-                    {new Date(b.createdAt).toLocaleString('th-TH')}
-                  </div>
+                  {cancellation ? <CancellationSummary request={cancellation} /> : null}
                 </div>
-                <StatusBadge label={b.statusMeta.label} tone={b.statusMeta.tone} />
-              </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
       </div>

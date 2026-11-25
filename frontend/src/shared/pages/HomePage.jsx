@@ -26,7 +26,7 @@ export default function HomePage() {
         <section className="page-wrap" id="booking-history">
           <div className="container" style={{ paddingTop: 32, paddingBottom: 8 }}>
             <h2 className="mitr" style={{ fontWeight: 500 }}>ประวัติการจอง</h2>
-            <p className="text-muted">แยกตามโรงแรม รับส่ง และจองคิวคลินิก รายการที่ฝ่ายบัญชียังไม่ตรวจจะขึ้นว่า ยังไม่อนุมัติ</p>
+            <p className="text-muted">รวมการจองโรงแรม รับส่ง และนัดคลินิก โดยนัดคลินิกไม่มีมัดจำ</p>
             <BookingHistory embedded />
           </div>
         </section>

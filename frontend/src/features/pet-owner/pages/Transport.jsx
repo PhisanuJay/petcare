@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { usePets } from '../usePets.js';
 import PlaceFields, {
   emptyZonePlace,
-  mergeFacilities,
   placeFromCatalog,
 } from '../../pet-transport/components/PlaceFields.jsx';
 import PriceQuote, { ServiceZonesMap } from '../../pet-transport/components/PriceQuote.jsx';
@@ -13,6 +12,7 @@ import TransportSubnav from '../../pet-transport/components/TransportSubnav.jsx'
 import { SERVICE_TYPES, isRoundTrip } from '../../pet-transport/constants.js';
 import { quotePrice } from '../../pet-transport/pricing.js';
 import { useTransport } from '../../pet-transport/useTransport.js';
+import { useHotelBookings } from '../useHotelBookings.js';
 import '../../pet-transport/transport.css';
 
 const OWNER_NAV = [
@@ -20,6 +20,16 @@ const OWNER_NAV = [
   { to: '/pet-owner/transport/history', label: 'ประวัติการจอง', icon: 'bi-clock-history' },
   { to: '/pet-owner/transport/requests', label: 'คำขอรับ-ส่ง', icon: 'bi-truck' },
 ];
+
+const PET_TYPES = [
+  { id: 'dog', label: 'สุนัข' },
+  { id: 'cat', label: 'แมว' },
+  { id: 'other', label: 'อื่น ๆ' },
+];
+
+function petTypeFor(species) {
+  return species === 'dog' || species === 'cat' ? species : 'other';
+}
 
 function clonePlace(place) {
   return place ? { ...place } : emptyZonePlace('');
@@ -31,22 +41,24 @@ function placesReady(place) {
 
 export default function TransportPage() {
   const { currentUser } = useAuth();
-  const { pets } = usePets();
-  const { zones, clinics, hotels, createBooking } = useTransport();
+  const { pets, loading: petsLoading } = usePets();
+  const { zones, clinics, createBooking } = useTransport();
+  const { bookings: hotelBookings, linkRelatedBooking } = useHotelBookings();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const hotelBookingId = params.get('hotelBookingId');
+  const requestedPetId = params.get('petId');
 
   const homeSeed = useMemo(
     () => emptyZonePlace(currentUser?.address || '', 'home'),
     [currentUser?.address],
   );
-  const facilitySeed = useMemo(() => {
-    const list = mergeFacilities(clinics, hotels);
-    return placeFromCatalog(list[0], 'facility');
-  }, [clinics, hotels]);
+  const facilitySeed = useMemo(() => placeFromCatalog(clinics[0], 'facility'), [clinics]);
 
   const [serviceType, setServiceType] = useState('outbound');
-  const [petId, setPetId] = useState(pets[0]?.id || '');
-  const [petName, setPetName] = useState(pets[0]?.name || '');
+  const [petId, setPetId] = useState('');
+  const [petName, setPetName] = useState('');
+  const [petSpecies, setPetSpecies] = useState('dog');
   const [petNotes, setPetNotes] = useState('');
   const [from, setFrom] = useState(() => homeSeed);
   const [to, setTo] = useState(() => facilitySeed);
@@ -58,6 +70,18 @@ export default function TransportPage() {
   const [error, setError] = useState('');
   const [fromTouched, setFromTouched] = useState(false);
   const appliedServiceType = useRef(null);
+  const initializedPetsFor = useRef(null);
+
+  useEffect(() => {
+    if (petsLoading || initializedPetsFor.current === currentUser?.id) return;
+    initializedPetsFor.current = currentUser?.id;
+    const firstPet = pets.find((pet) => pet.id === requestedPetId) || pets[0];
+    setPetId(firstPet?.id || '');
+    setPetName(firstPet?.name || '');
+    setPetSpecies(petTypeFor(firstPet?.species || 'dog'));
+  }, [currentUser?.id, pets, petsLoading, requestedPetId]);
+
+  const typedPets = pets.filter((pet) => petTypeFor(pet.species) === petSpecies);
 
   // Apply defaults once per service type — never fight user edits on จุดรับ
   useEffect(() => {
@@ -125,6 +149,14 @@ export default function TransportPage() {
     setPetId(id);
     const pet = pets.find((p) => p.id === id);
     setPetName(pet?.name || '');
+    if (pet) setPetSpecies(petTypeFor(pet.species));
+  }
+
+  function onPetTypeChange(type) {
+    setPetSpecies(type);
+    const pet = pets.find((item) => petTypeFor(item.species) === type);
+    setPetId(pet?.id || '');
+    setPetName(pet?.name || '');
   }
 
   function onReturnFromChange(next) {
@@ -156,9 +188,15 @@ export default function TransportPage() {
     if (!estimate || estimate.total == null) {
       return setError('คำนวณราคาไม่สำเร็จ');
     }
+    if (petId && !pets.some((pet) => pet.id === petId)) {
+      return setError('กรุณาเลือกสัตว์เลี้ยงอีกครั้ง');
+    }
     const outboundPickupTime = parseThaiDateTime(outboundDate, outboundTime);
     if (!outboundPickupTime) {
       return setError('กรุณาระบุวันและเวลารับให้ถูกต้อง (วว/ดด/ปปปป) และเวลาในช่วง 09:00–21:00 น.');
+    }
+    if (hotelBookingId && !hotelBookings.some((booking) => booking.id === hotelBookingId)) {
+      return setError('ไม่พบการจองโรงแรมที่ต้องการเชื่อม');
     }
 
     try {
@@ -168,7 +206,7 @@ export default function TransportPage() {
         ownerPhone: currentUser.phone || '',
         petId: petId || null,
         petName: petName.trim(),
-        petSpecies: pets.find((pet) => pet.id === petId)?.species || '',
+        petSpecies: pets.find((pet) => pet.id === petId)?.species || petSpecies,
         petBreed: pets.find((pet) => pet.id === petId)?.breed || '',
         petNotes: petNotes.trim(),
         serviceType,
@@ -181,6 +219,13 @@ export default function TransportPage() {
         returnPickupTime: null,
         returnDropoffTime: null,
       });
+      if (hotelBookingId) {
+        linkRelatedBooking(hotelBookingId, {
+          kind: 'transport',
+          id: booking.id,
+          label: `รับ–ส่ง · ${booking.petName}`,
+        });
+      }
       navigate(`/pet-owner/transport/${booking.id}`);
     } catch (err) {
       setError(err.message || 'จองไม่สำเร็จ');
@@ -205,6 +250,12 @@ export default function TransportPage() {
             </p>
           </div>
           <TransportSubnav items={OWNER_NAV} />
+          {hotelBookingId && (
+            <div className="tp-alert tp-alert--info">
+              กำลังเพิ่มบริการรับ–ส่งให้การจองโรงแรมนี้{' '}
+              <Link to={`/pet-owner/cat-hotel/bookings/${hotelBookingId}`}>กลับรายละเอียดโรงแรม</Link>
+            </div>
+          )}
 
           <form className="tp-form" onSubmit={handleSubmit}>
             {error && <div className="tp-alert tp-alert--danger">{error}</div>}
@@ -237,9 +288,28 @@ export default function TransportPage() {
                 <h3>รายละเอียดการจอง</h3>
                 <div className="field">
                   <label htmlFor="pet">สัตว์เลี้ยง</label>
-                  {pets.length ? (
+                  {!petsLoading && (
+                    <div className="d-flex flex-wrap gap-2 mb-2" role="group" aria-label="ประเภทสัตว์เลี้ยง">
+                      {PET_TYPES.map((type) => (
+                        <button
+                          key={type.id}
+                          type="button"
+                          className={`btn btn-sm ${petSpecies === type.id ? 'btn-sky' : 'btn-soft'}`}
+                          aria-pressed={petSpecies === type.id}
+                          onClick={() => onPetTypeChange(type.id)}
+                        >
+                          {type.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {petsLoading ? (
+                    <select id="pet" disabled value="">
+                      <option value="">กำลังโหลดรายชื่อสัตว์เลี้ยง…</option>
+                    </select>
+                  ) : typedPets.length ? (
                     <select id="pet" value={petId} onChange={(e) => onPetChange(e.target.value)}>
-                      {pets.map((p) => (
+                      {typedPets.map((p) => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
@@ -251,9 +321,9 @@ export default function TransportPage() {
                       placeholder="ชื่อสัตว์เลี้ยง"
                     />
                   )}
-                  {!pets.length && (
+                  {!petsLoading && !typedPets.length && (
                     <p className="tp-muted">
-                      ยังไม่มีสัตว์ในระบบ — <Link to="/pet-owner/my-pets/new">เพิ่มสัตว์เลี้ยง</Link> หรือกรอกชื่อเอง
+                      ยังไม่มี{PET_TYPES.find((type) => type.id === petSpecies)?.label}ในรายการ — <Link to="/pet-owner/my-pets/new">เพิ่มสัตว์เลี้ยง</Link> หรือระบุชื่อเอง
                     </p>
                   )}
                 </div>
@@ -272,7 +342,6 @@ export default function TransportPage() {
                 value={from}
                 onChange={onFromChange}
                 clinics={clinics}
-                hotels={hotels}
                 allowedKinds={lockInboundFrom ? ['facility'] : ['home', 'custom']}
                 locked={lockInboundFrom}
               />
@@ -281,7 +350,6 @@ export default function TransportPage() {
                 value={to}
                 onChange={setTo}
                 clinics={clinics}
-                hotels={hotels}
                 allowedKinds={lockOutboundTo ? ['facility'] : ['home', 'custom']}
                 locked={lockOutboundTo}
               />
@@ -301,7 +369,6 @@ export default function TransportPage() {
                     value={returnFrom}
                     onChange={onReturnFromChange}
                     clinics={clinics}
-                    hotels={hotels}
                     allowedKinds={['facility']}
                     locked={lockReturnFrom}
                   />
@@ -310,7 +377,6 @@ export default function TransportPage() {
                     value={returnTo}
                     onChange={onReturnToChange}
                     clinics={clinics}
-                    hotels={hotels}
                     allowedKinds={['home', 'custom']}
                   />
                 </div>

@@ -8,12 +8,14 @@ export const HOTEL_STATUS = {
   waiting: 'waiting',
   checkedIn: 'checked_in',
   checkedOut: 'checked_out',
+  cancelled: 'cancelled',
 };
 
 export const HOTEL_STATUS_LABEL = {
   waiting: 'รอนำน้องมาฝาก',
   checked_in: 'กำลังเข้าพัก',
   checked_out: 'รับกลับแล้ว',
+  cancelled: 'ยกเลิกการจอง',
 };
 
 export function stayNights(checkIn, checkOut) {
@@ -40,17 +42,18 @@ export function cagePlan(pets) {
 }
 
 /** Price for a room, dates, and cage count. Discount matches the hotel coupon on the home page. */
-export function quoteStay({ roomName, checkIn, checkOut, cages = 1 }) {
+export function quoteStay({ roomName, checkIn, checkOut, cages = 1, pricePerNight }) {
   const room = HOTEL_ROOMS.find((item) => item.name === roomName);
   const nights = stayNights(checkIn, checkOut);
   const units = Number(cages);
-  if (!room || !nights || !Number.isInteger(units) || units < 1) return null;
-  const subtotal = room.price * nights * units;
+  const rate = pricePerNight == null ? room?.price : Number(pricePerNight);
+  if (!room || !nights || !Number.isSafeInteger(rate) || rate < 1 || !Number.isInteger(units) || units < 1) return null;
+  const subtotal = rate * nights * units;
   const promoApplied = nights >= HOTEL_STAY_PROMO.minNights && checkIn <= HOTEL_STAY_PROMO.until;
   const discount = promoApplied ? Math.round((subtotal * HOTEL_STAY_PROMO.percent) / 100) : 0;
   return {
     roomName: room.name,
-    pricePerNight: room.price,
+    pricePerNight: rate,
     nights,
     cages: units,
     subtotal,
@@ -94,6 +97,20 @@ function assertStay(checkIn, checkOut) {
   if (checkOut <= checkIn) throw new Error('วันรับกลับต้องอยู่หลังวันเข้าพัก');
 }
 
+function normalizeLinkedBookings(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => item
+      && ['clinic', 'transport'].includes(item.kind)
+      && typeof item.id === 'string'
+      && item.id.trim())
+    .map((item) => ({
+      kind: item.kind,
+      id: item.id.trim(),
+      label: String(item.label || '').trim(),
+    }));
+}
+
 /**
  * Hotel stays for the logged-in owner.
  * A booking stores the owner email so staff can grant a camera to that same address.
@@ -125,7 +142,13 @@ export function useHotelBookings() {
     const checkOut = String(data.checkOut || '');
     assertStay(checkIn, checkOut);
     const plan = cagePlan(pets);
-    const quote = quoteStay({ roomName: data.roomName, checkIn, checkOut, cages: plan.cages });
+    const quote = quoteStay({
+      roomName: data.roomName,
+      checkIn,
+      checkOut,
+      cages: plan.cages,
+      pricePerNight: data.pricePerNight,
+    });
     if (!quote) throw new Error('กรุณาเลือกวันเข้าพักและวันรับกลับ');
     const booking = {
       id: newId(),
@@ -139,12 +162,29 @@ export function useHotelBookings() {
       checkIn,
       checkOut,
       status: HOTEL_STATUS.waiting,
+      linkedBookings: normalizeLinkedBookings(data.linkedBookings),
       createdAt: new Date().toISOString(),
       ...quote,
     };
     setAll([booking, ...getAll()]);
     return booking;
   }, [currentUser]);
+
+  const linkRelatedBooking = useCallback((id, linkedBooking) => {
+    if (!ownerId) throw new Error('กรุณาเข้าสู่ระบบ');
+    const [related] = normalizeLinkedBookings([linkedBooking]);
+    if (!related) throw new Error('ข้อมูลบริการที่เชื่อมไม่ถูกต้อง');
+    const rows = getAll();
+    const current = rows.find((row) => row.id === id && row.ownerId === ownerId);
+    if (!current) throw new Error('ไม่พบการจองโรงแรมนี้');
+    const linkedBookings = normalizeLinkedBookings(current.linkedBookings);
+    if (linkedBookings.some((item) => item.kind === related.kind && item.id === related.id)) {
+      return current;
+    }
+    const updated = { ...current, linkedBookings: [...linkedBookings, related] };
+    setAll(rows.map((row) => (row.id === id ? updated : row)));
+    return updated;
+  }, [ownerId]);
 
   const setStatus = useCallback((id, status) => {
     if (!Object.values(HOTEL_STATUS).includes(status)) throw new Error('สถานะไม่ถูกต้อง');
@@ -154,7 +194,7 @@ export function useHotelBookings() {
     setAll(rows.map((row) => (row.id === id ? { ...row, status } : row)));
   }, [ownerId]);
 
-  return { bookings, createBooking, setStatus };
+  return { bookings, createBooking, linkRelatedBooking, setStatus };
 }
 
 /** Every stay, for the hotel desk. Status changes here, not on the customer page. */
@@ -168,7 +208,11 @@ export function useAllHotelBookings() {
     if (!Object.values(HOTEL_STATUS).includes(status)) throw new Error('สถานะไม่ถูกต้อง');
     const rows = getAll();
     if (!rows.some((row) => row.id === id)) throw new Error('ไม่พบการจองนี้');
-    setAll(rows.map((row) => (row.id === id ? { ...row, status } : row)));
+    setAll(rows.map((row) => (
+      row.id === id
+        ? { ...row, status, updatedAt: new Date().toISOString() }
+        : row
+    )));
   }, []);
   return { bookings, setStatus };
 }

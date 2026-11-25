@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { PAYMENT_STATUSES, serviceTypeMeta } from '../constants.js';
 import { formatBaht } from '../pricing.js';
@@ -8,9 +8,7 @@ import { bookingBucket, shortBookingId } from './adminBookingUtils.js';
 
 const TABS = [
   { id: 'all', label: 'ทั้งหมด' },
-  { id: 'awaiting_price', label: 'รอยืนยันราคา' },
-  { id: 'awaiting_assign', label: 'รอ Assign คนขับ' },
-  { id: 'awaiting_payment', label: 'รอชำระเงิน' },
+  { id: 'awaiting_assign', label: 'รอมอบหมายคนขับ' },
   { id: 'in_progress', label: 'กำลังดำเนินการ' },
   { id: 'completed', label: 'เสร็จสิ้น' },
   { id: 'cancelled', label: 'ยกเลิก' },
@@ -43,7 +41,7 @@ function primaryTrip(b) {
 
 function driversLabel(b) {
   const names = (b.trips || [])
-    .map((t) => t.driver?.name)
+    .map((t) => t.driver?.name || (t.driverId ? `รหัส ${shortBookingId(t.driverId)}` : ''))
     .filter(Boolean);
   if (!names.length) return 'ยังไม่มอบหมาย';
   return [...new Set(names)].join(', ');
@@ -58,37 +56,41 @@ function serviceLabel(type) {
 }
 
 export default function BookingManagement() {
+  const [searchParams] = useSearchParams();
   const {
     bookings,
     activeDrivers,
-    confirmPrice,
     assignDriver,
-    adminMarkPaid,
   } = useTransport();
 
-  const [tab, setTab] = useState('all');
+  const [tab, setTab] = useState(() => {
+    const initialTab = searchParams.get('tab');
+    return TABS.some((item) => item.id === initialTab) ? initialTab : 'all';
+  });
   const [q, setQ] = useState('');
-  const [paymentFilter, setPaymentFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [modal, setModal] = useState(null);
+  const paidBookings = useMemo(
+    () => bookings.filter((booking) => booking.paymentStatus === 'paid'),
+    [bookings],
+  );
 
   const counts = useMemo(() => {
     const base = Object.fromEntries(TABS.map((t) => [t.id, 0]));
-    base.all = bookings.length;
-    bookings.forEach((b) => {
+    base.all = paidBookings.length;
+    paidBookings.forEach((b) => {
       const key = bookingBucket(b);
       base[key] = (base[key] || 0) + 1;
     });
     return base;
-  }, [bookings]);
+  }, [paidBookings]);
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return bookings.filter((b) => {
+    return paidBookings.filter((b) => {
       if (tab !== 'all' && bookingBucket(b) !== tab) return false;
-      if (paymentFilter && b.paymentStatus !== paymentFilter) return false;
       if (dateFilter) {
         const trip = primaryTrip(b);
         if (dayKey(trip?.pickupTime) !== dateFilter) return false;
@@ -99,33 +101,16 @@ export default function BookingManagement() {
       }
       return true;
     });
-  }, [bookings, tab, q, paymentFilter, dateFilter]);
+  }, [paidBookings, tab, q, dateFilter]);
 
   function flashOk(text) {
     setErr('');
     setMsg(text);
   }
 
-  async function confirmPriceNow(b) {
-    setErr('');
-    try {
-      await confirmPrice(b.id, {
-        fareZoneId: b.fareZoneId || b.zoneId || b.estimatedQuote?.fareZoneId || '1',
-        customPerTrip: null,
-      });
-      flashOk(`ยืนยันราคาแล้ว · ${b.petName}`);
-    } catch (e) {
-      setErr(e.message);
-    }
-  }
-
   function openAssign(b) {
     const picks = Object.fromEntries((b.trips || []).map((t) => [t.id, t.driverId || '']));
     setModal({ type: 'assign', booking: b, picks });
-  }
-
-  function openPaid(b) {
-    setModal({ type: 'paid', booking: b });
   }
 
   function closeModal() {
@@ -135,6 +120,10 @@ export default function BookingManagement() {
   async function submitAssign() {
     if (!modal?.booking) return;
     try {
+      if (modal.booking.paymentStatus !== 'paid') {
+        setErr('รอฝ่ายบัญชียืนยันการชำระเงินก่อนมอบหมายคนขับ');
+        return;
+      }
       const entries = Object.entries(modal.picks || {}).filter(([, id]) => id);
       if (!entries.length) {
         setErr('เลือกคนขับอย่างน้อย 1 ทริป');
@@ -150,21 +139,10 @@ export default function BookingManagement() {
     }
   }
 
-  async function submitPaid() {
-    if (!modal?.booking) return;
-    try {
-      await adminMarkPaid(modal.booking.id);
-      flashOk(`ยืนยันชำระแล้ว · ${modal.booking.petName} — คนขับเริ่มงานได้`);
-      closeModal();
-    } catch (e) {
-      setErr(e.message);
-    }
-  }
-
   return (
     <div className="tp-bookings">
-      <h1>Booking Management</h1>
-      <p className="tp-lead">ยืนยันราคา · มอบหมายคนขับ · ยืนยันชำระเงิน จากหน้ารายการหรือเข้า Detail</p>
+      <h1>จัดการรายการจอง</h1>
+      <p className="tp-lead">รายการที่ฝ่ายบัญชียืนยันชำระแล้ว สำหรับมอบหมายและติดตามคนขับ</p>
 
       {msg ? <div className="tp-alert tp-alert--ok">{msg}</div> : null}
       {err && !modal ? <div className="tp-alert tp-alert--danger">{err}</div> : null}
@@ -198,15 +176,6 @@ export default function BookingManagement() {
             />
           </div>
           <div className="field">
-            <label htmlFor="bm-pay">สถานะการชำระเงิน</label>
-            <select id="bm-pay" value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)}>
-              <option value="">ทั้งหมด</option>
-              {Object.values(PAYMENT_STATUSES).map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
             <label htmlFor="bm-date">วันที่นัดรับ</label>
             <input
               id="bm-date"
@@ -222,7 +191,6 @@ export default function BookingManagement() {
               className="btn btn-soft"
               onClick={() => {
                 setQ('');
-                setPaymentFilter('');
                 setDateFilter('');
                 setTab('all');
               }}
@@ -287,19 +255,9 @@ export default function BookingManagement() {
                   </td>
                   <td>
                     <div className="tp-row-actions">
-                      {bucket === 'awaiting_price' ? (
-                        <button type="button" className="btn btn-soft btn-sm" onClick={() => confirmPriceNow(b)}>
-                          ยืนยันราคา
-                        </button>
-                      ) : null}
-                      {bucket === 'awaiting_assign' || (b.trips || []).some((t) => !t.driverId) ? (
+                      {bucket === 'awaiting_assign' ? (
                         <button type="button" className="btn btn-soft btn-sm" onClick={() => openAssign(b)}>
-                          Assign
-                        </button>
-                      ) : null}
-                      {b.paymentStatus !== 'paid' && bucket !== 'cancelled' && bucket !== 'awaiting_price' ? (
-                        <button type="button" className="btn btn-soft btn-sm" onClick={() => openPaid(b)}>
-                          ตรวจชำระ
+                          มอบหมายคนขับ
                         </button>
                       ) : null}
                       <Link className="btn btn-sky btn-sm" to={`/admin/transport/bookings/${b.id}`}>
@@ -358,28 +316,12 @@ export default function BookingManagement() {
                 <div className="tp-actions">
                   <button type="button" className="btn btn-soft" onClick={closeModal}>ยกเลิก</button>
                   <button type="button" className="btn btn-sky" onClick={submitAssign} disabled={!activeDrivers.length}>
-                    ยืนยัน Assign
+                    ยืนยันมอบหมายคนขับ
                   </button>
                 </div>
               </>
             ) : null}
 
-            {modal.type === 'paid' ? (
-              <>
-                <h2 id="bm-modal-title">ยืนยันการชำระเงิน</h2>
-                <p className="tp-muted">
-                  {modal.booking.petName} · {modal.booking.ownerName}
-                  <br />
-                  ยอด {formatBaht(modal.booking.quote?.total)} · สถานะปัจจุบัน: {paymentMeta(modal.booking.paymentStatus).label}
-                </p>
-                {err ? <div className="tp-alert tp-alert--danger">{err}</div> : null}
-                <p className="tp-muted">หลังยืนยัน คนขับจะเริ่มอัปเดตสถานะงานได้</p>
-                <div className="tp-actions">
-                  <button type="button" className="btn btn-soft" onClick={closeModal}>ยกเลิก</button>
-                  <button type="button" className="btn btn-sky" onClick={submitPaid}>ยืนยันชำระแล้ว</button>
-                </div>
-              </>
-            ) : null}
           </div>
         </div>
       ) : null}

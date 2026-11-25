@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { IconSearch } from '../components/Marks';
 import { api, bangkokInput, formatWhen, statusLabel } from '../api';
+import { listLocalOwnerAccounts } from '../../../../auth/AuthContext.jsx';
 
 const CARE_LABEL = {
   feed: 'อาหาร',
@@ -495,7 +496,7 @@ export function RoomsPanel({ canManage = true, canGrant = false, onOpenAccess } 
       )}
 
       {adding ? (
-        <div className="overlay"><div className="modal rooms-edit-modal">
+        <div className="overlay"><div className="cctv-modal rooms-edit-modal">
           <form onSubmit={addCamera}>
             <h2>เพิ่มกล้อง</h2>
             <p className="muted tiny">ใส่ที่อยู่ RTSP แล้วกดเชื่อมต่อ ระบบจะตรวจให้ทันที</p>
@@ -542,7 +543,7 @@ export function RoomsPanel({ canManage = true, canGrant = false, onOpenAccess } 
       ) : null}
 
       {editing ? (
-        <div className="overlay"><div className="modal rooms-edit-modal">
+        <div className="overlay"><div className="cctv-modal rooms-edit-modal">
           <form onSubmit={saveCamera}>
             <h2>แก้ไขกล้อง</h2>
             {error ? <p className="banner error">{error}</p> : null}
@@ -568,7 +569,7 @@ export function RoomsPanel({ canManage = true, canGrant = false, onOpenAccess } 
       ) : null}
 
       {removeTarget ? (
-        <div className="overlay"><div className="modal rooms-edit-modal">
+        <div className="overlay"><div className="cctv-modal rooms-edit-modal">
           <h2>ลบกล้อง {removeTarget.name}?</h2>
           {error ? <p className="banner error">{error}</p> : null}
           <p className="muted">สิทธิ์ดูภาพของลูกค้าสำหรับกล้องนี้จะถูกเพิกถอน</p>
@@ -614,11 +615,11 @@ export function RolesPanel({ embedded = false, initialCameraId = '' } = {}) {
     const active = filter === 'active' ? '1' : '0';
     const [access, people, cams] = await Promise.all([
       api(`/api/admin/grants?active=${active}`),
-      api('/api/admin/customers'),
+      listLocalOwnerAccounts(),
       api('/api/admin/cameras?pageSize=100'),
     ]);
     setGrants(access.items);
-    setCustomers(people.items);
+    setCustomers(people);
     setCameras(cams.items);
     return cams.items;
   }
@@ -656,17 +657,20 @@ export function RolesPanel({ embedded = false, initialCameraId = '' } = {}) {
     setError('');
     setOkMsg('');
     try {
+      const customer = customers.find((item) => String(item.id) === String(form.userId));
+      if (!customer) throw new Error('ไม่พบบัญชีลูกค้า PetCare ที่เลือก');
       await api(`/api/admin/cameras/${form.cameraId}/grants`, {
         method: 'POST',
         body: {
-          userId: Number(form.userId),
+          userId: customer.id,
+          email: customer.email,
+          displayName: customer.displayName,
           petName: form.petName,
           roomLabel: form.roomLabel,
           startsAt: form.startsAt,
           endsAt: form.endsAt,
         },
       });
-      const customer = customers.find((item) => String(item.id) === String(form.userId));
       const camera = cameras.find((item) => String(item.id) === String(form.cameraId));
       setOkMsg(`ให้สิทธิ์ ${customer?.displayName || 'ลูกค้า'} ดู ${camera?.name || 'กล้อง'} แล้ว`);
       setForm((prev) => ({
@@ -1564,7 +1568,7 @@ export function UsersPanel({ mode, session }) {
 
       {removeTarget ? (
         <div className="overlay" onClick={() => { if (!busy) setRemoveTarget(null); }}>
-          <div className="modal profile-modal users-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="cctv-modal profile-modal users-modal" onClick={(event) => event.stopPropagation()}>
             <div className="card-top">
               <div>
                 <h2>ลบ{removeTarget.kind.label}นี้?</h2>
@@ -1590,7 +1594,7 @@ export function UsersPanel({ mode, session }) {
 
       {composerKind ? (
         <div className="overlay" onClick={closeComposer}>
-          <div className="modal account-modal" onClick={(event) => event.stopPropagation()}>
+          <div className="cctv-modal account-modal" onClick={(event) => event.stopPropagation()}>
             <div className="account-modal-head">
               <div>
                 <h2>เพิ่มลูกค้า</h2>

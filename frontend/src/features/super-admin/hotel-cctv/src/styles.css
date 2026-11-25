@@ -413,7 +413,7 @@ svg { display: block; }
 .page-head h1 { font-size: 1.55rem; display: flex; align-items: center; gap: 10px; }
 .page-tools { flex-wrap: wrap; justify-content: flex-end; }
 
-.panel, .stat-card, .login-card, .modal, .empty, .banner {
+.panel, .stat-card, .login-card, .cctv-modal, .empty, .banner {
   background: var(--card);
   border-radius: 16px;
   border: 1px solid #edf2f7;
@@ -905,13 +905,13 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
   padding: 16px;
   background: rgba(15, 23, 42, 0.45);
 }
-.modal {
+.cctv-modal {
   width: min(520px, 100%);
   max-height: calc(100vh - 32px);
   overflow: auto;
   padding: 22px;
 }
-.modal.account-modal {
+.cctv-modal.account-modal {
   width: min(640px, calc(100vw - 32px));
   max-height: min(92vh, 780px);
   padding: 0;
@@ -919,7 +919,7 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
   display: flex;
   flex-direction: column;
 }
-.modal.account-modal form {
+.cctv-modal.account-modal form {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1037,9 +1037,9 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
   .account-fields,
   .account-fields.is-edit { grid-template-columns: 1fr; }
 }
-.modal.wide { width: min(900px, 100%); }
-.modal form, .split form { display: grid; gap: 12px; }
-.modal.account-modal form {
+.cctv-modal.wide { width: min(900px, 100%); }
+.cctv-modal form, .split form { display: grid; gap: 12px; }
+.cctv-modal.account-modal form {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1528,6 +1528,9 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
   min-height: 0;
   min-width: 0;
   color: var(--text, #3a4a5c);
+}
+.watch-board.watch-room.has-error {
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
 .watch-room-header {
   display: flex;
@@ -2584,7 +2587,7 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
 }
 .theme-admin .panel,
 .theme-admin .stat-card,
-.theme-admin .modal,
+.theme-admin .cctv-modal,
 .theme-admin .empty,
 .theme-admin .banner {
   border-radius: 24px;
@@ -2866,6 +2869,16 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
 
 @media (max-width: 760px) {
   .theme-admin .sidebar {
+    position: fixed;
+    z-index: 20;
+    inset: auto 12px 12px;
+    width: auto;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px;
+    gap: 8px;
+    overflow: visible;
     margin: 0;
     border-radius: 999px;
   }

@@ -1,14 +1,26 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { cancelBooking, createBooking, listBookings } from './bookingStore.js';
+import {
+  createBooking,
+  listBookings,
+  requestBookingCancellation,
+  resolveBookingCancellation,
+} from './bookingStore.js';
 import { isServiceOnline } from '../clinic-admin/clinicSettings.js';
 import { BOOKING_SERVICES, isDateString, todayString, validateSlot } from './clinicSchedule.js';
-import { cancelReservation, createReservation, listReservations } from './hotelStore.js';
+import { getHotelRoomPrices } from '../pet-transport/service.js';
+import {
+  createReservation,
+  listReservations,
+  requestReservationCancellation,
+  resolveReservationCancellation,
+} from './hotelStore.js';
 import { findAdoptionAnimal, listAdoptionAnimals } from './adoptionAnimals.js';
 import { cancelAdoptionRequest, createAdoptionRequest, listAdoptionRequests } from './adoptionStore.js';
 import { cancelTransportRequest, createTransportRequest, listTransportRequests } from './transportStore.js';
 import { createPet, deletePet, findPet, listPets, updatePet } from './store.js';
 import { saveOwnerProfile } from './ownerStore.js';
+import { listGrantedCamerasForOwner } from '../super-admin/cctvAdmin.js';
 
 /**
  * Pet Owner API module
@@ -189,19 +201,26 @@ router.post('/bookings', wrap(async (req, res) => {
   res.status(201).json(booking);
 }));
 
-router.post('/bookings/:id/cancel', wrap(async (req, res) => {
-  res.json(await cancelBooking(req.ownerId, req.params.id));
+router.post('/bookings/:id/request-cancel', wrap(async (req, res) => {
+  res.json(await requestBookingCancellation(
+    req.ownerId,
+    req.params.id,
+    req.body?.cancellationId,
+    req.body?.reason,
+  ));
+}));
+
+router.post('/admin/bookings/:id/resolve-cancel', wrap(async (req, res) => {
+  res.json(await resolveBookingCancellation(
+    req.params.id,
+    req.body?.cancellationId,
+    Boolean(req.body?.approve),
+    req.body?.adminNote || '',
+  ));
 }));
 
 /* ---------- Cat hotel ---------- */
 
-// Keep in sync with HOTEL_ROOMS in frontend/src/features/pet-owner/hotelOptions.js
-// (room names and prices are copied from the home page: shared/data/homeContent.js).
-const HOTEL_ROOMS = {
-  standard: { label: 'Standard', pricePerNight: 450 },
-  deluxe: { label: 'Deluxe', pricePerNight: 750 },
-  suite: { label: 'Suite', pricePerNight: 1200 },
-};
 const HOTEL_SPECIES = 'cat';
 const MAX_HOTEL_NIGHTS = 30;
 
@@ -223,7 +242,8 @@ router.post('/cat-hotel/reservations', wrap(async (req, res) => {
   const pet = await findPet(req.ownerId, petId);
   if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
   if (pet.species !== HOTEL_SPECIES) throw httpError(400, 'โรงแรมนี้รับเฉพาะน้องแมว');
-  if (!Object.hasOwn(HOTEL_ROOMS, roomType)) throw httpError(400, 'กรุณาเลือกประเภทห้อง');
+  const room = getHotelRoomPrices().find((item) => item.id === roomType);
+  if (!room) throw httpError(400, 'กรุณาเลือกประเภทห้อง');
   if (!isDateString(checkIn)) throw httpError(400, 'กรุณาเลือกวันเช็คอิน');
   if (!isDateString(checkOut)) throw httpError(400, 'กรุณาเลือกวันเช็คเอาท์');
   if (checkIn < todayString()) throw httpError(400, 'วันเช็คอินต้องไม่ใช่วันที่ผ่านมาแล้ว');
@@ -231,25 +251,38 @@ router.post('/cat-hotel/reservations', wrap(async (req, res) => {
   if (nights < 1) throw httpError(400, 'วันเช็คเอาท์ต้องหลังวันเช็คอินอย่างน้อย 1 วัน');
   if (nights > MAX_HOTEL_NIGHTS) throw httpError(400, `ฝากได้ไม่เกิน ${MAX_HOTEL_NIGHTS} คืนต่อครั้ง`);
 
-  const room = HOTEL_ROOMS[roomType];
   const reservation = await createReservation(req.ownerId, {
     petId,
     petName: pet.name,
     petSpecies: pet.species,
     roomType,
     roomLabel: room.label,
-    pricePerNight: room.pricePerNight,
+    pricePerNight: room.price,
     checkIn,
     checkOut,
     nights,
-    totalPrice: room.pricePerNight * nights,
+    totalPrice: room.price * nights,
     note,
   });
   res.status(201).json(reservation);
 }));
 
-router.post('/cat-hotel/reservations/:id/cancel', wrap(async (req, res) => {
-  res.json(await cancelReservation(req.ownerId, req.params.id));
+router.post('/cat-hotel/reservations/:id/request-cancel', wrap(async (req, res) => {
+  res.json(await requestReservationCancellation(
+    req.ownerId,
+    req.params.id,
+    req.body?.cancellationId,
+    req.body?.reason,
+  ));
+}));
+
+router.post('/admin/cat-hotel/reservations/:id/resolve-cancel', wrap(async (req, res) => {
+  res.json(await resolveReservationCancellation(
+    req.params.id,
+    req.body?.cancellationId,
+    Boolean(req.body?.approve),
+    req.body?.adminNote || '',
+  ));
 }));
 
 /* ---------- Pet transport ---------- */
@@ -375,6 +408,14 @@ function cctvAccess(reservation, today) {
 }
 
 router.use('/cctv', requireOwner);
+
+router.get('/cctv/cameras', (req, res, next) => {
+  const email = String(req.get('x-owner-email') || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return next(httpError(400, 'ข้อมูลบัญชีลูกค้าไม่ถูกต้อง'));
+  }
+  res.json({ items: listGrantedCamerasForOwner(req.ownerId, email) });
+});
 
 router.get('/cctv', wrap(async (req, res) => {
   const today = todayString();

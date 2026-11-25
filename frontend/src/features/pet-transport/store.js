@@ -1,15 +1,19 @@
 import { transportApi } from './api.js';
 import { bookingStatusMeta } from './constants.js';
 import { districtLabel, subdistrictById } from './pricing.js';
+import { STAFF_SESSION_CHANGED } from '../auth/staffSession.js';
 
 const listeners = new Set();
 let cache = emptyState();
 let loadPromise = null;
 let hydrated = false;
+let sessionGeneration = 0;
+let sessionListenerRegistered = false;
 
 function emptyState() {
   return {
     zones: [],
+    hotelRoomPrices: [],
     clinics: [],
     hotels: [],
     bookings: [],
@@ -34,6 +38,7 @@ function setCache(next) {
 function applyState(state) {
   setCache({
     zones: state.zones || [],
+    hotelRoomPrices: state.hotelRoomPrices || [],
     clinics: state.clinics || [],
     hotels: state.hotels || [],
     bookings: state.bookings || [],
@@ -49,25 +54,37 @@ function applyState(state) {
 async function ensureLoaded() {
   if (hydrated && !cache.loading) return cache;
   if (loadPromise) return loadPromise;
+  const generation = sessionGeneration;
   loadPromise = transportApi
     .getState()
     .then((state) => {
+      if (generation !== sessionGeneration) return cache;
       hydrated = true;
       applyState(state);
       return cache;
     })
     .catch((error) => {
-      setCache({
-        ...cache,
-        loading: false,
-        error: error.message || 'โหลดข้อมูลไม่สำเร็จ',
-      });
+      if (generation === sessionGeneration) {
+        setCache({
+          ...cache,
+          loading: false,
+          error: error.message || 'โหลดข้อมูลไม่สำเร็จ',
+        });
+      }
       throw error;
     })
     .finally(() => {
-      loadPromise = null;
+      if (generation === sessionGeneration) loadPromise = null;
     });
   return loadPromise;
+}
+
+function onStaffSessionChanged() {
+  sessionGeneration += 1;
+  loadPromise = null;
+  hydrated = false;
+  setCache(emptyState());
+  ensureLoaded().catch(() => {});
 }
 
 async function mutate(fn) {
@@ -83,6 +100,10 @@ async function mutate(fn) {
 
 export function subscribeTransport(listener) {
   listeners.add(listener);
+  if (!sessionListenerRegistered && typeof window !== 'undefined') {
+    window.addEventListener(STAFF_SESSION_CHANGED, onStaffSessionChanged);
+    sessionListenerRegistered = true;
+  }
   ensureLoaded().catch(() => {});
   return () => {
     listeners.delete(listener);
@@ -154,12 +175,16 @@ export async function updateTripSchedule(tripId, payload) {
   await mutate(() => transportApi.updateTripSchedule(tripId, payload));
 }
 
-export async function ownerConfirmPayment(bookingId, note = '') {
-  await mutate(() => transportApi.ownerConfirmPayment(bookingId, note));
+export async function ownerConfirmPayment(bookingId, slip) {
+  await mutate(() => transportApi.ownerConfirmPayment(bookingId, slip));
 }
 
-export async function adminMarkPaid(bookingId) {
-  await mutate(() => transportApi.adminMarkPaid(bookingId));
+export async function approveTransportPayment(bookingId) {
+  await mutate(() => transportApi.approveTransportPayment(bookingId));
+}
+
+export async function rejectTransportPayment(bookingId, note = '') {
+  await mutate(() => transportApi.rejectTransportPayment(bookingId, note));
 }
 
 export async function advanceTripStatus(tripId, note = '') {
@@ -170,12 +195,12 @@ export async function attachEvidence(tripId, kind, dataUrl) {
   await mutate(() => transportApi.attachEvidence(tripId, kind, dataUrl));
 }
 
-export async function requestCancel(bookingId, reason) {
-  await mutate(() => transportApi.requestCancel(bookingId, reason));
+export async function requestCancel(bookingId, ownerId, cancellationId, reason) {
+  await mutate(() => transportApi.requestCancel(bookingId, ownerId, cancellationId, reason));
 }
 
-export async function resolveCancel(bookingId, approve, adminNote = '') {
-  await mutate(() => transportApi.resolveCancel(bookingId, approve, adminNote));
+export async function resolveCancel(bookingId, cancellationId, approve, adminNote = '') {
+  await mutate(() => transportApi.resolveCancel(bookingId, cancellationId, approve, adminNote));
 }
 
 export function notificationsForDriver(driverId) {
@@ -211,12 +236,8 @@ export async function updateZones(zones) {
   await mutate(() => transportApi.updateZones(zones));
 }
 
-export async function addHotel(payload) {
-  await mutate(() => transportApi.addHotel(payload));
-}
-
-export async function removeHotel(id) {
-  await mutate(() => transportApi.removeHotel(id));
+export async function updateHotelRoomPrices(rooms) {
+  await mutate(() => transportApi.updateHotelRoomPrices(rooms));
 }
 
 export async function resetTransportDemo() {

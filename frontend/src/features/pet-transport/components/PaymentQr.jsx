@@ -30,7 +30,7 @@ export default function PaymentQr({ bookingId, amount, visible }) {
         <div className="tp-muted">พร้อมเพย์ {PROMPTPAY_ID}</div>
         <div className="tp-muted">{ACCOUNT_NAME}</div>
         <p className="tp-muted" style={{ marginBottom: 0 }}>
-          สแกนด้วยแอปธนาคาร แล้วกดยืนยันว่าชำระแล้วด้านล่าง
+          สแกนด้วยแอปธนาคาร แล้วแนบสลิปเพื่อส่งให้ฝ่ายบัญชีตรวจสอบ
         </p>
       </div>
     </div>

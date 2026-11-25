@@ -10,6 +10,7 @@ import BookingPage from '../features/pet-owner/pages/Booking.jsx';
 import MedicalPage from '../features/pet-owner/pages/Medical.jsx';
 import CatHotelPage, { CatHotelBookingsPage, StayBookPage, StayWatchPage } from '../features/pet-owner/pages/CatHotel.jsx';
 import CatHotelReservationPage from '../features/pet-owner/pages/CatHotelReservation.jsx';
+import HotelBookingDetailPage from '../features/pet-owner/pages/HotelBookingDetail.jsx';
 import PaymentPage from '../features/payments/PaymentPage.jsx';
 import BookingHistoryPage from '../features/payments/BookingHistory.jsx';
 import TransportPage from '../features/pet-owner/pages/Transport.jsx';
@@ -62,10 +63,8 @@ import AdminTransportLayout from '../features/pet-transport/admin/AdminTransport
 import TransportDashboard from '../features/pet-transport/admin/TransportDashboard.jsx';
 import BookingManagement from '../features/pet-transport/admin/BookingManagement.jsx';
 import BookingAdminDetail from '../features/pet-transport/admin/BookingAdminDetail.jsx';
-import PaymentVerification from '../features/pet-transport/admin/PaymentVerification.jsx';
 import CancellationPage from '../features/pet-transport/admin/CancellationPage.jsx';
 import TransportPricingPage from '../features/pet-transport/admin/PricingPage.jsx';
-import HotelsPage from '../features/pet-transport/admin/HotelsPage.jsx';
 import DriversPage from '../features/pet-transport/admin/DriversPage.jsx';
 
 import AdoptionDashboardPage from '../features/adoption/pages/Dashboard.jsx';
@@ -99,6 +98,7 @@ export const petOwnerRoutes = (
     <Route path="cat-hotel/reservations" element={<CatHotelReservationPage />} />
     <Route path="cat-hotel/book" element={<StayBookPage />} />
     <Route path="cat-hotel/bookings" element={<CatHotelBookingsPage />} />
+    <Route path="cat-hotel/bookings/:bookingId" element={<HotelBookingDetailPage />} />
     <Route path="cat-hotel/watch/:cameraId" element={<StayWatchPage />} />
     <Route path="transport" element={<TransportPage />} />
     <Route path="transport/requests" element={<TransportRequestsPage />} />
@@ -118,9 +118,7 @@ export const adminTransportRoutes = (
       <Route path="bookings/:bookingId" element={<BookingAdminDetail />} />
       <Route path="cancellations" element={<CancellationPage />} />
       <Route path="pricing" element={<TransportPricingPage />} />
-      <Route path="hotels" element={<HotelsPage />} />
       <Route path="drivers" element={<DriversPage />} />
-      <Route path="payments" element={<PaymentVerification />} />
     </Route>
     <Route path="users" element={<AdminUsersPage />} />
     <Route path="providers" element={<AdminProvidersPage />} />
@@ -141,13 +139,6 @@ export const driverTransportRoutes = (
     <Route path="history" element={<HistoryPage />} />
     <Route path="notifications" element={<DriverNotificationsPage />} />
     <Route path="profile" element={<DriverProfilePage />} />
-  </>
-);
-
-export const financeRoutes = (
-  <>
-    <Route index element={<PaymentVerification />} />
-    <Route path="payments" element={<PaymentVerification />} />
   </>
 );
 

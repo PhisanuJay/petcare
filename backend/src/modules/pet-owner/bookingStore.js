@@ -9,7 +9,7 @@ import { createJsonCollection, httpError } from './jsonCollection.js';
  *   ownerName / ownerPhone are copied from the owner's account when booking (may be '' on older bookings).
  * status: 'pending' → 'confirmed' | 'rejected' (Medical Assistant);
  *         'confirmed' → 'no_show' (Medical Assistant) | 'completed' (Veterinarian);
- *         'pending' / 'confirmed' → 'cancelled' (by the owner).
+ *         'pending' / 'confirmed' → 'cancel_requested' → 'cancelled' (by Admin).
  * The Medical Assistant can also move a pending / confirmed booking to another date and time
  * (rescheduleBookingAsClinic).
  */
@@ -27,7 +27,15 @@ const OWNER_CANCELLABLE = ['pending', 'confirmed'];
 const CLINIC_RESCHEDULABLE = ['pending', 'confirmed'];
 /** Bookings that no longer hold their time slot. */
 const INACTIVE = ['cancelled', 'rejected'];
-export const BOOKING_STATUSES = ['pending', 'confirmed', 'completed', 'no_show', 'rejected', 'cancelled'];
+export const BOOKING_STATUSES = [
+  'pending',
+  'confirmed',
+  'completed',
+  'no_show',
+  'rejected',
+  'cancel_requested',
+  'cancelled',
+];
 /**
  * Hand-over rule between the Medical Assistant and the Veterinarian: a booking reaches the vet only
  * after the Medical Assistant has confirmed it ('pending' → 'confirmed'). The vet never sees
@@ -61,15 +69,59 @@ export function createBooking(ownerId, data) {
   });
 }
 
-export function cancelBooking(ownerId, id) {
+export function requestBookingCancellation(ownerId, id, cancellationId, reason) {
   return bookings.update((all) => {
     const index = all.findIndex((b) => b.id === id && b.ownerId === ownerId);
     if (index === -1) throw httpError(404, 'ไม่พบนัดหมายนี้');
-    if (all[index].status === 'cancelled') return { records: all, result: all[index] };
+    if (all[index].status === 'cancel_requested') throw httpError(409, 'มีคำขอยกเลิกที่กำลังรอพิจารณา');
     if (!OWNER_CANCELLABLE.includes(all[index].status)) {
       throw httpError(409, 'นัดนี้ดำเนินการไปแล้ว ไม่สามารถยกเลิกได้');
     }
-    const booking = { ...all[index], status: 'cancelled', updatedAt: new Date().toISOString() };
+    const text = String(reason || '').trim();
+    if (text.length < 3 || text.length > 500) throw httpError(400, 'กรุณาระบุเหตุผล 3 ถึง 500 ตัวอักษร');
+    if (!cancellationId) throw httpError(400, 'ข้อมูลคำขอยกเลิกไม่ถูกต้อง');
+    const booking = {
+      ...all[index],
+      status: 'cancel_requested',
+      cancelRequest: {
+        id: cancellationId,
+        reason: text,
+        status: 'pending',
+        previousStatus: all[index].status,
+        requestedAt: new Date().toISOString(),
+      },
+      updatedAt: new Date().toISOString(),
+    };
+    const next = all.slice();
+    next[index] = booking;
+    return { records: next, result: booking };
+  });
+}
+
+export function resolveBookingCancellation(id, cancellationId, approve, adminNote = '') {
+  return bookings.update((all) => {
+    const index = all.findIndex((b) => b.id === id);
+    if (index === -1) throw httpError(404, 'ไม่พบนัดหมายนี้');
+    const current = all[index];
+    if (
+      current.status !== 'cancel_requested'
+      || current.cancelRequest?.status !== 'pending'
+      || current.cancelRequest?.id !== cancellationId
+    ) {
+      throw httpError(409, 'คำขอนี้ไม่อยู่ในสถานะรอพิจารณา');
+    }
+    const now = new Date().toISOString();
+    const booking = {
+      ...current,
+      status: approve ? 'cancelled' : current.cancelRequest.previousStatus,
+      cancelRequest: {
+        ...current.cancelRequest,
+        status: approve ? 'approved' : 'rejected',
+        adminNote: String(adminNote || '').trim().slice(0, 500),
+        resolvedAt: now,
+      },
+      updatedAt: now,
+    };
     const next = all.slice();
     next[index] = booking;
     return { records: next, result: booking };
