@@ -25,6 +25,7 @@ export const HOTEL_ROOMS = [
   {
     name: 'Standard',
     price: 450,
+    image: '/rooms/standard.jpg',
     icon: 'bi-house-door',
     bg: '#e7f1ff',
     fg: '#2f7fc8',
@@ -33,6 +34,7 @@ export const HOTEL_ROOMS = [
   {
     name: 'Deluxe',
     price: 750,
+    image: '/rooms/deluxe.jpg',
     icon: 'bi-building',
     bg: '#dff3fb',
     fg: '#1f97c7',
@@ -42,6 +44,7 @@ export const HOTEL_ROOMS = [
   {
     name: 'Suite',
     price: 1200,
+    image: '/rooms/suite.jpg',
     icon: 'bi-stars',
     bg: '#e6e3ff',
     fg: '#5b52d6',
@@ -120,10 +123,18 @@ export const VETS = [
   { img: vet4, name: 'น.สพ.ธนกฤต มีเมตตา', spec: 'ผิวหนัง' },
 ];
 
+export const HOTEL_STAY_PROMO = {
+  percent: 15,
+  minNights: 3,
+  until: '2026-12-31',
+  title: 'พักโรงแรม 3 คืนขึ้นไป',
+  desc: 'ทุกประเภทห้อง ถึง 31 ธ.ค.',
+};
+
 export const PROMOS = [
   { big: '20%', small: 'OFF', bg: 'var(--sky)', title: 'แพ็กเกจวัคซีนลูกสัตว์', desc: 'ครบชุด 3 เข็ม ถึง 30 พ.ย.', cta: 'เก็บคูปอง' },
   { big: '990', small: 'บาท', bg: '#7bc8a4', title: 'ตรวจสุขภาพประจำปี', desc: 'เลือด + ร่างกาย + ปรึกษาหมอ', cta: 'เก็บคูปอง' },
-  { big: '15%', small: 'โรงแรม', bg: '#b69cf0', title: 'พักโรงแรม 3 คืนขึ้นไป', desc: 'ทุกประเภทห้อง ถึง 31 ธ.ค.', cta: 'เก็บคูปอง' },
+  { big: `${HOTEL_STAY_PROMO.percent}%`, small: 'โรงแรม', bg: '#b69cf0', title: HOTEL_STAY_PROMO.title, desc: HOTEL_STAY_PROMO.desc, cta: 'เก็บคูปอง' },
 ];
 
 export const REVIEWS = [

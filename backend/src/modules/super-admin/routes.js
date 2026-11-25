@@ -2,13 +2,20 @@ import { Router } from 'express';
 
 /**
  * Super Admin API module
- * Owner: ฟ่าง
- * Placeholder routes — implement later.
+ * Owner: ฟ่าง (Xsup404)
+ * Placeholder routes for monorepo shell.
+ * Full Pet Hotel CCTV API lives in ./hotel-cctv (standalone).
  */
 const router = Router();
 
 router.get('/', (_req, res) => {
-  res.json({ module: 'super-admin', owner: 'ฟ่าง', status: 'placeholder' });
+  res.json({
+    module: 'super-admin',
+    owner: 'ฟ่าง',
+    github: 'Xsup404',
+    status: 'placeholder',
+    hotelCctv: 'see ./hotel-cctv',
+  });
 });
 
 router.get('/users', (_req, res) => {

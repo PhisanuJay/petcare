@@ -6,9 +6,9 @@ function NeedLoginModal({ next, onClose }) {
   const query = `?next=${encodeURIComponent(next)}`;
   return (
     <>
-      <div className="modal d-block" tabIndex={-1} role="dialog" onClick={onClose}>
+      <div className="modal d-block need-login" tabIndex={-1} role="dialog" onClick={onClose}>
         <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-content border-0 p-4 text-center" style={{ borderRadius: 30 }}>
+          <div className="modal-content border-0 text-center">
             <div style={{ fontSize: '3rem' }}>🐾</div>
             <h5 className="mitr">เข้าสู่ระบบก่อนนะ</h5>
             <p className="text-muted small">สมัครสมาชิกฟรี จองคิว จองโรงแรม และขอรับเลี้ยงน้องได้ทันที แถมรับแต้มสะสม</p>

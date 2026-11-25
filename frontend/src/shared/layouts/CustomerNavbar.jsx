@@ -20,7 +20,9 @@ const MEMBER_MENU = [
   { to: '/pet-owner', label: 'นัดหมายของฉัน', icon: 'bi-calendar2-check', end: true },
   { to: '/pet-owner/my-pets', label: 'สัตว์เลี้ยงของฉัน', icon: 'bi-heart' },
   { to: '/pet-owner/medical', label: 'ประวัติ', icon: 'bi-journal-medical' },
+  { to: '/pet-owner/history', label: 'ประวัติการจอง', icon: 'bi-receipt' },
   { to: '/pet-owner/cat-hotel', label: 'โรงแรมสัตว์', icon: 'bi-building' },
+  { to: '/pet-owner/transport', label: 'รับ–ส่งสัตว์', icon: 'bi-truck' },
   { to: '/pet-owner/adoption', label: 'หาบ้าน', icon: 'bi-house-add' },
   { to: '/#promo', label: 'โปรโมชั่น', icon: 'bi-tag' },
 ];
