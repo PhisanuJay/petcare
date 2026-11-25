@@ -43,25 +43,31 @@ function BellIcon() {
 }
 
 /**
- * Minimal shell for Admin / Driver after login (not the customer site).
+ * Minimal shell for Admin / Driver / Finance after login (not the customer site).
  */
 export default function StaffShell({ variant }) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const path = useLocation().pathname;
   const isAdmin = variant === 'admin' || currentUser?.role === ROLES.admin;
+  const isFinance = variant === 'finance' || currentUser?.role === ROLES.finance;
 
-  const links = [
+  const adminLinks = [
     { to: '/admin/transport', label: 'Transport Dashboard' },
     { to: '/admin/transport/bookings', label: 'Bookings' },
     { to: '/admin/transport/drivers', label: 'จัดการคนขับ' },
-    { to: '/admin/transport/payments', label: 'Payment' },
     { to: '/admin/transport/pricing', label: 'Pricing' },
   ];
 
-  if (!isAdmin) {
+  const financeLinks = [
+    { to: '/finance', label: 'ตรวจชำระเงิน' },
+  ];
+
+  if (!isAdmin && !isFinance) {
     return <DriverShell currentUser={currentUser} path={path} logout={logout} navigate={navigate} />;
   }
+
+  const links = isFinance ? financeLinks : adminLinks;
 
   return (
     <div className="app-shell">

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import PaymentQr from '../../pet-transport/components/PaymentQr.jsx';
 import PriceQuote from '../../pet-transport/components/PriceQuote.jsx';
 import StatusBadge from '../../pet-transport/components/StatusBadge.jsx';
 import TransportSubnav from '../../pet-transport/components/TransportSubnav.jsx';
@@ -11,6 +12,10 @@ import {
   isFacilityKind,
   serviceTypeMeta,
 } from '../../pet-transport/constants.js';
+import {
+  catalogOptionsForPlace,
+  otherServiceKindForPlace,
+} from '../../pet-transport/serviceCatalog.js';
 import { useTransport } from '../../pet-transport/useTransport.js';
 import '../../pet-transport/transport.css';
 
@@ -53,19 +58,50 @@ function placeIcon(place) {
 
 function paymentLabel(status) {
   if (status === 'paid') return 'ชำระแล้ว';
-  if (status === 'owner_confirmed') return 'รอ Admin ยืนยันเงิน';
+  if (status === 'owner_confirmed') return 'รอตรวจสอบการชำระ';
   return 'ยังไม่ชำระ';
 }
 
 export default function TransportDetailPage() {
   const { bookingId } = useParams();
   const { currentUser } = useAuth();
-  const { getBooking, ownerConfirmPayment, requestCancel, trips } = useTransport();
+  const {
+    getBooking,
+    ownerConfirmPayment,
+    requestCancel,
+    setBookingOtherService,
+    trips,
+  } = useTransport();
   const booking = getBooking(bookingId);
   const [note, setNote] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [showQr, setShowQr] = useState(false);
+  const [otherServiceId, setOtherServiceId] = useState('');
+  const [hotelNights, setHotelNights] = useState(1);
+  const [savingService, setSavingService] = useState(false);
+  const [wantExtra, setWantExtra] = useState(false);
+
+  const primaryTrip = booking?.trips?.[0] || null;
+  const facilityPlace = primaryTrip?.to || null;
+  const otherKind = otherServiceKindForPlace(facilityPlace);
+  const otherOptions = useMemo(
+    () => catalogOptionsForPlace(facilityPlace),
+    [facilityPlace],
+  );
+
+  useEffect(() => {
+    const existing = booking?.quote?.otherService;
+    if (existing?.id) {
+      setOtherServiceId(existing.id);
+      setHotelNights(existing.nights || 1);
+      setWantExtra(true);
+    } else {
+      setOtherServiceId('');
+      setWantExtra(false);
+    }
+  }, [booking?.id, booking?.quote?.otherService?.id, booking?.quote?.otherService?.nights]);
 
   if (!booking || booking.ownerId !== currentUser?.id) {
     return (
@@ -80,18 +116,60 @@ export default function TransportDetailPage() {
     );
   }
 
-  const canPay = ['awaiting_payment', 'driver_assigned', 'price_confirmed'].includes(booking.status)
-    && booking.paymentStatus !== 'paid';
+  const canPay = !['paid', 'owner_confirmed'].includes(booking.paymentStatus)
+    && !['cancelled', 'cancel_requested', 'completed'].includes(booking.status);
   const canCancel = canOwnerRequestCancel(booking, trips);
+  const canAddServices = booking.serviceType !== 'inbound'
+    && !['paid', 'owner_confirmed'].includes(booking.paymentStatus)
+    && !['cancelled', 'cancel_requested', 'completed'].includes(booking.status);
   const svc = serviceTypeMeta(booking.serviceType);
-  const primaryTrip = booking.trips[0];
   const primaryPickup = primaryTrip?.pickupTime;
+  const quote = booking.quote;
+  const payAmount = quote?.total;
+
+  async function saveOtherService() {
+    setErr('');
+    setMsg('');
+    setSavingService(true);
+    try {
+      const id = otherServiceId || null;
+      await setBookingOtherService(booking.id, {
+        otherServiceId: id,
+        hotelNights: otherKind === 'hotel' ? hotelNights : 1,
+      });
+      setMsg(id ? 'เพิ่มบริการแล้ว — ยอดในใบสรุปอัปเดตแล้ว' : 'ไม่เพิ่มบริการอื่น ใช้เฉพาะค่ารถ');
+      setWantExtra(false);
+      setShowQr(false);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSavingService(false);
+    }
+  }
+
+  async function clearOtherService() {
+    setErr('');
+    setMsg('');
+    setSavingService(true);
+    try {
+      await setBookingOtherService(booking.id, { otherServiceId: null });
+      setMsg('ลบบริการเพิ่มแล้ว เหลือเฉพาะค่ารถ');
+      setWantExtra(false);
+      setOtherServiceId('');
+      setShowQr(false);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSavingService(false);
+    }
+  }
 
   async function pay() {
     setErr('');
     try {
       await ownerConfirmPayment(booking.id, note);
-      setMsg('บันทึกแล้วว่าคุณชำระเงินแล้ว — รอ Admin ตรวจสอบ');
+      setMsg('');
+      setShowQr(false);
     } catch (e) {
       setErr(e.message);
     }
@@ -127,7 +205,7 @@ export default function TransportDetailPage() {
               <StatusBadge label={booking.statusMeta.label} tone={booking.statusMeta.tone} />
               <StatusBadge
                 label={paymentLabel(booking.paymentStatus)}
-                tone={booking.paymentStatus === 'paid' ? 'ok' : 'warn'}
+                tone={booking.paymentStatus === 'paid' ? 'ok' : booking.paymentStatus === 'owner_confirmed' ? 'info' : 'warn'}
               />
             </div>
             <div className="tp-summary-card__meta">
@@ -233,12 +311,113 @@ export default function TransportDetailPage() {
               <div className="tp-price-card">
                 <h3 className="tp-section-title">
                   <i className="bi bi-tags" />
-                  {booking.finalQuote ? 'ราคาสุดท้าย' : 'ราคาประมาณ'}
+                  {booking.finalQuote ? 'ราคาสุดท้าย' : 'สรุปค่าใช้จ่าย'}
                 </h3>
-                <PriceQuote quote={booking.quote} title="" />
+                <PriceQuote quote={quote} title="" />
               </div>
             </aside>
           </div>
+
+          {canAddServices && otherOptions.length > 0 && (
+            <div className="tp-card" style={{ marginTop: '1rem' }}>
+              <div className="tp-add-service-head">
+                <div>
+                  <h3 className="tp-section-title" style={{ marginBottom: 0 }}>
+                    เพิ่มบริการ
+                  </h3>
+                  <p className="tp-muted" style={{ margin: '0.35rem 0 0' }}>
+                    ไม่บังคับ — กด + เมื่อต้องการเพิ่มคลินิก/โรงแรม หรือข้ามไปชำระค่ารถอย่างเดียว
+                  </p>
+                  {quote?.otherService && !wantExtra && (
+                    <p style={{ margin: '0.5rem 0 0' }}>
+                      เพิ่มแล้ว: <strong>{quote.otherService.label}</strong>
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className={`tp-add-service-btn ${wantExtra ? 'is-open' : ''}`}
+                  aria-expanded={wantExtra}
+                  aria-label={wantExtra ? 'ปิดฟอร์มเพิ่มบริการ' : 'เพิ่มบริการคลินิกหรือโรงแรม'}
+                  title={wantExtra ? 'ปิด' : 'เพิ่มบริการ'}
+                  onClick={async () => {
+                    if (wantExtra) {
+                      setWantExtra(false);
+                      setOtherServiceId(quote?.otherService?.id || '');
+                    } else {
+                      setWantExtra(true);
+                      setOtherServiceId(quote?.otherService?.id || otherOptions[0]?.id || '');
+                    }
+                  }}
+                >
+                  <i className={`bi ${wantExtra ? 'bi-x-lg' : 'bi-plus-lg'}`} />
+                </button>
+              </div>
+
+              {wantExtra && (
+                <>
+                  <div className="tp-form" style={{ marginTop: '0.85rem' }}>
+                    <div className="field">
+                      <label htmlFor="detail-other-service">
+                        {otherKind === 'hotel' ? 'เลือกห้อง' : 'เลือกบริการ'}
+                      </label>
+                      <select
+                        id="detail-other-service"
+                        value={otherServiceId}
+                        onChange={(e) => setOtherServiceId(e.target.value)}
+                      >
+                        {otherOptions.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label} — ฿{Number(opt.price).toLocaleString('th-TH')}
+                            {opt.unit ? ` / ${opt.unit}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {otherKind === 'hotel' && otherServiceId && (
+                      <div className="field">
+                        <label htmlFor="detail-hotel-nights">จำนวนคืน</label>
+                        <input
+                          id="detail-hotel-nights"
+                          type="number"
+                          min={1}
+                          max={30}
+                          value={hotelNights}
+                          onChange={(e) => setHotelNights(Math.max(1, Number(e.target.value) || 1))}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="tp-actions">
+                    <button
+                      type="button"
+                      className="btn btn-sky"
+                      disabled={savingService || !otherServiceId}
+                      onClick={saveOtherService}
+                    >
+                      บันทึกบริการ
+                    </button>
+                    {quote?.otherService && (
+                      <button
+                        type="button"
+                        className="btn btn-soft"
+                        disabled={savingService}
+                        onClick={clearOtherService}
+                      >
+                        ลบบริการเพิ่ม
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {booking.serviceType === 'inbound' && (
+            <p className="tp-muted" style={{ marginTop: '1rem' }}>
+              ประเภท “รับกลับ” คิดเฉพาะค่ารถ ไม่เพิ่มบริการอื่น
+            </p>
+          )}
 
           {primaryTrip && (
             <div className="tp-status-card">
@@ -256,18 +435,41 @@ export default function TransportDetailPage() {
                 <i className="bi bi-cash-coin" />
                 ชำระเงิน
               </h3>
-              <p className="tp-muted">โอนนอกระบบแล้วกดยืนยัน — Admin จะ Mark as Paid (ไม่มี Payment Gateway ใน MVP)</p>
-              <div className="tp-form">
-                <div className="field">
-                  <label htmlFor="pay-note">หมายเหตุการชำระ</label>
-                  <input id="pay-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="เช่น โอนแล้วเมื่อ 15:00" />
+              <p className="tp-muted">
+                กดปุ่มด้านล่างเพื่อแสดง QR Code สแกนด้วยแอปธนาคาร แล้วกดยืนยันว่าชำระแล้ว
+              </p>
+
+              {!showQr ? (
+                <div className="tp-actions">
+                  <button type="button" className="btn btn-sky" onClick={() => setShowQr(true)}>
+                    <i className="bi bi-qr-code-scan" />
+                    ยืนยันการชำระ — แสดง QR
+                  </button>
                 </div>
-              </div>
-              <div className="tp-actions">
-                <button type="button" className="btn btn-sky" onClick={pay}>
-                  ยืนยันว่าชำระแล้ว
-                </button>
-              </div>
+              ) : (
+                <>
+                  <PaymentQr bookingId={booking.id} amount={payAmount} visible />
+                  <div className="tp-form">
+                    <div className="field">
+                      <label htmlFor="pay-note">หมายเหตุการชำระ</label>
+                      <input
+                        id="pay-note"
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="เช่น โอนแล้วเมื่อ 15:00"
+                      />
+                    </div>
+                  </div>
+                  <div className="tp-actions">
+                    <button type="button" className="btn btn-sky" onClick={pay}>
+                      ยืนยันว่าชำระแล้ว
+                    </button>
+                    <button type="button" className="btn btn-soft" onClick={() => setShowQr(false)}>
+                      ปิด QR
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

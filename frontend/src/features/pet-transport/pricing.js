@@ -46,6 +46,8 @@ export function priceForZone(zoneId, zones = ZONES) {
  * Quote from pickup/dropoff zones.
  * Round trip = sum of both legs, no discount.
  * outbound / inbound / one_way = single leg.
+ * outbound / round_trip may include otherService (clinic/hotel) from Pet-Owner-Vet catalog.
+ * inbound = transport only.
  */
 export function quotePrice({
   fromZoneId,
@@ -56,6 +58,7 @@ export function quotePrice({
   zones = ZONES,
   customPerTrip = null,
   fareZoneOverride = null,
+  otherService = null,
 }) {
   const outboundFareZone = fareZoneOverride || fareZoneId(fromZoneId, toZoneId);
   let outboundPerTrip = null;
@@ -68,10 +71,14 @@ export function quotePrice({
   }
 
   const round = isRoundTrip(serviceType);
+  const inboundOnly = serviceType === 'inbound';
   const retFrom = returnFromZoneId || toZoneId;
   const retTo = returnToZoneId || fromZoneId;
   const returnFareZone = round ? fareZoneId(retFrom, retTo) : null;
   const returnPerTrip = round ? fareForZones(retFrom, retTo, zones) : null;
+
+  const addon = !inboundOnly && otherService?.amount != null ? otherService : null;
+  const otherServicesTotal = addon ? Number(addon.amount) : 0;
 
   if (
     outboundPerTrip == null
@@ -92,6 +99,10 @@ export function quotePrice({
       returnPerTrip: round ? returnPerTrip : null,
       outboundFareZone,
       returnFareZone,
+      transportTotal: null,
+      otherServicesTotal: inboundOnly ? 0 : otherServicesTotal || null,
+      otherService: inboundOnly ? null : addon,
+      lines: [],
       subtotal: null,
       discount: 0,
       total: null,
@@ -100,7 +111,23 @@ export function quotePrice({
   }
 
   const trips = round ? 2 : 1;
-  const subtotal = round ? outboundPerTrip + returnPerTrip : outboundPerTrip;
+  const transportTotal = round ? outboundPerTrip + returnPerTrip : outboundPerTrip;
+  const lines = [
+    {
+      type: 'transport',
+      label: round ? 'ค่ารถรับ–ส่ง (ไป–กลับ)' : 'ค่ารถรับ–ส่ง',
+      amount: transportTotal,
+    },
+  ];
+  if (addon && Number.isFinite(otherServicesTotal) && otherServicesTotal > 0) {
+    lines.push({
+      type: addon.kind || 'other',
+      label: addon.label || 'ค่าบริการอื่น',
+      amount: otherServicesTotal,
+    });
+  }
+
+  const subtotal = transportTotal + (Number.isFinite(otherServicesTotal) ? otherServicesTotal : 0);
   return {
     fromZoneId,
     toZoneId,
@@ -115,6 +142,10 @@ export function quotePrice({
     returnPerTrip: round ? returnPerTrip : null,
     outboundFareZone,
     returnFareZone,
+    transportTotal,
+    otherServicesTotal: inboundOnly ? 0 : otherServicesTotal,
+    otherService: inboundOnly ? null : addon,
+    lines,
     subtotal,
     discount: 0,
     total: subtotal,

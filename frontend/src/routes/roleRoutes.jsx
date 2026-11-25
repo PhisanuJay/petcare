@@ -101,7 +101,6 @@ export const adminTransportRoutes = (
       <Route index element={<TransportDashboard />} />
       <Route path="bookings" element={<BookingManagement />} />
       <Route path="bookings/:bookingId" element={<BookingAdminDetail />} />
-      <Route path="payments" element={<PaymentVerification />} />
       <Route path="cancellations" element={<CancellationPage />} />
       <Route path="pricing" element={<TransportPricingPage />} />
       <Route path="hotels" element={<HotelsPage />} />
@@ -127,6 +126,14 @@ export const driverTransportRoutes = (
     <Route path="history" element={<HistoryPage />} />
     <Route path="notifications" element={<DriverNotificationsPage />} />
     <Route path="profile" element={<DriverProfilePage />} />
+  </>
+);
+
+/** Finance routes — nested under `/finance` + StaffShell + RequireRole(finance). */
+export const financeRoutes = (
+  <>
+    <Route index element={<PaymentVerification />} />
+    <Route path="payments" element={<PaymentVerification />} />
   </>
 );
 

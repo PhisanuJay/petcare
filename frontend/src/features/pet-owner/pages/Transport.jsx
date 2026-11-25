@@ -333,7 +333,12 @@ export default function TransportPage() {
             </div>
 
             <div style={{ marginTop: '1rem' }}>
-              <PriceQuote quote={estimate} title="สรุปค่าบริการ (ก่อนยืนยัน)" />
+              <PriceQuote quote={estimate} title="สรุปค่ารถ (ก่อนยืนยัน)" />
+              {serviceType !== 'inbound' && (
+                <p className="tp-muted" style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+                  หลังยืนยันการจอง สามารถเพิ่มบริการคลินิก/โรงแรมได้ในหน้ารายละเอียด
+                </p>
+              )}
             </div>
 
             <div className="tp-actions">

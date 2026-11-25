@@ -385,7 +385,7 @@ export default function DriverSchedule() {
               </div>
 
               {!paid ? (
-                <p className="dv-banner">รอแอดมินยืนยันชำระเงินก่อนเริ่มงาน</p>
+                <p className="dv-banner">รอตรวจสอบการชำระ</p>
               ) : (
                 <p className="dv-banner is-ok">รอเข้ารับน้องตามเวลานัด และอัปเดตสถานะงาน</p>
               )}

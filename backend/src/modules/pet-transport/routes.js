@@ -44,6 +44,14 @@ router.post('/bookings/:id/confirm-price', (req, res) => {
   }
 });
 
+router.post('/bookings/:id/other-service', (req, res) => {
+  try {
+    ok(res, service.setBookingOtherService(req.params.id, req.body || {}));
+  } catch (error) {
+    fail(res, error);
+  }
+});
+
 router.post('/bookings/:id/owner-confirm-payment', (req, res) => {
   try {
     ok(res, service.ownerConfirmPayment(req.params.id, req.body?.note || ''));

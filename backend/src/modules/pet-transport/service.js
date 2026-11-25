@@ -10,6 +10,7 @@ import {
   stringifyJson,
 } from './mappers.js';
 import { isRoundTrip, quotePrice } from './pricing.js';
+import { resolveOtherService } from './serviceCatalog.js';
 import { reseedsCatalog } from './migrate.js';
 
 const UPCOMING_WINDOW_MS = 2 * 60 * 60 * 1000;
@@ -211,6 +212,7 @@ export function createBooking(input) {
     returnToZoneId: returnTo.zoneId,
     serviceType: input.serviceType,
     zones,
+    otherService: null,
   });
   if (estimate.total == null) {
     throw new Error('คำนวณราคาไม่สำเร็จ');
@@ -277,6 +279,62 @@ export function createBooking(input) {
   });
 }
 
+export function setBookingOtherService(bookingId, { otherServiceId = null, hotelNights = 1 } = {}) {
+  return transaction(() => {
+    const row = getBookingRow(bookingId);
+    if (!row) throw new Error('ไม่พบการจอง');
+    const booking = mapBooking(row);
+    if (['cancelled', 'completed'].includes(booking.status)) {
+      throw new Error('ไม่สามารถเพิ่มบริการในสถานะนี้');
+    }
+    if (booking.paymentStatus === 'paid') {
+      throw new Error('ชำระเงินแล้ว แก้บริการไม่ได้');
+    }
+    if (booking.serviceType === 'inbound') {
+      throw new Error('รับกลับคิดเฉพาะค่ารถ ไม่เพิ่มบริการอื่น');
+    }
+
+    const trips = tripsForBooking(bookingId);
+    const pickup = trips.find((t) => t.type === 'pickup') || trips[0];
+    const facilityPlace = pickup?.to || null;
+    const otherService = otherServiceId
+      ? resolveOtherService({
+        serviceType: booking.serviceType,
+        place: facilityPlace,
+        otherServiceId,
+        hotelNights,
+      })
+      : null;
+    if (otherServiceId && !otherService) {
+      throw new Error('ไม่พบบริการที่เลือก');
+    }
+
+    const zones = listZones();
+    const estimate = quotePrice({
+      fromZoneId: booking.fromZoneId,
+      toZoneId: booking.toZoneId,
+      returnFromZoneId: booking.returnFromZoneId,
+      returnToZoneId: booking.returnToZoneId,
+      serviceType: booking.serviceType,
+      zones,
+      otherService,
+    });
+    if (estimate.total == null) throw new Error('คำนวณราคาไม่สำเร็จ');
+
+    const now = new Date().toISOString();
+    const nextStatus = ['submitted', 'price_confirmed', 'driver_assigned'].includes(booking.status)
+      ? 'awaiting_payment'
+      : booking.status;
+
+    run(
+      `UPDATE bookings SET estimated_quote_json = ?, final_quote_json = NULL, status = ?, updated_at = ?
+       WHERE id = ?`,
+      [stringifyJson(estimate), nextStatus, now, bookingId],
+    );
+    return { booking: mapBooking(getBookingRow(bookingId)), state: getState() };
+  });
+}
+
 export function confirmPrice(bookingId, { fareZoneId, customPerTrip } = {}) {
   return transaction(() => {
     const row = getBookingRow(bookingId);
@@ -293,6 +351,7 @@ export function confirmPrice(bookingId, { fareZoneId, customPerTrip } = {}) {
       zones,
       fareZoneOverride: override,
       customPerTrip: customPerTrip === '' || customPerTrip == null ? null : Number(customPerTrip),
+      otherService: b.estimatedQuote?.otherService || null,
     });
     if (quote.total == null) throw new Error('ต้องใส่ราคาก่อนยืนยัน');
     const now = new Date().toISOString();
@@ -399,7 +458,7 @@ export function ownerConfirmPayment(bookingId, note = '') {
     const row = getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const b = mapBooking(row);
-    if (!['awaiting_payment', 'driver_assigned', 'price_confirmed'].includes(b.status)) {
+    if (!['submitted', 'awaiting_payment', 'driver_assigned', 'price_confirmed'].includes(b.status)) {
       throw new Error('ยังไม่ถึงขั้นตอนชำระเงิน');
     }
     run(

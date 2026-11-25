@@ -41,6 +41,15 @@ const SEED_DRIVER = {
   licenseExpiry: '2028-12-31',
 };
 
+const SEED_FINANCE = {
+  id: 'finance-seed',
+  email: 'finance@petcare.local',
+  password: 'Finance1234',
+  firstName: 'กานต์',
+  lastName: 'การเงิน',
+  phone: '0211112222',
+};
+
 async function upsertSeedUser(users, seed, role) {
   const existing = users.find((u) => u.email === seed.email || (seed.id && u.id === seed.id));
   const salt = newId();
@@ -128,6 +137,7 @@ async function ensureUsersBootstrapped() {
   if (await upsertSeedUser(users, SEED_ADMIN, ROLES.admin)) changed = true;
   if (await upsertSeedUser(users, SEED_OWNER, ROLES.owner)) changed = true;
   if (await upsertSeedUser(users, SEED_DRIVER, ROLES.driver)) changed = true;
+  if (await upsertSeedUser(users, SEED_FINANCE, ROLES.finance)) changed = true;
 
   if (changed) saveUsers(users);
   return users;
@@ -452,4 +462,9 @@ export const DEMO_ADMIN_LOGIN = {
 export const DEMO_DRIVER_LOGIN = {
   email: SEED_DRIVER.email,
   password: SEED_DRIVER.password,
+};
+
+export const DEMO_FINANCE_LOGIN = {
+  email: SEED_FINANCE.email,
+  password: SEED_FINANCE.password,
 };

@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, DEMO_OWNER_LOGIN, useAuth } from '../AuthContext.jsx';
+import {
+  DEMO_ADMIN_LOGIN,
+  DEMO_DRIVER_LOGIN,
+  DEMO_FINANCE_LOGIN,
+  DEMO_OWNER_LOGIN,
+  useAuth,
+} from '../AuthContext.jsx';
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
 import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
 
@@ -51,7 +57,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ)">
+    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ / การเงิน)">
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <div className="alert-soft danger mb-3">
@@ -130,6 +136,9 @@ export default function LoginPage() {
           คนขับ: {DEMO_DRIVER_LOGIN.email} / {DEMO_DRIVER_LOGIN.password}
           {' · '}
           แอดมิน: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
+        </p>
+        <p className="text-center small text-muted mt-1 mb-0">
+          การเงิน: {DEMO_FINANCE_LOGIN.email} / {DEMO_FINANCE_LOGIN.password}
         </p>
       </form>
     </AuthCard>

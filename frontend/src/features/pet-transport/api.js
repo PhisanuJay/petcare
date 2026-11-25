@@ -25,6 +25,8 @@ export const transportApi = {
   createBooking: (body) => request('/bookings', { method: 'POST', body: JSON.stringify(body) }),
   confirmPrice: (id, body) =>
     request(`/bookings/${id}/confirm-price`, { method: 'POST', body: JSON.stringify(body || {}) }),
+  setOtherService: (id, body) =>
+    request(`/bookings/${id}/other-service`, { method: 'POST', body: JSON.stringify(body || {}) }),
   ownerConfirmPayment: (id, note) =>
     request(`/bookings/${id}/owner-confirm-payment`, {
       method: 'POST',

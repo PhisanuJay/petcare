@@ -142,6 +142,10 @@ export async function confirmPrice(bookingId, payload) {
   await mutate(() => transportApi.confirmPrice(bookingId, payload));
 }
 
+export async function setBookingOtherService(bookingId, payload) {
+  await mutate(() => transportApi.setOtherService(bookingId, payload));
+}
+
 export async function assignDriver(tripId, driverId, driverLabel = '') {
   await mutate(() => transportApi.assignDriver(tripId, driverId, driverLabel));
 }

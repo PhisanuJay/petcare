@@ -6,7 +6,6 @@ const NAV = [
   { to: '/admin/transport', label: 'Dashboard', icon: 'bi-speedometer2', end: true },
   { to: '/admin/transport/bookings', label: 'Bookings', icon: 'bi-journal-text' },
   { to: '/admin/transport/drivers', label: 'คนขับ', icon: 'bi-person-badge' },
-  { to: '/admin/transport/payments', label: 'Payment', icon: 'bi-cash-coin' },
   { to: '/admin/transport/cancellations', label: 'ยกเลิก', icon: 'bi-x-circle' },
   { to: '/admin/transport/pricing', label: 'Pricing', icon: 'bi-tag' },
   { to: '/admin/transport/hotels', label: 'Pet Hotel', icon: 'bi-building' },
