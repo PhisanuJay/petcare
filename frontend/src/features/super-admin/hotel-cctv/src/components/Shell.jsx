@@ -106,7 +106,7 @@ export default function Shell({ role, children }) {
         }
         setSession(data);
       })
-      .catch(() => navigate(cctvPath('/login'), { replace: true }));
+      .catch(() => navigate('/login?next=/super-admin', { replace: true }));
   }, [navigate, role]);
 
   useEffect(() => {
@@ -153,7 +153,7 @@ export default function Shell({ role, children }) {
 
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    navigate(cctvPath('/login'), { replace: true });
+    navigate('/login?next=/super-admin', { replace: true });
   }
 
   if (!session) return <main className="center-page">กำลังโหลด</main>;

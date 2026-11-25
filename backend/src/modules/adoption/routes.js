@@ -1,8 +1,11 @@
 import { Router } from 'express';
-import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 import { getCustomerSession, requireCustomer } from '../auth/store.js';
+import { findUserByEmail } from '../auth/usersRepository.js';
 
 const router = Router();
+const scrypt = promisify(scryptCallback);
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const STAFF_SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 const staffSessions = new Map();
@@ -11,6 +14,14 @@ const safeEqual = (left, right) => {
   const rightBuffer = Buffer.from(right);
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 };
+
+async function verifyUserPassword(password, user) {
+  if (!user?.salt || !user?.passwordHash) return false;
+  const expected = Buffer.from(user.passwordHash, 'hex');
+  if (!expected.length) return false;
+  const candidate = await scrypt(password, user.salt, expected.length);
+  return expected.length === candidate.length && timingSafeEqual(expected, candidate);
+}
 
 function requireAdoptionStaff(req, res, next) {
   const token = req.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
@@ -100,117 +111,8 @@ function parseAnimalFields(body) {
   };
 }
 
-const animals = [
-  {
-    id: 'adopt-001',
-    name: 'น้องถั่วเหลือง',
-    species: 'สุนัข',
-    breed: 'พันธุ์ผสม',
-    sex: 'female',
-    age: '1 ปี',
-    color: 'น้ำตาลอ่อน',
-    vaccination: 'ฉีดวัคซีนแล้ว',
-    disease: 'ไม่มีโรคประจำตัว',
-    additionalInfo: '',
-    personality: 'ขี้อ้อน ชอบเล่นกับเด็ก',
-    location: 'กรุงเทพฯ',
-    emoji: '🐕',
-    cardColor: '#fff1c9',
-    tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
-    status: 'available',
-  },
-  {
-    id: 'adopt-002',
-    name: 'น้องมะลิ',
-    species: 'แมว',
-    breed: 'ขาวมณี',
-    sex: 'female',
-    age: '8 เดือน',
-    color: 'ขาว',
-    vaccination: 'ฉีดวัคซีนแล้ว',
-    disease: 'ไม่มีโรคประจำตัว',
-    additionalInfo: '',
-    personality: 'เรียบร้อย ชอบนอนตัก',
-    location: 'นนทบุรี',
-    emoji: '🐈',
-    cardColor: '#e7f1ff',
-    tags: ['ฉีดวัคซีนแล้ว'],
-    status: 'available',
-  },
-  {
-    id: 'adopt-003',
-    name: 'น้องดำ',
-    species: 'สุนัข',
-    breed: 'ไทย',
-    sex: 'male',
-    age: '2 ปี',
-    color: 'ดำ',
-    vaccination: 'ฉีดวัคซีนแล้ว',
-    disease: 'ไม่มีโรคประจำตัว',
-    additionalInfo: '',
-    personality: 'ฉลาด เป็นมิตรกับคนคุ้นเคย',
-    location: 'ปทุมธานี',
-    emoji: '🐶',
-    cardColor: '#dff5e8',
-    tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
-    status: 'available',
-  },
-  {
-    id: 'adopt-004',
-    name: 'น้องส้มโอ',
-    species: 'แมว',
-    breed: 'แมวส้ม',
-    sex: 'male',
-    age: '3 เดือน',
-    color: 'ส้ม',
-    vaccination: 'ถ่ายพยาธิแล้ว',
-    disease: 'ไม่มีโรคประจำตัว',
-    additionalInfo: '',
-    personality: 'ซน ขี้เล่น เข้ากับแมวตัวอื่นได้',
-    location: 'กรุงเทพฯ',
-    emoji: '🐱',
-    cardColor: '#ffe6d9',
-    tags: ['ถ่ายพยาธิแล้ว'],
-    status: 'available',
-  },
-  {
-    id: 'adopt-005',
-    name: 'น้องโมจิ',
-    species: 'สุนัข',
-    breed: 'พันธุ์ผสม',
-    sex: 'male',
-    age: '6 เดือน',
-    color: 'ขาวน้ำตาล',
-    vaccination: 'ตรวจสุขภาพแล้ว',
-    disease: 'ไม่มีโรคประจำตัว',
-    additionalInfo: '',
-    personality: 'ร่าเริง ชอบเดินเล่น',
-    location: 'สมุทรปราการ',
-    emoji: '🐕',
-    cardColor: '#f6e0ff',
-    tags: ['ตรวจสุขภาพแล้ว'],
-    status: 'available',
-  },
-  {
-    id: 'adopt-006',
-    name: 'น้องข้าวปั้น',
-    species: 'แมว',
-    breed: 'แมวสามสี',
-    sex: 'female',
-    age: '1 ปี 6 เดือน',
-    color: 'สามสี',
-    vaccination: 'ฉีดวัคซีนแล้ว',
-    disease: 'ไม่มีโรคประจำตัว',
-    additionalInfo: '',
-    personality: 'ใจเย็น ชอบอยู่ใกล้คน',
-    location: 'นนทบุรี',
-    emoji: '🐈',
-    cardColor: '#dff3fb',
-    tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
-    status: 'available',
-  },
-];
-
+/** No seeded mock animals — staff/customers create entries via API. Not persisted (needs MSSQL). */
+const animals = [];
 const applications = [];
 
 router.get('/', (_req, res) => {
@@ -226,33 +128,66 @@ router.get('/animals', (req, res) => {
   });
 });
 
-router.post('/staff/login', (req, res) => {
-  const { email, password } = req.body ?? {};
-  const configuredEmail = process.env.ADOPTION_STAFF_EMAIL?.trim().toLowerCase();
-  const configuredPassword = process.env.ADOPTION_STAFF_PASSWORD;
+router.post('/staff/login', async (req, res, next) => {
+  try {
+    const { email, password } = req.body ?? {};
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+    }
 
-  if (!configuredEmail || !configuredPassword) {
-    return res.status(503).json({ error: 'ยังไม่ได้ตั้งค่าบัญชีพนักงานใน Backend' });
+    const normalizedEmail = email.trim().toLowerCase();
+    let accepted = false;
+
+    const dbUser = await findUserByEmail(normalizedEmail);
+    if (
+      dbUser
+      && dbUser.active !== false
+      && dbUser.role === 'adoption_staff'
+      && await verifyUserPassword(password, dbUser)
+    ) {
+      accepted = true;
+    }
+
+    // Optional env override for local ops (legacy).
+    const configuredEmail = process.env.ADOPTION_STAFF_EMAIL?.trim().toLowerCase();
+    const configuredPassword = process.env.ADOPTION_STAFF_PASSWORD;
+    if (
+      !accepted
+      && configuredEmail
+      && configuredPassword
+      && safeEqual(normalizedEmail, configuredEmail)
+      && safeEqual(password, configuredPassword)
+    ) {
+      accepted = true;
+    }
+
+    if (!accepted) {
+      return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+    }
+
+    const now = Date.now();
+    for (const [sessionToken, expiresAt] of staffSessions) {
+      if (expiresAt <= now) staffSessions.delete(sessionToken);
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = now + STAFF_SESSION_DURATION_MS;
+    staffSessions.set(token, expiresAt);
+    return res.json({
+      token,
+      expiresAt: new Date(expiresAt).toISOString(),
+      staff: {
+        id: dbUser?.id || 'adoption-staff',
+        email: normalizedEmail,
+        role: 'adoption_staff',
+        name: dbUser
+          ? [dbUser.firstName, dbUser.lastName].filter(Boolean).join(' ') || normalizedEmail
+          : 'พนักงานหาบ้านสัตว์',
+      },
+    });
+  } catch (error) {
+    next(error);
   }
-
-  if (
-    typeof email !== 'string' ||
-    typeof password !== 'string' ||
-    !safeEqual(email.trim().toLowerCase(), configuredEmail) ||
-    !safeEqual(password, configuredPassword)
-  ) {
-    return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
-  }
-
-  const now = Date.now();
-  for (const [sessionToken, expiresAt] of staffSessions) {
-    if (expiresAt <= now) staffSessions.delete(sessionToken);
-  }
-
-  const token = randomBytes(32).toString('hex');
-  const expiresAt = now + STAFF_SESSION_DURATION_MS;
-  staffSessions.set(token, expiresAt);
-  return res.json({ token, expiresAt: new Date(expiresAt).toISOString() });
 });
 
 router.get('/staff/session', requireAdoptionStaff, (_req, res) => {

@@ -3,8 +3,11 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DEMO_ACCOUNTANT_LOGIN,
   DEMO_ADMIN_LOGIN,
+  DEMO_ADOPTION_STAFF_LOGIN,
   DEMO_DRIVER_LOGIN,
+  DEMO_FIND_HOME_LOGIN,
   DEMO_OWNER_LOGIN,
+  DEMO_SUPER_ADMIN_LOGIN,
   useAuth,
 } from '../AuthContext.jsx';
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
@@ -62,7 +65,7 @@ export default function LoginPage() {
     try {
       let cctvError = '';
       const email = form.email.trim().toLowerCase();
-      if (email === 'admin@petcare.local') {
+      if (email === DEMO_SUPER_ADMIN_LOGIN.email) {
         try {
           const response = await fetch('/api/cctv-auth/login', {
             method: 'POST',
@@ -135,7 +138,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ / บัญชี)">
+    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / หาบ้าน / พนักงานหาบ้าน / Admin / Staff / Super Admin)">
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <div className="alert-soft danger mb-3">
@@ -209,6 +212,12 @@ export default function LoginPage() {
           Owner: {DEMO_OWNER_LOGIN.email} / {DEMO_OWNER_LOGIN.password}
         </p>
         <p className="text-center small text-muted mt-1 mb-0">
+          หาบ้าน: {DEMO_FIND_HOME_LOGIN.email} / {DEMO_FIND_HOME_LOGIN.password}
+        </p>
+        <p className="text-center small text-muted mt-1 mb-0">
+          พนักงานหาบ้าน: {DEMO_ADOPTION_STAFF_LOGIN.email} / {DEMO_ADOPTION_STAFF_LOGIN.password}
+        </p>
+        <p className="text-center small text-muted mt-1 mb-0">
           คนขับ: {DEMO_DRIVER_LOGIN.email} / {DEMO_DRIVER_LOGIN.password}
           {' · '}แอดมิน: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
         </p>
@@ -216,7 +225,10 @@ export default function LoginPage() {
           บัญชี: {DEMO_ACCOUNTANT_LOGIN.email} / {DEMO_ACCOUNTANT_LOGIN.password}
         </p>
         <p className="text-center small text-muted mt-1 mb-0">
-          Super Admin CCTV: admin@petcare.local / 1234
+          Super Admin: {DEMO_SUPER_ADMIN_LOGIN.email} / {DEMO_SUPER_ADMIN_LOGIN.password}
+        </p>
+        <p className="text-center small text-muted mt-1 mb-0">
+          Staff คลินิก: admin@petcare.clinic / vet12345
         </p>
       </form>
     </AuthCard>

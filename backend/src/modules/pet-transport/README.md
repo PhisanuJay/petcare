@@ -1,51 +1,25 @@
-# Pet Transport API (SQLite)
+# Pet Transport API (Microsoft SQL Server)
 
-เก็บข้อมูลจอง / ทริป / แจ้งเตือนในไฟล์ SQLite จริง ที่ `backend/data/petcare-transport.sqlite`
+ข้อมูลจอง / ทริป / แจ้งเตือน / payments อยู่ใน SQL Server database `PetCare`  
+(โมดูล CCTV ยังใช้ SQLite ของตัวเองแยกต่างหาก)
 
-REST API บน SQLite (`backend/data/petcare-transport.sqlite`) คู่กับ `frontend/src/features/pet-transport/`
+## ตั้งค่า
 
-## เริ่มต้น
-
-รัน backend หลักที่พอร์ต `3001` — โมดูลนี้เปิด DB และ migrate อัตโนมัติตอนโหลด routes
+คัดลอก `backend/.env.example` เป็น `backend/.env` แล้วใส่ค่าเชื่อมต่อ SQL Server
 
 ```bash
+cd backend
+npm run db:ping
 npm run dev
 ```
+
+ตารางถูกสร้างอัตโนมัติตอนสตาร์ท (`migrate.js`)
 
 ## Endpoints หลัก
 
 - `GET /api/pet-transport/state` — snapshot ทั้งระบบ
 - `POST /api/pet-transport/bookings` — สร้างการจอง
 - workflow อื่น: confirm-price, assign-driver, payment, trip status, cancel, zones
-ใช้ built-in `node:sqlite` (Node 22+) — ไม่ต้องติดตั้ง DB server
+- `GET /api/payments/*` — โมดูลชำระเงิน / ยกเลิก (MSSQL เดียวกัน)
 
-## รัน
-
-```bash
-cd backend
-npm run dev
-```
-
-Health: `GET http://localhost:3001/health`
-
-## Endpoints หลัก (`/api/pet-transport`)
-
-| Method | Path | คำอธิบาย |
-|--------|------|----------|
-| GET | `/catalog` | zones and clinics; existing hotel rows are retained for historical trip locations |
-| GET | `/snapshot` | ทั้งระบบ (bookings + trips) |
-| GET | `/bookings` | รายการจอง |
-| POST | `/bookings` | สร้างจอง + ทริป |
-| GET | `/bookings/:id` | รายละเอียดจอง |
-| POST | `/bookings/:id/confirm-price` | Admin ยืนยันราคา |
-| POST | `/bookings/:id/mark-paid` | Admin ยืนยันชำระ |
-| POST | `/bookings/:id/owner-confirm-payment` | Owner แจ้งชำระ |
-| GET | `/trips?driverId=` | ทริป (กรองคนขับได้) |
-| POST | `/trips/:id/assign-driver` | มอบหมายคนขับ |
-| POST | `/trips/:id/advance` | อัปเดตสถานะทริป |
-| PATCH | `/trips/:id/schedule` | เปลี่ยนเวลานัด |
-| POST | `/trips/:id/evidence` | แนบรูป |
-| POST | `/trips/:id/issues` | แจ้งปัญหา |
-| GET | `/drivers/:id/notifications` | แจ้งเตือนคนขับ |
-
-Response รูปแบบ: `{ ok: true, data }` หรือ `{ ok: false, error }`
+Health: `GET http://localhost:3001/health` → `engine: "mssql"`

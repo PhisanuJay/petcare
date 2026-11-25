@@ -24,8 +24,6 @@ import {
   ensureUpcomingReminders,
   updateZones,
   updateHotelRoomPrices,
-  resetTransportDemo,
-  purgeDemoDriverJobs,
   toAssignDriver,
 } from './store.js';
 
@@ -115,7 +113,5 @@ export function useTransport() {
     ensureUpcomingReminders,
     updateZones,
     updateHotelRoomPrices,
-    resetTransportDemo,
-    purgeDemoDriverJobs,
   };
 }

@@ -117,36 +117,6 @@ export const ISSUE_REASONS = [
   { id: 'other', label: 'อื่น ๆ' },
 ];
 
-export const DEMO_CLINICS = [
-  {
-    id: 'clinic-1',
-    name: 'คลินิกมะแอ่ว',
-    address: '99/9 ถนนพหลโยธิน แขวงจตุจักร เขตจตุจักร กรุงเทพฯ 10900',
-    districtId: 'chatuchak',
-    subdistrictId: 'chatuchak',
-    zoneId: '1',
-  },
-];
-
-export const DEMO_HOTELS = [
-  {
-    id: 'hotel-1',
-    name: 'PetCare Hotel ลาดยาว',
-    address: '45 ถ.วิภาวดี แขวงลาดยาว',
-    districtId: 'chatuchak',
-    subdistrictId: 'latyao',
-    zoneId: '2',
-  },
-  {
-    id: 'hotel-2',
-    name: 'Cat Nest จันทรเกษม',
-    address: '12 ถ.ประดิพัทธ์ แขวงจันทรเกษม',
-    districtId: 'chatuchak',
-    subdistrictId: 'chantharakasem',
-    zoneId: '2',
-  },
-];
-
 export function tripStatusMeta(id) {
   return TRIP_STATUSES.find((s) => s.id === id) ?? TRIP_STATUSES[0];
 }

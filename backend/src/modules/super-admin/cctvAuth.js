@@ -1,9 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { DatabaseSync } from 'node:sqlite';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
+import { queryOne } from '../../db/mssql.js';
+import { migrateCctv } from './cctvMigrate.js';
 
 const COOKIE_NAME = 'cathotel';
 const SESSION_MAX_AGE_SECONDS = 12 * 60 * 60;
@@ -18,9 +17,19 @@ const PERMISSION_KEYS = [
   'view_logs',
   'view_settings',
 ];
-const databasePath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'data', 'cathotel.sqlite');
-const database = new DatabaseSync(databasePath, { readOnly: true });
+
 const sessions = new Map();
+let readyPromise = null;
+
+export function ensureCctvReady() {
+  if (!readyPromise) {
+    readyPromise = migrateCctv().catch((error) => {
+      readyPromise = null;
+      throw error;
+    });
+  }
+  return readyPromise;
+}
 
 function getSessionToken(req) {
   const cookie = req.headers.cookie || '';
@@ -29,14 +38,15 @@ function getSessionToken(req) {
   return entry ? entry.slice(COOKIE_NAME.length + 1) : '';
 }
 
-function findUserById(id) {
-  return database.prepare(
+async function findUserById(id) {
+  return queryOne(
     `SELECT id, email, role, display_name, is_active
-     FROM users WHERE id = ? AND is_active = 1`,
-  ).get(id);
+     FROM dbo.cctv_users WHERE id = ? AND is_active = 1`,
+    [id],
+  );
 }
 
-function findSessionUser(token) {
+async function findSessionUser(token) {
   const session = sessions.get(token);
   if (!session) return null;
   if (session.expiresAt <= Date.now()) {
@@ -46,10 +56,11 @@ function findSessionUser(token) {
   return findUserById(session.userId);
 }
 
-function publicUser(user) {
-  const permissionRow = database.prepare(
-    'SELECT * FROM staff_permissions WHERE user_id = ?',
-  ).get(user.id);
+async function publicUser(user) {
+  const permissionRow = await queryOne(
+    'SELECT * FROM dbo.cctv_staff_permissions WHERE user_id = ?',
+    [user.id],
+  );
   const isSuper = user.role === 'admin' && Number(user.id) === 1;
   const permissions = Object.fromEntries(
     PERMISSION_KEYS.map((key) => [key, isSuper || Boolean(permissionRow?.[key])]),
@@ -66,25 +77,30 @@ function publicUser(user) {
   };
 }
 
-export function getCctvRequestUser(req) {
+export async function getCctvRequestUser(req) {
+  await ensureCctvReady();
   const token = getSessionToken(req);
-  const user = token ? findSessionUser(token) : null;
+  const user = token ? await findSessionUser(token) : null;
   return user ? publicUser(user) : null;
 }
 
 export function requireCctvPermission(permission) {
-  return (req, res, next) => {
-    const user = getCctvRequestUser(req);
-    if (!user) {
-      res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'กรุณาเข้าสู่ระบบ' } });
-      return;
+  return async (req, res, next) => {
+    try {
+      const user = await getCctvRequestUser(req);
+      if (!user) {
+        res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'กรุณาเข้าสู่ระบบ' } });
+        return;
+      }
+      if (!user.isSuper && !user.permissions[permission]) {
+        res.status(403).json({ error: { code: 'FORBIDDEN', message: 'ไม่มีสิทธิ์ดำเนินการนี้' } });
+        return;
+      }
+      req.cctvUser = user;
+      next();
+    } catch (error) {
+      next(error);
     }
-    if (!user.isSuper && !user.permissions[permission]) {
-      res.status(403).json({ error: { code: 'FORBIDDEN', message: 'ไม่มีสิทธิ์ดำเนินการนี้' } });
-      return;
-    }
-    req.cctvUser = user;
-    next();
   };
 }
 
@@ -103,6 +119,15 @@ function unauthorized(res) {
 
 const router = Router();
 
+router.use(async (_req, _res, next) => {
+  try {
+    await ensureCctvReady();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/brand', (_req, res) => {
   res.json({ hotelName: 'PetCare Hotel' });
 });
@@ -116,14 +141,15 @@ router.post('/login', async (req, res) => {
   }
 
   const user = loginName.toLowerCase() === 'admin'
-    ? database.prepare(
+    ? await queryOne(
+      `SELECT TOP 1 id, email, password_hash, role, display_name, is_active
+       FROM dbo.cctv_users WHERE role = N'admin' AND is_active = 1 ORDER BY id`,
+    )
+    : await queryOne(
       `SELECT id, email, password_hash, role, display_name, is_active
-       FROM users WHERE role = 'admin' AND is_active = 1 ORDER BY id LIMIT 1`,
-    ).get()
-    : database.prepare(
-      `SELECT id, email, password_hash, role, display_name, is_active
-       FROM users WHERE lower(email) = ? AND is_active = 1`,
-    ).get(loginName.toLowerCase());
+       FROM dbo.cctv_users WHERE lower(email) = ? AND is_active = 1`,
+      [loginName.toLowerCase()],
+    );
 
   if (!user || !(await bcrypt.compare(password, user.password_hash))) {
     unauthorized(res);
@@ -136,18 +162,18 @@ router.post('/login', async (req, res) => {
     expiresAt: Date.now() + SESSION_MAX_AGE_MS,
   });
   setSessionCookie(res, token);
-  res.json({ user: publicUser(user) });
+  res.json({ user: await publicUser(user) });
 });
 
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   const token = getSessionToken(req);
-  const user = token ? findSessionUser(token) : null;
+  const user = token ? await findSessionUser(token) : null;
   if (!user) {
     if (token) sessions.delete(token);
     res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'กรุณาเข้าสู่ระบบ' } });
     return;
   }
-  res.json({ user: publicUser(user) });
+  res.json({ user: await publicUser(user) });
 });
 
 router.post('/logout', (req, res) => {

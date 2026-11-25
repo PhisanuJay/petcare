@@ -240,14 +240,6 @@ export async function updateHotelRoomPrices(rooms) {
   await mutate(() => transportApi.updateHotelRoomPrices(rooms));
 }
 
-export async function resetTransportDemo() {
-  await mutate(() => transportApi.resetDemo());
-}
-
-export async function purgeDemoDriverJobs() {
-  await mutate(() => transportApi.purgeDemoJobs());
-}
-
 export function enrichBooking(booking, state = cache, drivers = []) {
   if (!booking) return null;
   const trips = state.trips

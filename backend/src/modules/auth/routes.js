@@ -13,6 +13,7 @@ import {
   revokeCustomerSession,
   updateCustomer,
 } from './store.js';
+import { listActiveOwners, listUsersByRole, upsertUser } from './usersRepository.js';
 
 const router = Router();
 const scrypt = promisify(scryptCallback);
@@ -34,8 +35,10 @@ async function hashPassword(password, salt) {
 }
 
 async function verifyPassword(password, user) {
-  const candidate = await scrypt(password, user?.salt || 'invalid-customer', 64);
-  const expected = user ? Buffer.from(user.passwordHash, 'hex') : Buffer.alloc(64);
+  if (!user?.salt || !user?.passwordHash) return false;
+  const keyLen = Buffer.from(user.passwordHash, 'hex').length || 64;
+  const candidate = await scrypt(password, user.salt, keyLen);
+  const expected = Buffer.from(user.passwordHash, 'hex');
   return expected.length === candidate.length && timingSafeEqual(expected, candidate);
 }
 
@@ -44,24 +47,48 @@ function createLoginResponse(user, remember) {
   return { user: publicCustomer(user), token, expiresAt: new Date(expiresAt).toISOString() };
 }
 
-router.post('/staff/login', (req, res) => {
-  const { email, password } = req.body ?? {};
-  const account = checkStaffLogin(email, password);
-  if (!account) return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
-  res.json({ token: createSession(account.id), staff: toPublicStaff(account) });
+router.post('/staff/login', async (req, res, next) => {
+  try {
+    const { email, password } = req.body ?? {};
+    const account = await checkStaffLogin(email, password);
+    if (!account) return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
+    res.json({ token: createSession(account.id), staff: toPublicStaff(account) });
+  } catch (error) {
+    next(error);
+  }
 });
 
-router.get('/staff/me', (req, res) => {
-  const token = bearerToken(req);
-  const staff = token ? findStaffById(sessionStaffId(token)) : null;
-  if (!staff) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ' });
-  res.json(toPublicStaff(staff));
+router.get('/staff/me', async (req, res, next) => {
+  try {
+    const token = bearerToken(req);
+    const staff = token ? await findStaffById(sessionStaffId(token)) : null;
+    if (!staff) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ' });
+    res.json(toPublicStaff(staff));
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post('/staff/logout', (req, res) => {
   const token = bearerToken(req);
   if (token) destroySession(token);
   res.json({ ok: true });
+});
+
+router.get('/owners', async (_req, res, next) => {
+  try {
+    const owners = await listActiveOwners();
+    res.json({
+      owners: owners.map((user) => ({
+        id: user.id,
+        email: user.email,
+        displayName: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email,
+        isActive: user.active !== false,
+      })),
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.post('/register', async (req, res) => {
@@ -80,25 +107,40 @@ router.post('/register', async (req, res) => {
   ) {
     return res.status(400).json({ error: 'กรุณาตรวจสอบข้อมูลสมัครสมาชิก' });
   }
-  if (findCustomerByEmail(normalizedEmail)) {
+  if (await findCustomerByEmail(normalizedEmail)) {
     return res.status(409).json({ error: 'อีเมลนี้ถูกใช้สมัครแล้ว ลองเข้าสู่ระบบแทน' });
   }
 
   const salt = randomBytes(16).toString('hex');
   const passwordHash = await hashPassword(password, salt);
-  const user = createCustomer({
-    id: randomUUID(),
-    firstName: firstName.trim(),
-    lastName: lastName.trim(),
-    email: normalizedEmail,
-    phone: phone.replace(/[-\s]/g, ''),
-    salt,
-    passwordHash,
-    createdAt: new Date().toISOString(),
-  });
-
-  return res.status(201).json(createLoginResponse(user, remember));
+  try {
+    const user = await createCustomer({
+      id: randomUUID(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: normalizedEmail,
+      phone: phone.replace(/[-\s]/g, ''),
+      salt,
+      passwordHash,
+      role: 'owner',
+      points: 50,
+      createdAt: new Date().toISOString(),
+    });
+    return res.status(201).json(createLoginResponse(user, remember));
+  } catch (error) {
+    if (error.status === 409) return res.status(409).json({ error: error.message });
+    throw error;
+  }
 });
+
+const APP_LOGIN_ROLES = new Set([
+  'owner',
+  'admin',
+  'driver',
+  'accountant',
+  'super_admin',
+  'find_home',
+]);
 
 router.post('/login', async (req, res) => {
   const { email, password, remember = true } = req.body ?? {};
@@ -106,11 +148,66 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'กรุณากรอกอีเมลและรหัสผ่าน' });
   }
 
-  const user = findCustomerByEmail(email.trim().toLowerCase());
-  if (!(await verifyPassword(password, user))) {
+  const user = await findCustomerByEmail(email.trim().toLowerCase());
+  if (
+    !user
+    || user.active === false
+    || !APP_LOGIN_ROLES.has(user.role)
+    || !(await verifyPassword(password, user))
+  ) {
     return res.status(401).json({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' });
   }
   return res.json(createLoginResponse(user, remember));
+});
+
+router.post('/drivers', requireCustomer, async (req, res, next) => {
+  try {
+    if (req.customer.role !== 'admin') {
+      return res.status(403).json({ error: 'เฉพาะแอดมินเท่านั้นที่สร้างบัญชีคนขับได้' });
+    }
+    const { firstName, lastName, email, phone, password, vehicle } = req.body ?? {};
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    if (!validName(firstName) || !validName(lastName) || !validEmail(normalizedEmail)) {
+      return res.status(400).json({ error: 'กรุณาตรวจสอบข้อมูลคนขับ' });
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ error: 'รหัสผ่านอย่างน้อย 8 ตัวอักษร' });
+    }
+    if (await findCustomerByEmail(normalizedEmail)) {
+      return res.status(409).json({ error: 'อีเมลนี้มีในระบบแล้ว' });
+    }
+    const salt = randomBytes(16).toString('hex');
+    const passwordHash = await hashPassword(password, salt);
+    const user = await upsertUser({
+      id: randomUUID(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email: normalizedEmail,
+      phone: typeof phone === 'string' ? phone.trim() : '',
+      role: 'driver',
+      vehicle: typeof vehicle === 'string' ? vehicle.trim() : '',
+      salt,
+      passwordHash,
+      active: true,
+      points: 0,
+      createdAt: new Date().toISOString(),
+    });
+    return res.status(201).json({ user: publicCustomer(user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get('/drivers', requireCustomer, async (req, res, next) => {
+  try {
+    if (req.customer.role !== 'admin') {
+      return res.status(403).json({ error: 'เฉพาะแอดมินเท่านั้น' });
+    }
+    const drivers = await listUsersByRole('driver');
+    res.json({ drivers: drivers.map(publicCustomer) });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get('/session', requireCustomer, (req, res) => {
@@ -122,7 +219,7 @@ router.post('/logout', requireCustomer, (req, res) => {
   res.json({ ok: true });
 });
 
-router.patch('/profile', requireCustomer, (req, res) => {
+router.patch('/profile', requireCustomer, async (req, res) => {
   const patch = {};
   const { firstName, lastName, email, phone } = req.body ?? {};
 
@@ -137,7 +234,7 @@ router.patch('/profile', requireCustomer, (req, res) => {
   if (email !== undefined) {
     const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     if (!validEmail(normalizedEmail)) return res.status(400).json({ error: 'รูปแบบอีเมลไม่ถูกต้อง' });
-    const existing = findCustomerByEmail(normalizedEmail);
+    const existing = await findCustomerByEmail(normalizedEmail);
     if (existing && existing.id !== req.customer.id) {
       return res.status(409).json({ error: 'อีเมลนี้มีผู้ใช้อื่นใช้แล้ว' });
     }
@@ -153,7 +250,7 @@ router.patch('/profile', requireCustomer, (req, res) => {
     return res.status(400).json({ error: 'ไม่มีข้อมูลบัญชีให้แก้ไข' });
   }
 
-  const user = updateCustomer(req.customer.id, patch);
+  const user = await updateCustomer(req.customer.id, patch);
   return res.json({ user: publicCustomer(user) });
 });
 
@@ -168,7 +265,7 @@ router.patch('/password', requireCustomer, async (req, res) => {
 
   const salt = randomBytes(16).toString('hex');
   const passwordHash = await hashPassword(newPassword, salt);
-  updateCustomer(req.customer.id, { salt, passwordHash });
+  await updateCustomer(req.customer.id, { salt, passwordHash });
   return res.json({ ok: true });
 });
 

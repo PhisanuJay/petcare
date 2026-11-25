@@ -92,6 +92,4 @@ export const transportApi = {
     request('/zones', { method: 'PUT', body: JSON.stringify({ zones }) }),
   updateHotelRoomPrices: (rooms) =>
     request('/hotel-room-prices', { method: 'PUT', body: JSON.stringify({ rooms }) }),
-  resetDemo: () => request('/reset-demo', { method: 'POST', body: '{}' }),
-  purgeDemoJobs: () => request('/purge-demo-jobs', { method: 'POST', body: '{}' }),
 };

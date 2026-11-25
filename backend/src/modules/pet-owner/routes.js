@@ -409,13 +409,13 @@ function cctvAccess(reservation, today) {
 
 router.use('/cctv', requireOwner);
 
-router.get('/cctv/cameras', (req, res, next) => {
+router.get('/cctv/cameras', wrap(async (req, res) => {
   const email = String(req.get('x-owner-email') || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return next(httpError(400, 'ข้อมูลบัญชีลูกค้าไม่ถูกต้อง'));
+    throw httpError(400, 'ข้อมูลบัญชีลูกค้าไม่ถูกต้อง');
   }
-  res.json({ items: listGrantedCamerasForOwner(req.ownerId, email) });
-});
+  res.json({ items: await listGrantedCamerasForOwner(req.ownerId, email) });
+}));
 
 router.get('/cctv', wrap(async (req, res) => {
   const today = todayString();

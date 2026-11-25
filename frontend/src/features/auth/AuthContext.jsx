@@ -1,53 +1,21 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { AUTH_API_URL } from '../../shared/api.js';
-import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
-import { hashPassword, needsPasswordRehash, verifyPassword } from './password.js';
+import { STORAGE_KEYS, readJSON, writeJSON } from '../../shared/utils/storage.js';
 import { ROLES, homePathForRole, normalizeRole } from './roles.js';
 import { API_BASE } from '../pet-owner/api.js';
 import { STAFF_SESSION_EXPIRED, clearStaffSession, readStaffSession, saveStaffSession } from './staffSession.js';
 
 const AuthContext = createContext(null);
 const WELCOME_POINTS = 50;
-const DEMO_DRIVER_ID = 'driver-seed';
-const DEMO_OWNER_ID = 'owner-seed';
 
-const SEED_ADMIN = {
-  email: 'admin@petcare.local',
-  password: 'Admin1234',
-  firstName: 'Admin',
-  lastName: 'PetCare',
-  phone: '0200000000',
-};
-
-const SEED_OWNER = {
-  id: DEMO_OWNER_ID,
-  email: 'owner@petcare.local',
-  password: 'Owner1234',
-  firstName: 'มานี',
-  lastName: 'รักสัตว์',
-  phone: '0810001111',
-};
-
-const SEED_DRIVER = {
-  id: DEMO_DRIVER_ID,
-  email: 'driver@petcare.local',
-  password: '1234',
-  firstName: 'สมชาย',
-  lastName: 'คนขับ',
-  phone: '0890001122',
-  vehicle: 'รถตู้',
-  plateNumber: 'สก 1234',
-  licenseNumber: 'DL-88001234',
-  licenseExpiry: '2028-12-31',
-};
-
-const SEED_ACCOUNTANT = {
-  email: 'accountant@petcare.local',
-  password: 'Account1234',
-  firstName: 'ฝ่าย',
-  lastName: 'บัญชี',
-  phone: '0200000001',
-};
+/** Hint credentials — accounts are seeded in dbo.users. */
+export const DEMO_OWNER_LOGIN = { email: 'owner@petcare.local', password: 'Owner1234' };
+export const DEMO_ADMIN_LOGIN = { email: 'admin@petcare.local', password: 'Admin1234' };
+export const DEMO_DRIVER_LOGIN = { email: 'driver@petcare.local', password: '1234' };
+export const DEMO_ACCOUNTANT_LOGIN = { email: 'accountant@petcare.local', password: 'Account1234' };
+export const DEMO_SUPER_ADMIN_LOGIN = { email: 'superadmin@petcare.local', password: '1234' };
+export const DEMO_FIND_HOME_LOGIN = { email: 'findhome@petcare.local', password: 'FindHome1234' };
+export const DEMO_ADOPTION_STAFF_LOGIN = { email: 'adoption@petcare.local', password: 'Adoption1234' };
 
 const usersListeners = new Set();
 
@@ -86,93 +54,31 @@ function toPublicUser(user) {
   return { ...rest, role: normalizeRole(rest.role) };
 }
 
-async function upsertSeedUser(users, seed, role) {
-  const existing = users.find((user) => user.email === seed.email || (seed.id && user.id === seed.id));
-  const salt = newId();
-  const passwordHash = await hashPassword(seed.password, salt);
-  const base = {
-    id: seed.id || existing?.id || newId(),
-    firstName: seed.firstName,
-    lastName: seed.lastName,
-    email: seed.email,
-    phone: seed.phone || '',
-    address: existing?.address || '',
-    emergencyName: existing?.emergencyName || '',
-    emergencyPhone: existing?.emergencyPhone || '',
-    avatar: existing?.avatar || '',
-    points: existing?.points ?? (role === ROLES.owner ? WELCOME_POINTS : 0),
-    role,
-    vehicle: seed.vehicle || existing?.vehicle || '',
-    plateNumber: seed.plateNumber || existing?.plateNumber || '',
-    licenseNumber: seed.licenseNumber || existing?.licenseNumber || '',
-    licenseExpiry: seed.licenseExpiry || existing?.licenseExpiry || '',
-    active: true,
-    createdAt: existing?.createdAt || new Date().toISOString(),
-    salt,
-    passwordHash,
+function cachePublicUser(serverUser) {
+  const users = loadUsers();
+  const existing = users.find((user) => user.id === serverUser.id || user.email === serverUser.email);
+  const nextUser = {
+    ...(existing || {}),
+    ...serverUser,
+    role: normalizeRole(serverUser.role),
+    points: serverUser.points ?? existing?.points ?? (serverUser.role === ROLES.owner ? WELCOME_POINTS : 0),
   };
-
-  if (!existing) {
-    users.push(base);
-    return true;
-  }
-
-  const passwordOk = await verifyPassword(seed.password, existing.salt, existing.passwordHash);
-  const needsSync =
-    existing.id !== base.id
-    || existing.role !== role
-    || existing.active === false
-    || !passwordOk
-    || needsPasswordRehash(existing.passwordHash);
-  if (!needsSync) return false;
-
-  const index = users.findIndex((user) => user.id === existing.id || user.email === seed.email);
-  if (index >= 0) users[index] = { ...existing, ...base };
-  return true;
-}
-
-async function ensureUsersBootstrapped() {
-  let users = loadUsersRaw();
-  let changed = false;
-
-  const withoutFinanceSeed = users.filter(
-    (user) => user.id !== 'finance-seed' && user.email !== 'finance@petcare.local',
-  );
-  if (withoutFinanceSeed.length !== users.length) changed = true;
-  users = withoutFinanceSeed.map((user) => {
-    if (user.role !== 'finance') return user;
-    changed = true;
-    return { ...user, role: ROLES.owner };
-  });
-
-  users = users.map((user) => {
-    if (user.role) return user;
-    changed = true;
-    return { ...user, role: ROLES.owner };
-  });
-
-  if (await upsertSeedUser(users, SEED_ADMIN, ROLES.admin)) changed = true;
-  if (await upsertSeedUser(users, SEED_OWNER, ROLES.owner)) changed = true;
-  if (await upsertSeedUser(users, SEED_DRIVER, ROLES.driver)) changed = true;
-  if (await upsertSeedUser(users, SEED_ACCOUNTANT, ROLES.accountant)) changed = true;
-
-  if (changed) saveUsers(users);
-  return users;
-}
-
-let bootPromise = null;
-function bootUsers() {
-  if (!bootPromise) {
-    bootPromise = ensureUsersBootstrapped().catch((error) => {
-      bootPromise = null;
-      throw error;
-    });
-  }
-  return bootPromise;
+  delete nextUser.passwordHash;
+  delete nextUser.salt;
+  saveUsers([...users.filter((item) => item.id !== nextUser.id && item.email !== nextUser.email), nextUser]);
+  return nextUser;
 }
 
 export async function listLocalOwnerAccounts() {
-  await bootUsers();
+  try {
+    const response = await fetch(`${AUTH_API_URL}/owners`, { credentials: 'include' });
+    const body = await response.json().catch(() => ({}));
+    if (response.ok && Array.isArray(body.owners)) {
+      return body.owners.sort((left, right) => left.displayName.localeCompare(right.displayName, 'th'));
+    }
+  } catch {
+    /* fall through to local cache */
+  }
   return loadUsers()
     .filter((user) => user.role === ROLES.owner && user.active !== false)
     .map((user) => ({
@@ -208,7 +114,7 @@ function localUserFromServer(serverUser, existingUser) {
       emergencyName: '',
       emergencyPhone: '',
       avatar: '',
-      points: WELCOME_POINTS,
+      points: serverUser.role === ROLES.owner ? WELCOME_POINTS : 0,
     };
   delete localFields.passwordHash;
   delete localFields.salt;
@@ -216,7 +122,7 @@ function localUserFromServer(serverUser, existingUser) {
     ...localFields,
     ...serverUser,
     id: existingUser?.id ?? serverUser.id,
-    role: ROLES.owner,
+    role: normalizeRole(serverUser.role || existingUser?.role || ROLES.owner),
   };
 }
 
@@ -266,26 +172,36 @@ export function memberTier(points = 0) {
 export function AuthProvider({ children }) {
   const [authState, setAuthState] = useState(loadAuthState);
   const [usersVersion, setUsersVersion] = useState(0);
+  const [remoteDrivers, setRemoteDrivers] = useState([]);
   const { currentUser, authToken } = authState;
   const [currentStaff, setCurrentStaff] = useState(() => readStaffSession()?.staff ?? null);
-
-  useEffect(() => {
-    let cancelled = false;
-    bootUsers().then(() => {
-      if (cancelled) return;
-      setAuthState(loadAuthState());
-      setUsersVersion((version) => version + 1);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     const onExpired = () => setCurrentStaff(null);
     window.addEventListener(STAFF_SESSION_EXPIRED, onExpired);
     return () => window.removeEventListener(STAFF_SESSION_EXPIRED, onExpired);
   }, []);
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== ROLES.admin || !authToken) {
+      setRemoteDrivers([]);
+      return undefined;
+    }
+    let cancelled = false;
+    requestAuth('/drivers', { token: authToken })
+      .then((result) => {
+        if (cancelled) return;
+        const list = Array.isArray(result.drivers) ? result.drivers.map(toPublicUser) : [];
+        list.forEach((driver) => cachePublicUser(driver));
+        setRemoteDrivers(list);
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteDrivers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authToken, currentUser]);
 
   const bumpUsers = useCallback(() => setUsersVersion((version) => version + 1), []);
 
@@ -301,16 +217,12 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async ({ firstName, lastName, email, phone, password }) => {
-    await bootUsers();
     const result = await requestAuth('/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firstName, lastName, email, phone, password, remember: true }),
     });
-    const users = loadUsers();
-    const existing = users.find((user) => user.email === result.user.email);
-    const user = localUserFromServer(result.user, existing);
-    saveUsers([...users.filter((item) => item.id !== user.id), user]);
+    const user = cachePublicUser(localUserFromServer(result.user));
     bumpUsers();
     clearStaffSession();
     setCurrentStaff(null);
@@ -319,48 +231,24 @@ export function AuthProvider({ children }) {
   }, [bumpUsers, setCurrentStaff, startSession]);
 
   const login = useCallback(async (email, password, remember = true) => {
-    await bootUsers();
     const normalizedEmail = email.trim().toLowerCase();
-    const users = loadUsers();
-    const localUser = users.find((user) => user.email === normalizedEmail);
-
-    if (localUser?.salt && localUser?.passwordHash) {
-      const passwordMatches = await verifyPassword(password, localUser.salt, localUser.passwordHash);
-      if (passwordMatches) {
-        if (localUser.active === false) throw new Error('บัญชีนี้ถูกระงับการใช้งาน ติดต่อแอดมิน');
-        let user = localUser;
-        if (needsPasswordRehash(localUser.passwordHash)) {
-          const salt = newId();
-          const passwordHash = await hashPassword(password, salt);
-          user = { ...localUser, salt, passwordHash };
-          saveUsers(users.map((item) => (item.id === user.id ? user : item)));
-          bumpUsers();
-        }
-        if (user.role === ROLES.accountant) {
-          const staffSession = await requestAccountantSession(normalizedEmail, password);
-          saveStaffSession({ token: staffSession.token, staff: staffSession.staff }, remember);
-          setCurrentStaff(staffSession.staff);
-        } else {
-          clearStaffSession();
-          setCurrentStaff(null);
-        }
-        startSession(user, remember);
-        return toPublicUser(user);
-      }
-      throw new Error('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-    }
-
     const result = await requestAuth('/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: normalizedEmail, password, remember }),
     });
-    const existing = users.find((user) => user.email === result.user.email);
-    const user = localUserFromServer(result.user, existing);
-    saveUsers([...users.filter((item) => item.id !== user.id), user]);
+    const user = cachePublicUser(localUserFromServer(result.user));
     bumpUsers();
-    clearStaffSession();
-    setCurrentStaff(null);
+
+    if (normalizeRole(user.role) === ROLES.accountant) {
+      const staffSession = await requestAccountantSession(normalizedEmail, password);
+      saveStaffSession({ token: staffSession.token, staff: staffSession.staff }, remember);
+      setCurrentStaff(staffSession.staff);
+    } else {
+      clearStaffSession();
+      setCurrentStaff(null);
+    }
+
     startSession(user, remember, result.token);
     return toPublicUser(user);
   }, [bumpUsers, setCurrentStaff, startSession]);
@@ -434,63 +322,34 @@ export function AuthProvider({ children }) {
 
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบ');
-    if (authToken) {
-      await requestAuth('/password', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        token: authToken,
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-      return;
-    }
-
-    const users = loadUsers();
-    const user = users.find((item) => item.id === currentUser.id);
-    if (!user || !(await verifyPassword(currentPassword, user.salt, user.passwordHash))) {
-      throw new Error('รหัสผ่านปัจจุบันไม่ถูกต้อง');
-    }
-    const salt = newId();
-    const passwordHash = await hashPassword(newPassword, salt);
-    saveUsers(users.map((item) => (item.id === user.id ? { ...item, salt, passwordHash } : item)));
-    bumpUsers();
-  }, [authToken, bumpUsers, currentUser]);
+    if (!authToken) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+    await requestAuth('/password', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      token: authToken,
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }, [authToken, currentUser]);
 
   const createDriver = useCallback(async ({ firstName, lastName, email, phone, password, vehicle }) => {
     if (!currentUser || currentUser.role !== ROLES.admin) {
       throw new Error('เฉพาะแอดมินเท่านั้นที่สร้างบัญชีคนขับได้');
     }
-    await bootUsers();
-    const users = loadUsers();
-    const normalizedEmail = email.trim().toLowerCase();
-    if (users.some((user) => user.email === normalizedEmail)) throw new Error('อีเมลนี้มีในระบบแล้ว');
-    if (!password || password.length < 8) throw new Error('รหัสผ่านอย่างน้อย 8 ตัวอักษร');
-    const salt = newId();
-    const user = {
-      id: newId(),
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      email: normalizedEmail,
-      phone: (phone || '').trim(),
-      address: '',
-      emergencyName: '',
-      emergencyPhone: '',
-      avatar: '',
-      points: 0,
-      role: ROLES.driver,
-      vehicle: (vehicle || '').trim(),
-      plateNumber: '',
-      licenseNumber: '',
-      licenseExpiry: '',
-      active: true,
-      createdAt: new Date().toISOString(),
-      createdBy: currentUser.id,
-      salt,
-      passwordHash: await hashPassword(password, salt),
-    };
-    saveUsers([...users, user]);
+    if (!authToken) throw new Error('กรุณาเข้าสู่ระบบใหม่');
+    const result = await requestAuth('/drivers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      token: authToken,
+      body: JSON.stringify({ firstName, lastName, email, phone, password, vehicle }),
+    });
+    const user = cachePublicUser(localUserFromServer(result.user));
+    setRemoteDrivers((prev) => {
+      const next = [...prev.filter((item) => item.id !== user.id), toPublicUser(user)];
+      return next.sort((left, right) => left.firstName.localeCompare(right.firstName, 'th'));
+    });
     bumpUsers();
     return toPublicUser(user);
-  }, [bumpUsers, currentUser]);
+  }, [authToken, bumpUsers, currentUser]);
 
   const updateDriver = useCallback((driverId, patch) => {
     if (!currentUser || currentUser.role !== ROLES.admin) throw new Error('เฉพาะแอดมินเท่านั้น');
@@ -526,12 +385,15 @@ export function AuthProvider({ children }) {
   }, [bumpUsers, currentUser]);
 
   const drivers = useMemo(() => {
+    if (remoteDrivers.length) {
+      return [...remoteDrivers].sort((left, right) => left.firstName.localeCompare(right.firstName, 'th'));
+    }
     void usersVersion;
     return loadUsers()
       .filter((user) => user.role === ROLES.driver)
       .map(toPublicUser)
       .sort((left, right) => left.firstName.localeCompare(right.firstName, 'th'));
-  }, [usersVersion]);
+  }, [remoteDrivers, usersVersion]);
 
   const value = useMemo(() => ({
     currentUser,
@@ -574,8 +436,3 @@ export function useAuth() {
   if (!context) throw new Error('useAuth must be used inside <AuthProvider>');
   return context;
 }
-
-export const DEMO_OWNER_LOGIN = { email: SEED_OWNER.email, password: SEED_OWNER.password };
-export const DEMO_ADMIN_LOGIN = { email: SEED_ADMIN.email, password: SEED_ADMIN.password };
-export const DEMO_DRIVER_LOGIN = { email: SEED_DRIVER.email, password: SEED_DRIVER.password };
-export const DEMO_ACCOUNTANT_LOGIN = { email: SEED_ACCOUNTANT.email, password: SEED_ACCOUNTANT.password };

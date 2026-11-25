@@ -11,7 +11,7 @@ import {
 } from './mappers.js';
 import { isRoundTrip, quotePrice } from './pricing.js';
 import { resolveOtherService } from './serviceCatalog.js';
-import { reseedsCatalog, SEED_HOTEL_ROOM_PRICES } from './migrate.js';
+import { SEED_HOTEL_ROOM_PRICES, upsertHotelRoom, upsertZone } from './migrate.js';
 
 const UPCOMING_WINDOW_MS = 2 * 60 * 60 * 1000;
 const MAX_NOTIFICATIONS = 120;
@@ -44,20 +44,19 @@ function canOwnerRequestCancel(booking, trips) {
   return related.every((t) => tripStatusMeta(t.status).step < 4);
 }
 
-function notifyCancelledDrivers(bookingId, booking, adminNote, resolvedAt) {
-  tripsForBooking(bookingId)
-    .filter((trip) => trip.driverId)
-    .forEach((trip) => {
-      pushDriverNotification({
-        driverId: trip.driverId,
-        type: 'cancelled',
-        title: 'งานถูกยกเลิก',
-        body: `${booking.petName || 'สัตว์เลี้ยง'} · เวลารับ ${formatNotifyWhen(trip.pickupTime)}${adminNote ? ` — ${adminNote}` : ''}`,
-        tripId: trip.id,
-        bookingId,
-        dedupeKey: `cancelled:${bookingId}:${trip.driverId}:${resolvedAt}`,
-      });
+async function notifyCancelledDrivers(bookingId, booking, adminNote, resolvedAt) {
+  const trips = await tripsForBooking(bookingId);
+  for (const trip of trips.filter((t) => t.driverId)) {
+    await pushDriverNotification({
+      driverId: trip.driverId,
+      type: 'cancelled',
+      title: 'งานถูกยกเลิก',
+      body: `${booking.petName || 'สัตว์เลี้ยง'} · เวลารับ ${formatNotifyWhen(trip.pickupTime)}${adminNote ? ` — ${adminNote}` : ''}`,
+      tripId: trip.id,
+      bookingId,
+      dedupeKey: `cancelled:${bookingId}:${trip.driverId}:${resolvedAt}`,
     });
+  }
 }
 
 function formatNotifyWhen(iso) {
@@ -72,77 +71,83 @@ function formatNotifyWhen(iso) {
   });
 }
 
-function listZones() {
-  return queryAll('SELECT * FROM zones ORDER BY id').map(mapZone);
+async function listZones() {
+  return (await queryAll('SELECT * FROM dbo.zones ORDER BY id')).map(mapZone);
 }
 
-function listClinics() {
-  return queryAll('SELECT * FROM clinics ORDER BY name').map(mapClinic);
+async function listClinics() {
+  return (await queryAll('SELECT * FROM dbo.clinics ORDER BY name')).map(mapClinic);
 }
 
-function listHotels() {
-  return queryAll('SELECT * FROM hotels ORDER BY name').map(mapHotel);
+async function listHotels() {
+  return (await queryAll('SELECT * FROM dbo.hotels ORDER BY name')).map(mapHotel);
 }
 
-export function getHotelRoomPrices() {
+export async function getHotelRoomPrices() {
+  return (await queryAll(
+    'SELECT room_id AS id, label, price FROM dbo.hotel_room_prices ORDER BY sort_order',
+  )).map((room) => ({ ...room, price: Number(room.price) }));
+}
+
+async function listBookings() {
+  return (await queryAll('SELECT * FROM dbo.bookings ORDER BY created_at DESC')).map(mapBooking);
+}
+
+async function historyForTrip(tripId) {
   return queryAll(
-    'SELECT room_id AS id, label, price FROM hotel_room_prices ORDER BY sort_order',
-  ).map((room) => ({ ...room, price: Number(room.price) }));
-}
-
-function listBookings() {
-  return queryAll('SELECT * FROM bookings ORDER BY created_at DESC').map(mapBooking);
-}
-
-function historyForTrip(tripId) {
-  return queryAll(
-    'SELECT status, at, note FROM trip_status_history WHERE trip_id = ? ORDER BY id ASC',
+    'SELECT status, at, note FROM dbo.trip_status_history WHERE trip_id = ? ORDER BY id ASC',
     [tripId],
   );
 }
 
-function listTrips() {
-  return queryAll('SELECT * FROM trips ORDER BY created_at ASC').map((row) =>
-    mapTrip(row, historyForTrip(row.id)),
-  );
+async function listTrips() {
+  const rows = await queryAll('SELECT * FROM dbo.trips ORDER BY created_at ASC');
+  const trips = [];
+  for (const row of rows) {
+    trips.push(mapTrip(row, await historyForTrip(row.id)));
+  }
+  return trips;
 }
 
-function listIssues() {
-  return queryAll('SELECT * FROM issues ORDER BY created_at DESC').map(mapIssue);
+async function listIssues() {
+  return (await queryAll('SELECT * FROM dbo.issues ORDER BY created_at DESC')).map(mapIssue);
 }
 
-function listNotifications(driverId = null) {
+async function listNotifications(driverId = null) {
   const rows = driverId
-    ? queryAll(
-      'SELECT * FROM notifications WHERE driver_id = ? ORDER BY created_at DESC',
+    ? await queryAll(
+      'SELECT * FROM dbo.notifications WHERE driver_id = ? ORDER BY created_at DESC',
       [driverId],
     )
-    : queryAll('SELECT * FROM notifications ORDER BY created_at DESC');
+    : await queryAll('SELECT * FROM dbo.notifications ORDER BY created_at DESC');
   return rows.map(mapNotification);
 }
 
-function getBookingRow(id) {
-  return queryOne('SELECT * FROM bookings WHERE id = ?', [id]);
+async function getBookingRow(id) {
+  return queryOne('SELECT * FROM dbo.bookings WHERE id = ?', [id]);
 }
 
-function getTripRow(id) {
-  return queryOne('SELECT * FROM trips WHERE id = ?', [id]);
+async function getTripRow(id) {
+  return queryOne('SELECT * FROM dbo.trips WHERE id = ?', [id]);
 }
 
-function tripsForBooking(bookingId) {
-  return queryAll('SELECT * FROM trips WHERE booking_id = ?', [bookingId]).map((row) =>
-    mapTrip(row, historyForTrip(row.id)),
-  );
+async function tripsForBooking(bookingId) {
+  const rows = await queryAll('SELECT * FROM dbo.trips WHERE booking_id = ?', [bookingId]);
+  const trips = [];
+  for (const row of rows) {
+    trips.push(mapTrip(row, await historyForTrip(row.id)));
+  }
+  return trips;
 }
 
-function insertHistory(tripId, status, note = '') {
-  run(
-    'INSERT INTO trip_status_history (trip_id, status, at, note) VALUES (?, ?, ?, ?)',
+async function insertHistory(tripId, status, note = '') {
+  await run(
+    'INSERT INTO dbo.trip_status_history (trip_id, status, at, note) VALUES (?, ?, ?, ?)',
     [tripId, status, new Date().toISOString(), note],
   );
 }
 
-function pushDriverNotification({
+async function pushDriverNotification({
   driverId,
   type,
   title,
@@ -153,35 +158,34 @@ function pushDriverNotification({
 }) {
   if (!driverId) return;
   if (dedupeKey) {
-    const existing = queryOne(
-      'SELECT id FROM notifications WHERE dedupe_key = ? LIMIT 1',
+    const existing = await queryOne(
+      'SELECT TOP 1 id FROM dbo.notifications WHERE dedupe_key = ?',
       [dedupeKey],
     );
     if (existing) return;
   }
-  run(
-    `INSERT INTO notifications
+  await run(
+    `INSERT INTO dbo.notifications
       (id, driver_id, type, title, body, trip_id, booking_id, dedupe_key, read_at, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
     [newId(), driverId, type, title, body, tripId, bookingId, dedupeKey, new Date().toISOString()],
   );
-  const count = queryOne('SELECT COUNT(*) AS c FROM notifications')?.c ?? 0;
+  const count = Number((await queryOne('SELECT COUNT(*) AS c FROM dbo.notifications'))?.c ?? 0);
   if (count > MAX_NOTIFICATIONS) {
     const overflow = count - MAX_NOTIFICATIONS;
-    run(
-      `DELETE FROM notifications WHERE id IN (
-         SELECT id FROM notifications ORDER BY created_at ASC LIMIT ?
+    await run(
+      `DELETE FROM dbo.notifications WHERE id IN (
+         SELECT TOP (${overflow}) id FROM dbo.notifications ORDER BY created_at ASC
        )`,
-      [overflow],
     );
   }
 }
 
-function insertTrip({ bookingId, type, from, to, pickupTime, dropoffTime }) {
+async function insertTrip({ bookingId, type, from, to, pickupTime, dropoffTime }) {
   const id = newId();
   const now = new Date().toISOString();
-  run(
-    `INSERT INTO trips
+  await run(
+    `INSERT INTO dbo.trips
       (id, booking_id, type, driver_id, status, from_json, to_json, pickup_time, dropoff_time,
        evidence_pickup_json, evidence_dropoff_json, created_at)
      VALUES (?, ?, ?, NULL, 'assigned', ?, ?, ?, ?, NULL, NULL, ?)`,
@@ -196,36 +200,36 @@ function insertTrip({ bookingId, type, from, to, pickupTime, dropoffTime }) {
       now,
     ],
   );
-  insertHistory(id, 'assigned', 'สร้างทริป');
+  await insertHistory(id, 'assigned', 'สร้างทริป');
   return id;
 }
 
-export function getState({ includePaymentDetails = false } = {}) {
-  const bookings = listBookings();
+export async function getState({ includePaymentDetails = false } = {}) {
+  const bookings = await listBookings();
   return {
-    zones: listZones(),
-    hotelRoomPrices: getHotelRoomPrices(),
-    clinics: listClinics(),
-    hotels: listHotels(),
+    zones: await listZones(),
+    hotelRoomPrices: await getHotelRoomPrices(),
+    clinics: await listClinics(),
+    hotels: await listHotels(),
     bookings: includePaymentDetails
       ? bookings
       : bookings.map((booking) => ({ ...booking, paymentSlip: '' })),
-    trips: listTrips(),
-    issues: listIssues(),
-    notifications: listNotifications(),
+    trips: await listTrips(),
+    issues: await listIssues(),
+    notifications: await listNotifications(),
     seeded: true,
   };
 }
 
-export function getPricing() {
+export async function getPricing() {
   return {
-    zones: listZones(),
-    hotelRoomPrices: getHotelRoomPrices(),
+    zones: await listZones(),
+    hotelRoomPrices: await getHotelRoomPrices(),
   };
 }
 
-export function createBooking(input) {
-  const zones = listZones();
+export async function createBooking(input) {
+  const zones = await listZones();
   const from = { ...input.from };
   const to = { ...input.to };
   const returnFrom = input.returnFrom ? { ...input.returnFrom } : { ...to };
@@ -254,9 +258,9 @@ export function createBooking(input) {
   const bookingId = newId();
   const now = new Date().toISOString();
 
-  return transaction(() => {
-    run(
-      `INSERT INTO bookings (
+  return transaction(async () => {
+    await run(
+      `INSERT INTO dbo.bookings (
          id, owner_id, owner_name, owner_phone, pet_id, pet_name, pet_species, pet_notes, service_type,
          from_zone_id, to_zone_id, return_from_zone_id, return_to_zone_id, fare_zone_id,
          estimated_quote_json, final_quote_json, status, payment_status, payment_note,
@@ -284,7 +288,7 @@ export function createBooking(input) {
     );
 
     const tripIds = [
-      insertTrip({
+      await insertTrip({
         bookingId,
         type: 'pickup',
         from,
@@ -296,7 +300,7 @@ export function createBooking(input) {
 
     if (isRoundTrip(input.serviceType)) {
       tripIds.push(
-        insertTrip({
+        await insertTrip({
           bookingId,
           type: 'dropoff',
           from: returnFrom,
@@ -307,15 +311,18 @@ export function createBooking(input) {
       );
     }
 
-    const booking = mapBooking(getBookingRow(bookingId));
-    const trips = tripIds.map((id) => mapTrip(getTripRow(id), historyForTrip(id)));
-    return { booking, trips, state: getState() };
+    const booking = mapBooking(await getBookingRow(bookingId));
+    const trips = [];
+    for (const id of tripIds) {
+      trips.push(mapTrip(await getTripRow(id), await historyForTrip(id)));
+    }
+    return { booking, trips, state: await getState() };
   });
 }
 
-export function setBookingOtherService(bookingId, { otherServiceId = null, hotelNights = 1 } = {}) {
-  return transaction(() => {
-    const row = getBookingRow(bookingId);
+export async function setBookingOtherService(bookingId, { otherServiceId = null, hotelNights = 1 } = {}) {
+  return transaction(async () => {
+    const row = await getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const booking = mapBooking(row);
     if (['cancelled', 'completed'].includes(booking.status)) {
@@ -328,7 +335,7 @@ export function setBookingOtherService(bookingId, { otherServiceId = null, hotel
       throw new Error('รับกลับคิดเฉพาะค่ารถ ไม่เพิ่มบริการอื่น');
     }
 
-    const trips = tripsForBooking(bookingId);
+    const trips = await tripsForBooking(bookingId);
     const pickup = trips.find((t) => t.type === 'pickup') || trips[0];
     const facilityPlace = pickup?.to || null;
     const otherService = otherServiceId
@@ -337,14 +344,14 @@ export function setBookingOtherService(bookingId, { otherServiceId = null, hotel
         place: facilityPlace,
         otherServiceId,
         hotelNights,
-        hotelRooms: getHotelRoomPrices(),
+        hotelRooms: await getHotelRoomPrices(),
       })
       : null;
     if (otherServiceId && !otherService) {
       throw new Error('ไม่พบบริการที่เลือก');
     }
 
-    const zones = listZones();
+    const zones = await listZones();
     const estimate = quotePrice({
       fromZoneId: booking.fromZoneId,
       toZoneId: booking.toZoneId,
@@ -361,21 +368,21 @@ export function setBookingOtherService(bookingId, { otherServiceId = null, hotel
       ? 'awaiting_payment'
       : booking.status;
 
-    run(
-      `UPDATE bookings SET estimated_quote_json = ?, final_quote_json = NULL, status = ?, updated_at = ?
+    await run(
+      `UPDATE dbo.bookings SET estimated_quote_json = ?, final_quote_json = NULL, status = ?, updated_at = ?
        WHERE id = ?`,
       [stringifyJson(estimate), nextStatus, now, bookingId],
     );
-    return { booking: mapBooking(getBookingRow(bookingId)), state: getState() };
+    return { booking: mapBooking(await getBookingRow(bookingId)), state: await getState() };
   });
 }
 
-export function confirmPrice(bookingId, { fareZoneId, customPerTrip } = {}) {
-  return transaction(() => {
-    const row = getBookingRow(bookingId);
+export async function confirmPrice(bookingId, { fareZoneId, customPerTrip } = {}) {
+  return transaction(async () => {
+    const row = await getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const b = mapBooking(row);
-    const zones = listZones();
+    const zones = await listZones();
     const override = fareZoneId || b.fareZoneId || b.zoneId;
     const quote = quotePrice({
       fromZoneId: b.fromZoneId || b.estimatedQuote?.fromZoneId,
@@ -390,21 +397,21 @@ export function confirmPrice(bookingId, { fareZoneId, customPerTrip } = {}) {
     });
     if (quote.total == null) throw new Error('ต้องใส่ราคาก่อนยืนยัน');
     const now = new Date().toISOString();
-    run(
-      `UPDATE bookings SET fare_zone_id = ?, final_quote_json = ?, status = 'price_confirmed', updated_at = ?
+    await run(
+      `UPDATE dbo.bookings SET fare_zone_id = ?, final_quote_json = ?, status = 'price_confirmed', updated_at = ?
        WHERE id = ?`,
       [quote.fareZoneId, stringifyJson(quote), now, bookingId],
     );
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function assignDriver(tripId, driverId, driverLabel = '') {
-  return transaction(() => {
-    const tripRow = getTripRow(tripId);
+export async function assignDriver(tripId, driverId, driverLabel = '') {
+  return transaction(async () => {
+    const tripRow = await getTripRow(tripId);
     if (!tripRow) throw new Error('ไม่พบทริป');
-    const trip = mapTrip(tripRow, historyForTrip(tripId));
-    const bookingRow = getBookingRow(trip.bookingId);
+    const trip = mapTrip(tripRow, await historyForTrip(tripId));
+    const bookingRow = await getBookingRow(trip.bookingId);
     const booking = mapBooking(bookingRow);
     if (booking?.paymentStatus !== 'paid') {
       throw new Error('รอฝ่ายบัญชียืนยันการชำระเงินก่อนมอบหมายคนขับ');
@@ -413,7 +420,7 @@ export function assignDriver(tripId, driverId, driverLabel = '') {
     const petName = booking?.petName || 'สัตว์เลี้ยง';
 
     if (prevDriverId && prevDriverId !== driverId) {
-      pushDriverNotification({
+      await pushDriverNotification({
         driverId: prevDriverId,
         type: 'cancelled',
         title: 'งานถูกมอบหมายให้คนขับอื่น',
@@ -423,11 +430,11 @@ export function assignDriver(tripId, driverId, driverLabel = '') {
       });
     }
 
-    run(`UPDATE trips SET driver_id = ?, status = 'assigned' WHERE id = ?`, [driverId, tripId]);
-    insertHistory(tripId, 'assigned', `มอบหมายคนขับ ${driverLabel || driverId}`);
+    await run(`UPDATE dbo.trips SET driver_id = ?, status = 'assigned' WHERE id = ?`, [driverId, tripId]);
+    await insertHistory(tripId, 'assigned', `มอบหมายคนขับ ${driverLabel || driverId}`);
 
     if (driverId && driverId !== prevDriverId) {
-      pushDriverNotification({
+      await pushDriverNotification({
         driverId,
         type: 'assigned',
         title: 'มีงานใหม่ที่ Admin มอบหมาย',
@@ -439,7 +446,7 @@ export function assignDriver(tripId, driverId, driverLabel = '') {
     }
 
     if (booking) {
-      const related = tripsForBooking(booking.id);
+      const related = await tripsForBooking(booking.id);
       const allAssigned = related.every((t) => (t.id === tripId ? driverId : t.driverId));
       let nextStatus = booking.status;
       if (allAssigned && ['price_confirmed', 'submitted', 'driver_assigned'].includes(booking.status)) {
@@ -447,38 +454,38 @@ export function assignDriver(tripId, driverId, driverLabel = '') {
       } else if (booking.status === 'price_confirmed' || booking.status === 'submitted') {
         nextStatus = 'driver_assigned';
       }
-      run('UPDATE bookings SET status = ?, updated_at = ? WHERE id = ?', [
+      await run('UPDATE dbo.bookings SET status = ?, updated_at = ? WHERE id = ?', [
         nextStatus,
         new Date().toISOString(),
         booking.id,
       ]);
     }
 
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function updateTripSchedule(tripId, { pickupTime, dropoffTime } = {}) {
-  return transaction(() => {
-    const tripRow = getTripRow(tripId);
+export async function updateTripSchedule(tripId, { pickupTime, dropoffTime } = {}) {
+  return transaction(async () => {
+    const tripRow = await getTripRow(tripId);
     if (!tripRow) throw new Error('ไม่พบทริป');
-    const trip = mapTrip(tripRow, historyForTrip(tripId));
-    const booking = mapBooking(getBookingRow(trip.bookingId));
+    const trip = mapTrip(tripRow, await historyForTrip(tripId));
+    const booking = mapBooking(await getBookingRow(trip.bookingId));
     const prevPickup = trip.pickupTime;
     const nextPickup = pickupTime != null ? pickupTime : trip.pickupTime;
     const nextDropoff = dropoffTime != null ? dropoffTime : trip.dropoffTime;
 
-    run('UPDATE trips SET pickup_time = ?, dropoff_time = ? WHERE id = ?', [
+    await run('UPDATE dbo.trips SET pickup_time = ?, dropoff_time = ? WHERE id = ?', [
       nextPickup,
       nextDropoff,
       tripId,
     ]);
-    insertHistory(tripId, trip.status, `เปลี่ยนเวลานัดรับเป็น ${formatNotifyWhen(nextPickup)}`);
+    await insertHistory(tripId, trip.status, `เปลี่ยนเวลานัดรับเป็น ${formatNotifyWhen(nextPickup)}`);
     if (booking) {
-      run('UPDATE bookings SET updated_at = ? WHERE id = ?', [new Date().toISOString(), booking.id]);
+      await run('UPDATE dbo.bookings SET updated_at = ? WHERE id = ?', [new Date().toISOString(), booking.id]);
     }
     if (trip.driverId && prevPickup !== nextPickup) {
-      pushDriverNotification({
+      await pushDriverNotification({
         driverId: trip.driverId,
         type: 'time_changed',
         title: 'มีการเปลี่ยนแปลงเวลานัดรับ',
@@ -487,13 +494,13 @@ export function updateTripSchedule(tripId, { pickupTime, dropoffTime } = {}) {
         bookingId: trip.bookingId,
       });
     }
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function ownerConfirmPayment(bookingId, slip) {
-  return transaction(() => {
-    const row = getBookingRow(bookingId);
+export async function ownerConfirmPayment(bookingId, slip) {
+  return transaction(async () => {
+    const row = await getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const b = mapBooking(row);
     if (!['submitted', 'awaiting_payment', 'driver_assigned', 'price_confirmed'].includes(b.status)) {
@@ -508,56 +515,56 @@ export function ownerConfirmPayment(bookingId, slip) {
     if (slip.length > 8 * 1024 * 1024) {
       throw new Error('ไฟล์สลิปมีขนาดใหญ่เกินไป กรุณาเลือกรูปที่เล็กลง');
     }
-    run(
-      `UPDATE bookings SET payment_status = 'owner_confirmed', payment_note = '', payment_slip = ?,
+    await run(
+      `UPDATE dbo.bookings SET payment_status = 'owner_confirmed', payment_note = '', payment_slip = ?,
          status = 'awaiting_payment', updated_at = ? WHERE id = ?`,
       [slip, new Date().toISOString(), bookingId],
     );
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function approveTransportPayment(bookingId) {
-  return transaction(() => {
-    const row = getBookingRow(bookingId);
+export async function approveTransportPayment(bookingId) {
+  return transaction(async () => {
+    const row = await getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const booking = mapBooking(row);
     if (booking.status === 'cancelled') throw new Error('รายการนี้ถูกยกเลิกแล้ว');
     if (booking.paymentStatus !== 'owner_confirmed' || !booking.paymentSlip) {
       throw new Error('ยังไม่มีสลิปที่รอตรวจสอบ');
     }
-    run(
-      `UPDATE bookings SET payment_status = 'paid', status = 'paid', updated_at = ? WHERE id = ?`,
+    await run(
+      `UPDATE dbo.bookings SET payment_status = 'paid', status = 'paid', updated_at = ? WHERE id = ?`,
       [new Date().toISOString(), bookingId],
     );
-    return { state: getState({ includePaymentDetails: true }) };
+    return { state: await getState({ includePaymentDetails: true }) };
   });
 }
 
-export function rejectTransportPayment(bookingId, note = '') {
-  return transaction(() => {
-    const row = getBookingRow(bookingId);
+export async function rejectTransportPayment(bookingId, note = '') {
+  return transaction(async () => {
+    const row = await getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const booking = mapBooking(row);
     if (booking.status === 'cancelled') throw new Error('รายการนี้ถูกยกเลิกแล้ว');
     if (booking.paymentStatus !== 'owner_confirmed' || !booking.paymentSlip) {
       throw new Error('ยังไม่มีสลิปที่รอตรวจสอบ');
     }
-    run(
-      `UPDATE bookings SET payment_status = 'unpaid', payment_note = ?, status = 'awaiting_payment',
+    await run(
+      `UPDATE dbo.bookings SET payment_status = 'unpaid', payment_note = ?, status = 'awaiting_payment',
          updated_at = ? WHERE id = ?`,
       [String(note || '').trim().slice(0, 500), new Date().toISOString(), bookingId],
     );
-    return { state: getState({ includePaymentDetails: true }) };
+    return { state: await getState({ includePaymentDetails: true }) };
   });
 }
 
-export function advanceTripStatus(tripId, note = '') {
-  return transaction(() => {
-    const tripRow = getTripRow(tripId);
+export async function advanceTripStatus(tripId, note = '') {
+  return transaction(async () => {
+    const tripRow = await getTripRow(tripId);
     if (!tripRow) throw new Error('ไม่พบทริป');
-    const trip = mapTrip(tripRow, historyForTrip(tripId));
-    const booking = mapBooking(getBookingRow(trip.bookingId));
+    const trip = mapTrip(tripRow, await historyForTrip(tripId));
+    const booking = mapBooking(await getBookingRow(trip.bookingId));
     if (
       booking
       && booking.paymentStatus !== 'paid'
@@ -572,43 +579,43 @@ export function advanceTripStatus(tripId, note = '') {
       throw new Error('รอฝ่ายบัญชียืนยันชำระเงินก่อน');
     }
 
-    run('UPDATE trips SET status = ? WHERE id = ?', [next.id, tripId]);
-    insertHistory(tripId, next.id, note || next.label);
+    await run('UPDATE dbo.trips SET status = ? WHERE id = ?', [next.id, tripId]);
+    await insertHistory(tripId, next.id, note || next.label);
 
     if (booking) {
       let bookingStatus = next.id === 'completed' ? booking.status : 'in_progress';
-      const related = tripsForBooking(booking.id).map((t) =>
+      const related = (await tripsForBooking(booking.id)).map((t) =>
         (t.id === tripId ? { ...t, status: next.id } : t),
       );
       if (related.every((t) => t.status === 'completed')) bookingStatus = 'completed';
-      run('UPDATE bookings SET status = ?, updated_at = ? WHERE id = ?', [
+      await run('UPDATE dbo.bookings SET status = ?, updated_at = ? WHERE id = ?', [
         bookingStatus,
         new Date().toISOString(),
         booking.id,
       ]);
     }
 
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function attachEvidence(tripId, kind, dataUrl) {
-  return transaction(() => {
-    const tripRow = getTripRow(tripId);
+export async function attachEvidence(tripId, kind, dataUrl) {
+  return transaction(async () => {
+    const tripRow = await getTripRow(tripId);
     if (!tripRow) throw new Error('ไม่พบทริป');
     const payload = stringifyJson({ url: dataUrl, at: new Date().toISOString() });
     if (kind === 'pickup') {
-      run('UPDATE trips SET evidence_pickup_json = ? WHERE id = ?', [payload, tripId]);
+      await run('UPDATE dbo.trips SET evidence_pickup_json = ? WHERE id = ?', [payload, tripId]);
     } else {
-      run('UPDATE trips SET evidence_dropoff_json = ? WHERE id = ?', [payload, tripId]);
+      await run('UPDATE dbo.trips SET evidence_dropoff_json = ? WHERE id = ?', [payload, tripId]);
     }
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function requestCancel(bookingId, ownerId, cancellationId, reason) {
-  return transaction(() => {
-    const row = getBookingRow(bookingId);
+export async function requestCancel(bookingId, ownerId, cancellationId, reason) {
+  return transaction(async () => {
+    const row = await getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const booking = mapBooking(row);
     if (!ownerId || booking.ownerId !== ownerId) {
@@ -617,7 +624,7 @@ export function requestCancel(bookingId, ownerId, cancellationId, reason) {
     const text = String(reason || '').trim();
     if (text.length < 3 || text.length > 500) throw new Error('กรุณาระบุเหตุผล 3 ถึง 500 ตัวอักษร');
     if (!cancellationId) throw new Error('ข้อมูลคำขอยกเลิกไม่ถูกต้อง');
-    const trips = tripsForBooking(bookingId);
+    const trips = await tripsForBooking(bookingId);
     if (!canOwnerRequestCancel(booking, trips)) {
       throw new Error('ยกเลิกเองไม่ได้แล้ว ต้องติดต่อ Admin');
     }
@@ -628,18 +635,18 @@ export function requestCancel(bookingId, ownerId, cancellationId, reason) {
       status: 'pending',
       previousStatus: booking.status,
     };
-    run(
-      `UPDATE bookings SET cancel_request_json = ?, status = 'cancel_requested', updated_at = ?
+    await run(
+      `UPDATE dbo.bookings SET cancel_request_json = ?, status = 'cancel_requested', updated_at = ?
        WHERE id = ?`,
       [stringifyJson(cancelRequest), new Date().toISOString(), bookingId],
     );
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function resolveCancel(bookingId, cancellationId, approve, adminNote = '') {
-  return transaction(() => {
-    const row = getBookingRow(bookingId);
+export async function resolveCancel(bookingId, cancellationId, approve, adminNote = '') {
+  return transaction(async () => {
+    const row = await getBookingRow(bookingId);
     if (!row) throw new Error('ไม่พบการจอง');
     const booking = mapBooking(row);
     if (
@@ -659,8 +666,8 @@ export function resolveCancel(bookingId, cancellationId, approve, adminNote = ''
     };
     const previousStatus = booking.cancelRequest.previousStatus
       || (booking.paymentStatus === 'paid' ? 'paid' : 'awaiting_payment');
-    run(
-      `UPDATE bookings SET cancel_request_json = ?, status = ?, updated_at = ? WHERE id = ?`,
+    await run(
+      `UPDATE dbo.bookings SET cancel_request_json = ?, status = ?, updated_at = ? WHERE id = ?`,
       [
         stringifyJson(cancelRequest),
         approve ? 'cancelled' : previousStatus,
@@ -668,17 +675,17 @@ export function resolveCancel(bookingId, cancellationId, approve, adminNote = ''
         bookingId,
       ],
     );
-    if (approve) notifyCancelledDrivers(bookingId, booking, adminNote, cancelRequest.resolvedAt);
-    return { state: getState() };
+    if (approve) await notifyCancelledDrivers(bookingId, booking, adminNote, cancelRequest.resolvedAt);
+    return { state: await getState() };
   });
 }
 
-export function reportIssue({ tripId, driverId, reasonId, message }) {
-  return transaction(() => {
-    const trip = getTripRow(tripId);
+export async function reportIssue({ tripId, driverId, reasonId, message }) {
+  return transaction(async () => {
+    const trip = await getTripRow(tripId);
     if (!trip) throw new Error('ไม่พบทริป');
-    run(
-      `INSERT INTO issues (id, trip_id, booking_id, driver_id, reason_id, message, created_at)
+    await run(
+      `INSERT INTO dbo.issues (id, trip_id, booking_id, driver_id, reason_id, message, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         newId(),
@@ -690,24 +697,20 @@ export function reportIssue({ tripId, driverId, reasonId, message }) {
         new Date().toISOString(),
       ],
     );
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function updateZones(zones) {
-  return transaction(() => {
+export async function updateZones(zones) {
+  return transaction(async () => {
     for (const z of zones || []) {
-      run(
-        `INSERT INTO zones (id, label, price) VALUES (?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET label = excluded.label, price = excluded.price`,
-        [z.id, z.label, Number(z.price)],
-      );
+      await upsertZone({ id: z.id, label: z.label, price: Number(z.price) });
     }
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function updateHotelRoomPrices(rooms) {
+export async function updateHotelRoomPrices(rooms) {
   if (!Array.isArray(rooms) || rooms.length !== SEED_HOTEL_ROOM_PRICES.length) {
     throw new Error('กรุณาระบุราคาห้องพักให้ครบทุกประเภท');
   }
@@ -724,54 +727,49 @@ export function updateHotelRoomPrices(rooms) {
   });
   if (expectedRooms.size) throw new Error('กรุณาระบุราคาห้องพักให้ครบทุกประเภท');
 
-  return transaction(() => {
+  return transaction(async () => {
     for (const room of normalized) {
-      run(
-        `INSERT INTO hotel_room_prices (room_id, label, price, sort_order)
-         VALUES (?, ?, ?, ?)
-         ON CONFLICT(room_id) DO UPDATE SET price = excluded.price`,
-        [room.id, room.label, room.price, room.sortOrder],
-      );
+      await upsertHotelRoom(room);
     }
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function markNotificationRead(notificationId) {
-  run('UPDATE notifications SET read_at = ? WHERE id = ? AND read_at IS NULL', [
+export async function markNotificationRead(notificationId) {
+  await run('UPDATE dbo.notifications SET read_at = ? WHERE id = ? AND read_at IS NULL', [
     new Date().toISOString(),
     notificationId,
   ]);
-  return { state: getState() };
+  return { state: await getState() };
 }
 
-export function markAllNotificationsRead(driverId) {
-  run('UPDATE notifications SET read_at = ? WHERE driver_id = ? AND read_at IS NULL', [
+export async function markAllNotificationsRead(driverId) {
+  await run('UPDATE dbo.notifications SET read_at = ? WHERE driver_id = ? AND read_at IS NULL', [
     new Date().toISOString(),
     driverId,
   ]);
-  return { state: getState() };
+  return { state: await getState() };
 }
 
-export function ensureUpcomingReminders(driverId) {
-  if (!driverId) return { state: getState() };
+export async function ensureUpcomingReminders(driverId) {
+  if (!driverId) return { state: await getState() };
   const now = Date.now();
-  const trips = listTrips().filter((t) => t.driverId === driverId && t.status !== 'completed');
-  const bookings = listBookings();
-  const notifications = listNotifications(driverId);
+  const trips = (await listTrips()).filter((t) => t.driverId === driverId && t.status !== 'completed');
+  const bookings = await listBookings();
+  const notifications = await listNotifications(driverId);
 
-  return transaction(() => {
-    trips.forEach((trip) => {
+  return transaction(async () => {
+    for (const trip of trips) {
       const booking = bookings.find((b) => b.id === trip.bookingId);
-      if (!booking || booking.status === 'cancelled') return;
+      if (!booking || booking.status === 'cancelled') continue;
       const at = new Date(trip.pickupTime).getTime();
-      if (Number.isNaN(at)) return;
+      if (Number.isNaN(at)) continue;
       const delta = at - now;
-      if (delta <= 0 || delta > UPCOMING_WINDOW_MS) return;
+      if (delta <= 0 || delta > UPCOMING_WINDOW_MS) continue;
       const hourKey = new Date(trip.pickupTime).toISOString().slice(0, 13);
       const dedupeKey = `upcoming:${trip.id}:${hourKey}`;
-      if (notifications.some((n) => n.dedupeKey === dedupeKey)) return;
-      pushDriverNotification({
+      if (notifications.some((n) => n.dedupeKey === dedupeKey)) continue;
+      await pushDriverNotification({
         driverId,
         type: 'upcoming',
         title: 'แจ้งเตือนงานที่กำลังจะถึง',
@@ -780,47 +778,11 @@ export function ensureUpcomingReminders(driverId) {
         bookingId: trip.bookingId,
         dedupeKey,
       });
-    });
-    return { state: getState() };
-  });
-}
-
-export function resetDemo() {
-  return transaction(() => {
-    execSafe('DELETE FROM trip_status_history');
-    execSafe('DELETE FROM notifications');
-    execSafe('DELETE FROM issues');
-    execSafe('DELETE FROM trips');
-    execSafe('DELETE FROM bookings');
-    reseedsCatalog();
-    return { state: getState() };
-  });
-}
-
-function execSafe(sql) {
-  run(sql);
-}
-
-export function purgeDemoDriverJobs() {
-  return transaction(() => {
-    const demoBookings = queryAll(
-      `SELECT id FROM bookings WHERE id LIKE 'demo-booking-%'`,
-    ).map((r) => r.id);
-    const demoTrips = queryAll(`SELECT id FROM trips WHERE id LIKE 'demo-trip-%'`).map((r) => r.id);
-    for (const id of demoTrips) {
-      run('DELETE FROM trip_status_history WHERE trip_id = ?', [id]);
-      run('DELETE FROM issues WHERE trip_id = ?', [id]);
-      run('DELETE FROM notifications WHERE trip_id = ?', [id]);
-      run('DELETE FROM trips WHERE id = ?', [id]);
     }
-    for (const id of demoBookings) {
-      run('DELETE FROM notifications WHERE booking_id = ?', [id]);
-      run('DELETE FROM bookings WHERE id = ?', [id]);
-    }
-    return { state: getState() };
+    return { state: await getState() };
   });
 }
 
-export function notificationsForDriver(driverId) {
+export async function notificationsForDriver(driverId) {
   return listNotifications(driverId);
 }

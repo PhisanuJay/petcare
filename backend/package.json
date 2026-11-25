@@ -7,11 +7,12 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "db:path": "node -e \"import('./src/db/sqlite.js').then(m=>console.log(m.dbPath()))\""
+    "db:ping": "node -e \"import('./src/config/index.js'); import('./src/db/mssql.js').then(async m=>{await m.getPool(); console.log(m.connectionLabel()); await m.closePool();})\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "express": "^5.0.0"
+    "express": "^5.0.0",
+    "mssql": "^11.0.3"
   }
 }

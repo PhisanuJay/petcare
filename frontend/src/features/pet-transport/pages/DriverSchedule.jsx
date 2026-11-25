@@ -1,10 +1,10 @@
-import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useMemo, useState } from 'react';
 import DatePicker, { registerLocale } from 'react-datepicker';
 import { th } from 'date-fns/locale/th';
 import { Link } from 'react-router-dom';
 import IssueFields from '../components/IssueFields.jsx';
 import { nextTripStatus, tripStatusMeta } from '../constants.js';
-import { placeParts, purgeDemoDriverJobs } from '../store.js';
+import { placeParts } from '../store.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { speciesOf } from '../../pet-owner/petUtils.js';
 import { STORAGE_KEYS, readJSON } from '../../../shared/utils/storage.js';
@@ -150,10 +150,6 @@ export default function DriverSchedule() {
   const [tab, setTab] = useState('today');
   const [issueId, setIssueId] = useState('');
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
-
-  useEffect(() => {
-    purgeDemoDriverJobs();
-  }, []);
 
   const all = tripsForDriver(currentUser?.id);
   const openJobs = useMemo(

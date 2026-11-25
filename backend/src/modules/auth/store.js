@@ -1,37 +1,39 @@
 import { randomBytes } from 'node:crypto';
+import {
+  emailTaken,
+  findUserByEmail,
+  findUserById,
+  updateUserFields,
+  upsertUser,
+} from './usersRepository.js';
 
 const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
 const REMEMBERED_SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
-const usersById = new Map();
-const userIdByEmail = new Map();
 const sessions = new Map();
 
-export function findCustomerByEmail(email) {
-  const userId = userIdByEmail.get(email);
-  return userId ? usersById.get(userId) ?? null : null;
+export async function findCustomerByEmail(email) {
+  return findUserByEmail(email);
 }
 
-export function findCustomerById(userId) {
-  return usersById.get(userId) ?? null;
+export async function findCustomerById(userId) {
+  return findUserById(userId);
 }
 
-export function createCustomer(user) {
-  usersById.set(user.id, user);
-  userIdByEmail.set(user.email, user.id);
-  return user;
-}
-
-export function updateCustomer(userId, patch) {
-  const user = findCustomerById(userId);
-  if (!user) return null;
-
-  const updatedUser = { ...user, ...patch };
-  if (updatedUser.email !== user.email) {
-    userIdByEmail.delete(user.email);
-    userIdByEmail.set(updatedUser.email, userId);
+export async function createCustomer(user) {
+  if (await emailTaken(user.email)) {
+    const err = new Error('อีเมลนี้ถูกใช้สมัครแล้ว ลองเข้าสู่ระบบแทน');
+    err.status = 409;
+    throw err;
   }
-  usersById.set(userId, updatedUser);
-  return updatedUser;
+  return upsertUser({
+    ...user,
+    role: user.role || 'owner',
+    active: true,
+  });
+}
+
+export async function updateCustomer(userId, patch) {
+  return updateUserFields(userId, patch);
 }
 
 export function createCustomerSession(userId, remember) {
@@ -46,7 +48,7 @@ export function createCustomerSession(userId, remember) {
   return { token, expiresAt };
 }
 
-export function getCustomerSession(req) {
+export async function getCustomerSession(req) {
   const token = req.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
   const session = token ? sessions.get(token) : null;
   if (!session) return null;
@@ -55,8 +57,8 @@ export function getCustomerSession(req) {
     return null;
   }
 
-  const user = findCustomerById(session.userId);
-  if (!user) {
+  const user = await findUserById(session.userId);
+  if (!user || user.active === false) {
     sessions.delete(token);
     return null;
   }
@@ -67,18 +69,22 @@ export function revokeCustomerSession(token) {
   sessions.delete(token);
 }
 
-export function requireCustomer(req, res, next) {
-  const session = getCustomerSession(req);
-  if (!session) {
-    return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบสมาชิก' });
+export async function requireCustomer(req, res, next) {
+  try {
+    const session = await getCustomerSession(req);
+    if (!session) {
+      return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบสมาชิก' });
+    }
+    req.customer = session.user;
+    req.customerSessionToken = session.token;
+    return next();
+  } catch (error) {
+    return next(error);
   }
-
-  req.customer = session.user;
-  req.customerSessionToken = session.token;
-  return next();
 }
 
 export function publicCustomer(user) {
+  if (!user) return null;
   const { passwordHash: _passwordHash, salt: _salt, ...publicUser } = user;
   return publicUser;
 }

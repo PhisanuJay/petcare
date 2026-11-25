@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
-import { getDb } from '../../db/sqlite.js';
+import { queryAll, queryOne, run, transaction } from '../../db/mssql.js';
 import { requireStaff } from '../auth/middleware.js';
+import { ensurePetTransportReady } from '../pet-transport/routes.js';
 
 const router = Router();
 const KINDS = new Set(['hotel', 'transport', 'clinic']);
@@ -13,109 +14,83 @@ function httpError(status, message) {
   return error;
 }
 
-function initialize() {
-  getDb().exec(`
-    CREATE TABLE IF NOT EXISTS payments (
-      id TEXT PRIMARY KEY,
-      owner_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      ref_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      data TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS payments_owner_idx ON payments(owner_id, created_at);
-    CREATE INDEX IF NOT EXISTS payments_status_idx ON payments(status, created_at);
-    CREATE TABLE IF NOT EXISTS cancellations (
-      id TEXT PRIMARY KEY,
-      owner_id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      ref_id TEXT NOT NULL,
-      status TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      data TEXT NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS cancellations_owner_idx ON cancellations(owner_id, created_at);
-    CREATE INDEX IF NOT EXISTS cancellations_status_idx ON cancellations(status, created_at);
-    CREATE TABLE IF NOT EXISTS payment_legacy_imports (
-      owner_id TEXT PRIMARY KEY,
-      imported_at TEXT NOT NULL
-    );
-  `);
-}
-
-initialize();
-
 function parseRecord(row) {
   return JSON.parse(row.data);
 }
 
-function loadPayments(ownerId) {
-  return getDb()
-    .prepare('SELECT data FROM payments WHERE owner_id = ? ORDER BY created_at DESC')
-    .all(ownerId)
-    .map(parseRecord);
+async function loadPayments(ownerId) {
+  const rows = await queryAll(
+    'SELECT data FROM dbo.payments WHERE owner_id = ? ORDER BY created_at DESC',
+    [ownerId],
+  );
+  return rows.map(parseRecord);
 }
 
-function loadCancellations(ownerId) {
-  return getDb()
-    .prepare('SELECT data FROM cancellations WHERE owner_id = ? ORDER BY created_at DESC')
-    .all(ownerId)
-    .map(parseRecord);
+async function loadCancellations(ownerId) {
+  const rows = await queryAll(
+    'SELECT data FROM dbo.cancellations WHERE owner_id = ? ORDER BY created_at DESC',
+    [ownerId],
+  );
+  return rows.map(parseRecord);
 }
 
-function savePayment(payment) {
-  getDb().prepare(`
-    INSERT INTO payments (id, owner_id, kind, ref_id, status, created_at, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      status = excluded.status,
-      data = excluded.data
-  `).run(
-    payment.id,
-    payment.ownerId,
-    payment.kind,
-    payment.refId,
-    payment.status,
-    payment.createdAt || new Date().toISOString(),
-    JSON.stringify(payment),
+async function savePayment(payment) {
+  await run(
+    `MERGE dbo.payments AS t
+     USING (SELECT ? AS id, ? AS owner_id, ? AS kind, ? AS ref_id, ? AS status, ? AS created_at, ? AS data) AS s
+     ON t.id = s.id
+     WHEN MATCHED THEN UPDATE SET status = s.status, data = s.data
+     WHEN NOT MATCHED THEN INSERT (id, owner_id, kind, ref_id, status, created_at, data)
+       VALUES (s.id, s.owner_id, s.kind, s.ref_id, s.status, s.created_at, s.data);`,
+    [
+      payment.id,
+      payment.ownerId,
+      payment.kind,
+      payment.refId,
+      payment.status,
+      payment.createdAt || new Date().toISOString(),
+      JSON.stringify(payment),
+    ],
   );
 }
 
-function saveCancellation(request) {
-  getDb().prepare(`
-    INSERT INTO cancellations (id, owner_id, kind, ref_id, status, created_at, data)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      status = excluded.status,
-      data = excluded.data
-  `).run(
-    request.id,
-    request.ownerId,
-    request.kind,
-    request.refId,
-    request.status,
-    request.createdAt || new Date().toISOString(),
-    JSON.stringify(request),
+async function saveCancellation(request) {
+  await run(
+    `MERGE dbo.cancellations AS t
+     USING (SELECT ? AS id, ? AS owner_id, ? AS kind, ? AS ref_id, ? AS status, ? AS created_at, ? AS data) AS s
+     ON t.id = s.id
+     WHEN MATCHED THEN UPDATE SET status = s.status, data = s.data
+     WHEN NOT MATCHED THEN INSERT (id, owner_id, kind, ref_id, status, created_at, data)
+       VALUES (s.id, s.owner_id, s.kind, s.ref_id, s.status, s.created_at, s.data);`,
+    [
+      request.id,
+      request.ownerId,
+      request.kind,
+      request.refId,
+      request.status,
+      request.createdAt || new Date().toISOString(),
+      JSON.stringify(request),
+    ],
   );
 }
 
-function findPayment(id) {
-  const row = getDb().prepare('SELECT data FROM payments WHERE id = ?').get(id);
+async function findPayment(id) {
+  const row = await queryOne('SELECT data FROM dbo.payments WHERE id = ?', [id]);
   return row ? parseRecord(row) : null;
 }
 
-function findCancellation(id) {
-  const row = getDb().prepare('SELECT data FROM cancellations WHERE id = ?').get(id);
+async function findCancellation(id) {
+  const row = await queryOne('SELECT data FROM dbo.cancellations WHERE id = ?', [id]);
   return row ? parseRecord(row) : null;
 }
 
-function latestCancellation(kind, refId, ownerId) {
-  const row = getDb().prepare(`
-    SELECT data FROM cancellations
-    WHERE kind = ? AND ref_id = ? AND owner_id = ?
-    ORDER BY created_at DESC LIMIT 1
-  `).get(kind, refId, ownerId);
+async function latestCancellation(kind, refId, ownerId) {
+  const row = await queryOne(
+    `SELECT TOP 1 data FROM dbo.cancellations
+     WHERE kind = ? AND ref_id = ? AND owner_id = ?
+     ORDER BY created_at DESC`,
+    [kind, refId, ownerId],
+  );
   return row ? parseRecord(row) : null;
 }
 
@@ -151,27 +126,23 @@ function httpOwner(req, _res, next) {
 }
 
 const wrap = (fn) => (req, res, next) => {
-  try {
-    const result = fn(req, res);
-    if (result && typeof result.then === 'function') result.catch(next);
-  } catch (error) {
-    next(error);
-  }
+  Promise.resolve()
+    .then(() => ensurePetTransportReady())
+    .then(() => fn(req, res))
+    .catch(next);
 };
 
-router.post('/import', httpOwner, wrap((req, res) => {
-  const db = getDb();
-  const done = db.prepare('SELECT 1 FROM payment_legacy_imports WHERE owner_id = ?').get(req.ownerId);
+router.post('/import', httpOwner, wrap(async (req, res) => {
+  const done = await queryOne(
+    'SELECT 1 AS ok FROM dbo.payment_legacy_imports WHERE owner_id = ?',
+    [req.ownerId],
+  );
   if (done) return res.json({ imported: false });
 
   const payments = Array.isArray(req.body?.payments) ? req.body.payments : [];
   const cancellations = Array.isArray(req.body?.cancellations) ? req.body.cancellations : [];
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    const addPayment = db.prepare(`
-      INSERT OR IGNORE INTO payments (id, owner_id, kind, ref_id, status, created_at, data)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
+
+  await transaction(async () => {
     for (const payment of payments) {
       if (
         payment?.ownerId !== req.ownerId
@@ -180,21 +151,23 @@ router.post('/import', httpOwner, wrap((req, res) => {
         || !KINDS.has(payment.kind)
         || typeof payment.refId !== 'string'
       ) continue;
-      addPayment.run(
-        payment.id,
-        req.ownerId,
-        payment.kind,
-        payment.refId,
-        String(payment.status || 'awaiting_slip'),
-        String(payment.createdAt || new Date().toISOString()),
-        JSON.stringify(payment),
+      await run(
+        `IF NOT EXISTS (SELECT 1 FROM dbo.payments WHERE id = ?)
+           INSERT INTO dbo.payments (id, owner_id, kind, ref_id, status, created_at, data)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          payment.id,
+          payment.id,
+          req.ownerId,
+          payment.kind,
+          payment.refId,
+          String(payment.status || 'awaiting_slip'),
+          String(payment.createdAt || new Date().toISOString()),
+          JSON.stringify(payment),
+        ],
       );
     }
 
-    const addCancellation = db.prepare(`
-      INSERT OR IGNORE INTO cancellations (id, owner_id, kind, ref_id, status, created_at, data)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
     for (const request of cancellations) {
       if (
         request?.ownerId !== req.ownerId
@@ -203,29 +176,35 @@ router.post('/import', httpOwner, wrap((req, res) => {
         || !KINDS.has(request.kind)
         || typeof request.refId !== 'string'
       ) continue;
-      addCancellation.run(
-        request.id,
-        req.ownerId,
-        request.kind,
-        request.refId,
-        String(request.status || 'pending_admin'),
-        String(request.createdAt || new Date().toISOString()),
-        JSON.stringify(request),
+      await run(
+        `IF NOT EXISTS (SELECT 1 FROM dbo.cancellations WHERE id = ?)
+           INSERT INTO dbo.cancellations (id, owner_id, kind, ref_id, status, created_at, data)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          request.id,
+          request.id,
+          req.ownerId,
+          request.kind,
+          request.refId,
+          String(request.status || 'pending_admin'),
+          String(request.createdAt || new Date().toISOString()),
+          JSON.stringify(request),
+        ],
       );
     }
-    db.prepare('INSERT INTO payment_legacy_imports (owner_id, imported_at) VALUES (?, ?)')
-      .run(req.ownerId, new Date().toISOString());
-    db.exec('COMMIT');
-  } catch (error) {
-    db.exec('ROLLBACK');
-    throw error;
-  }
+
+    await run(
+      'INSERT INTO dbo.payment_legacy_imports (owner_id, imported_at) VALUES (?, ?)',
+      [req.ownerId, new Date().toISOString()],
+    );
+  });
+
   res.json({ imported: true });
 }));
 
-router.get('/', httpOwner, wrap((req, res) => res.json(loadPayments(req.ownerId))));
+router.get('/', httpOwner, wrap(async (req, res) => res.json(await loadPayments(req.ownerId))));
 
-router.post('/', httpOwner, wrap((req, res) => {
+router.post('/', httpOwner, wrap(async (req, res) => {
   const body = req.body;
   validateRecordIdentity(body, req.ownerId);
   const total = Number(body.total);
@@ -241,15 +220,15 @@ router.post('/', httpOwner, wrap((req, res) => {
     submittedAt: '',
     reviewedAt: '',
   };
-  if (findPayment(payment.id)) throw httpError(409, 'รายการชำระเงินนี้มีอยู่แล้ว');
-  savePayment(payment);
+  if (await findPayment(payment.id)) throw httpError(409, 'รายการชำระเงินนี้มีอยู่แล้ว');
+  await savePayment(payment);
   res.status(201).json(payment);
 }));
 
-router.post('/:id/slip', httpOwner, wrap((req, res) => {
-  const payment = findPayment(req.params.id);
+router.post('/:id/slip', httpOwner, wrap(async (req, res) => {
+  const payment = await findPayment(req.params.id);
   if (!payment || payment.ownerId !== req.ownerId) throw httpError(404, 'ไม่พบรายการชำระเงิน');
-  const cancellation = latestCancellation(payment.kind, payment.refId, req.ownerId);
+  const cancellation = await latestCancellation(payment.kind, payment.refId, req.ownerId);
   if (cancellation && cancellation.status !== 'rejected') {
     throw httpError(409, 'รายการนี้มีคำขอยกเลิกที่กำลังดำเนินการ ไม่สามารถส่งสลิปได้');
   }
@@ -263,20 +242,21 @@ router.post('/:id/slip', httpOwner, wrap((req, res) => {
     note: '',
     submittedAt: new Date().toISOString(),
   };
-  savePayment(updated);
+  await savePayment(updated);
   res.json(updated);
 }));
 
-router.get('/cancellations', httpOwner, wrap((req, res) => res.json(loadCancellations(req.ownerId))));
+router.get('/cancellations', httpOwner, wrap(async (req, res) =>
+  res.json(await loadCancellations(req.ownerId))));
 
-router.post('/cancellations', httpOwner, wrap((req, res) => {
+router.post('/cancellations', httpOwner, wrap(async (req, res) => {
   const input = req.body;
   const clean = validateCancellation(input, req.ownerId);
-  const open = getDb().prepare(`
-    SELECT 1 FROM cancellations
-    WHERE owner_id = ? AND kind = ? AND ref_id = ? AND status IN (?, ?)
-    LIMIT 1
-  `).get(req.ownerId, input.kind, input.refId, ...OPEN_CANCELLATION_STATUSES);
+  const open = await queryOne(
+    `SELECT TOP 1 1 AS ok FROM dbo.cancellations
+     WHERE owner_id = ? AND kind = ? AND ref_id = ? AND status IN (?, ?)`,
+    [req.ownerId, input.kind, input.refId, ...OPEN_CANCELLATION_STATUSES],
+  );
   if (open) throw httpError(409, 'รายการนี้มีคำขอยกเลิกที่กำลังดำเนินการอยู่');
 
   const request = {
@@ -290,34 +270,36 @@ router.post('/cancellations', httpOwner, wrap((req, res) => {
     refundReceipt: '',
     accountantNote: '',
   };
-  if (findCancellation(request.id)) throw httpError(409, 'คำขอนี้มีอยู่แล้ว');
-  saveCancellation(request);
+  if (await findCancellation(request.id)) throw httpError(409, 'คำขอนี้มีอยู่แล้ว');
+  await saveCancellation(request);
   res.status(201).json(request);
 }));
 
-router.delete('/cancellations/:id', httpOwner, wrap((req, res) => {
-  const request = findCancellation(req.params.id);
+router.delete('/cancellations/:id', httpOwner, wrap(async (req, res) => {
+  const request = await findCancellation(req.params.id);
   if (!request || request.ownerId !== req.ownerId) throw httpError(404, 'ไม่พบคำขอยกเลิก');
   if (request.status !== 'pending_admin') throw httpError(409, 'คำขอนี้ไม่สามารถยกเลิกได้แล้ว');
-  getDb().prepare('DELETE FROM cancellations WHERE id = ? AND owner_id = ?').run(request.id, req.ownerId);
+  await run('DELETE FROM dbo.cancellations WHERE id = ? AND owner_id = ?', [request.id, req.ownerId]);
   res.json({ ok: true });
 }));
 
-router.get('/staff/payments', requireStaff('accountant'), wrap((_req, res) => {
-  res.json(getDb().prepare('SELECT data FROM payments ORDER BY created_at DESC').all().map(parseRecord));
+router.get('/staff/payments', requireStaff('accountant'), wrap(async (_req, res) => {
+  const rows = await queryAll('SELECT data FROM dbo.payments ORDER BY created_at DESC');
+  res.json(rows.map(parseRecord));
 }));
 
-router.get('/staff/admin-payments', requireStaff('clinic_admin'), wrap((_req, res) => {
-  res.json(getDb().prepare('SELECT data FROM payments ORDER BY created_at DESC').all().map(parseRecord));
+router.get('/staff/admin-payments', requireStaff('clinic_admin'), wrap(async (_req, res) => {
+  const rows = await queryAll('SELECT data FROM dbo.payments ORDER BY created_at DESC');
+  res.json(rows.map(parseRecord));
 }));
 
-router.post('/staff/payments/:id/review', requireStaff('accountant'), wrap((req, res) => {
-  const payment = findPayment(req.params.id);
+router.post('/staff/payments/:id/review', requireStaff('accountant'), wrap(async (req, res) => {
+  const payment = await findPayment(req.params.id);
   if (!payment) throw httpError(404, 'ไม่พบรายการชำระเงิน');
   if (payment.status !== 'pending_review') throw httpError(409, 'รายการนี้ไม่ได้อยู่ระหว่างตรวจสลิป');
   const decision = req.body?.decision;
   if (!['approved', 'rejected'].includes(decision)) throw httpError(400, 'คำตัดสินไม่ถูกต้อง');
-  const cancellation = latestCancellation(payment.kind, payment.refId, payment.ownerId);
+  const cancellation = await latestCancellation(payment.kind, payment.refId, payment.ownerId);
   if (
     cancellation
     && cancellation.status !== 'pending_admin'
@@ -329,12 +311,12 @@ router.post('/staff/payments/:id/review', requireStaff('accountant'), wrap((req,
     note: String(req.body?.note || '').trim().slice(0, 500),
     reviewedAt: new Date().toISOString(),
   };
-  savePayment(updated);
+  await savePayment(updated);
   res.json(updated);
 }));
 
-router.post('/staff/payments/:id/cancel', requireStaff('clinic_admin'), wrap((req, res) => {
-  const payment = findPayment(req.params.id);
+router.post('/staff/payments/:id/cancel', requireStaff('clinic_admin'), wrap(async (req, res) => {
+  const payment = await findPayment(req.params.id);
   if (!payment) throw httpError(404, 'ไม่พบรายการชำระเงิน');
   if (['approved', 'cancelled'].includes(payment.status)) return res.json(payment);
   const updated = {
@@ -343,16 +325,17 @@ router.post('/staff/payments/:id/cancel', requireStaff('clinic_admin'), wrap((re
     note: 'ยกเลิกตามคำขอยกเลิกที่แอดมินอนุมัติ',
     reviewedAt: new Date().toISOString(),
   };
-  savePayment(updated);
+  await savePayment(updated);
   res.json(updated);
 }));
 
-router.get('/staff/cancellations', requireStaff('clinic_admin'), wrap((_req, res) => {
-  res.json(getDb().prepare('SELECT data FROM cancellations ORDER BY created_at DESC').all().map(parseRecord));
+router.get('/staff/cancellations', requireStaff('clinic_admin'), wrap(async (_req, res) => {
+  const rows = await queryAll('SELECT data FROM dbo.cancellations ORDER BY created_at DESC');
+  res.json(rows.map(parseRecord));
 }));
 
-router.post('/staff/cancellations/:id/decision', requireStaff('clinic_admin'), wrap((req, res) => {
-  const request = findCancellation(req.params.id);
+router.post('/staff/cancellations/:id/decision', requireStaff('clinic_admin'), wrap(async (req, res) => {
+  const request = await findCancellation(req.params.id);
   if (!request || request.status !== 'pending_admin') {
     throw httpError(409, 'คำขอนี้ไม่อยู่ในสถานะรอแอดมินพิจารณา');
   }
@@ -366,18 +349,17 @@ router.post('/staff/cancellations/:id/decision', requireStaff('clinic_admin'), w
     resolvedAt: now,
     approvedAt: approve ? now : '',
   };
-  saveCancellation(updated);
+  await saveCancellation(updated);
   res.json(updated);
 }));
 
-router.get('/staff/refunds', requireStaff('accountant'), wrap((_req, res) => {
-  res.json(getDb().prepare(
-    'SELECT data FROM cancellations ORDER BY created_at DESC',
-  ).all().map(parseRecord));
+router.get('/staff/refunds', requireStaff('accountant'), wrap(async (_req, res) => {
+  const rows = await queryAll('SELECT data FROM dbo.cancellations ORDER BY created_at DESC');
+  res.json(rows.map(parseRecord));
 }));
 
-router.post('/staff/refunds/:id/complete', requireStaff('accountant'), wrap((req, res) => {
-  const request = findCancellation(req.params.id);
+router.post('/staff/refunds/:id/complete', requireStaff('accountant'), wrap(async (req, res) => {
+  const request = await findCancellation(req.params.id);
   if (!request || request.status !== 'awaiting_refund') {
     throw httpError(409, 'คำขอนี้ไม่อยู่ในคิวคืนเงิน');
   }
@@ -393,7 +375,7 @@ router.post('/staff/refunds/:id/complete', requireStaff('accountant'), wrap((req
     accountantNote: String(req.body?.accountantNote || '').trim().slice(0, 500),
     refundedAt: new Date().toISOString(),
   };
-  saveCancellation(updated);
+  await saveCancellation(updated);
   res.json(updated);
 }));
 

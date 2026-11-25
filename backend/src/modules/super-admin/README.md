@@ -1,23 +1,20 @@
-# Super Admin (API)
+# Super Admin / Hotel CCTV
 
-**ผู้รับผิดชอบ:** ฟ่าง (Xsup404)
+CCTV auth + camera admin อยู่ใน PetCare backend (`/api/cctv-auth`, `/api/cctv-admin`)
 
-โฟลเดอร์ backend ของบทบาทนี้ — คู่กับ `frontend/src/features/super-admin/`
+## Database
 
-## Pet Hotel CCTV
+ข้อมูล CCTV อยู่ใน **Microsoft SQL Server** database `PetCare` (ตารางขึ้นต้น `cctv_`)
 
-หน้า CCTV อยู่ที่ `frontend/src/features/super-admin/hotel-cctv/`
+- `cctv_users`, `cctv_staff_permissions`
+- `cctv_cameras`, `cctv_camera_grants`, `cctv_petcare_camera_grants`
+- `cctv_stream_sessions`, `cctv_care_logs`
 
-ระบบ login ใช้ `/api/cctv-auth` ใน PetCare backend และบัญชีใน `data/cathotel.sqlite`
-โดย proxy จาก Vite ผ่านพอร์ต 3001
+สร้างอัตโนมัติตอน migrate backend  
+ย้ายข้อมูลจาก SQLite เก่า: `node scripts/migrate-cctv-sqlite-to-mssql.mjs`
 
-API จัดการกล้อง ห้อง ลูกค้า และสิทธิ์ดูกล้อง (`/api/cctv-admin/rooms`,
-`/api/cctv-admin/cameras`, `/api/cctv-admin/customers`, `/api/cctv-admin/grants`)
-อยู่ใน PetCare backend และใช้ข้อมูลจาก `data/cathotel.sqlite` โดยเข้ารหัส RTSP URL
-ด้วย `CAMERA_SECRET` จากไฟล์ `.env` ของโมดูลนี้
+RTSP URL เข้ารหัสด้วย `CAMERA_SECRET` จาก `.env` ของโมดูลนี้
 
-สิทธิ์ดูกล้องในหน้าลูกค้า PetCare ผูกกับ `owner_id` และอีเมลของบัญชี PetCare
-ผ่าน `/api/pet-owner/cctv/cameras` ไม่ได้อ้าง `users.id` ของบัญชี CCTV
+## หมายเหตุ
 
-ฟีเจอร์ CCTV อื่นที่ยังไม่มี route ใน PetCare backend เช่นบันทึกการดูแลและภาพสด
-ยังคาดหวัง service แยกที่เดิมระบุไว้เป็น `D:\CCTV\backend` พอร์ต 3000
+บริการ streaming / WHEP ภายนอก (พอร์ต 3000) ยังแยกต่างหากตาม `vite.config.js`
