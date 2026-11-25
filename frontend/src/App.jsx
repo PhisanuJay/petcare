@@ -11,6 +11,7 @@ import ProfilePage from './features/profile/pages/Profile.jsx';
 import { ROLES } from './features/auth/roles.js';
 import { petOwnerRoutes, adminTransportRoutes, driverTransportRoutes } from './routes/roleRoutes.jsx';
 import HotelCctvMount from './features/super-admin/HotelCctvMount.jsx';
+import AccountingPage from './features/accounting/AccountingPage.jsx';
 
 /**
  * Customer site for owners; Admin/Driver use StaffShell with role guards.
@@ -40,6 +41,12 @@ export default function App() {
           <Route path="admin" element={<StaffShell variant="admin" />}>
             {adminTransportRoutes}
           </Route>
+        </Route>
+      </Route>
+
+      <Route element={<RequireAuth />}>
+        <Route element={<RequireRole roles={[ROLES.accountant]} />}>
+          <Route path="accounting" element={<AccountingPage />} />
         </Route>
       </Route>
 

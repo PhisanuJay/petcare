@@ -7,7 +7,9 @@ import PetDetailPage from '../features/pet-owner/pages/PetDetail.jsx';
 import ServicesPage from '../features/pet-owner/pages/Services.jsx';
 import BookingPage from '../features/pet-owner/pages/Booking.jsx';
 import MedicalPage from '../features/pet-owner/pages/Medical.jsx';
-import CatHotelPage from '../features/pet-owner/pages/CatHotel.jsx';
+import CatHotelPage, { CatHotelBookingsPage, StayBookPage, StayWatchPage } from '../features/pet-owner/pages/CatHotel.jsx';
+import PaymentPage from '../features/payments/PaymentPage.jsx';
+import BookingHistoryPage from '../features/payments/BookingHistory.jsx';
 import TransportPage from '../features/pet-owner/pages/Transport.jsx';
 import TransportHistoryPage from '../features/pet-owner/pages/TransportHistory.jsx';
 import TransportDetailPage from '../features/pet-owner/pages/TransportDetail.jsx';
@@ -82,7 +84,12 @@ export const petOwnerRoutes = (
     <Route path="services" element={<ServicesPage />} />
     <Route path="booking" element={<BookingPage />} />
     <Route path="medical" element={<MedicalPage />} />
+    <Route path="history" element={<BookingHistoryPage />} />
+    <Route path="pay/:paymentId" element={<PaymentPage />} />
     <Route path="cat-hotel" element={<CatHotelPage />} />
+    <Route path="cat-hotel/book" element={<StayBookPage />} />
+    <Route path="cat-hotel/bookings" element={<CatHotelBookingsPage />} />
+    <Route path="cat-hotel/watch/:cameraId" element={<StayWatchPage />} />
     <Route path="transport" element={<TransportPage />} />
     <Route path="transport/history" element={<TransportHistoryPage />} />
     <Route path="transport/:bookingId" element={<TransportDetailPage />} />

@@ -717,7 +717,7 @@ export function RolesPanel({ embedded = false, initialCameraId = '' } = {}) {
       <div className="page-head">
         <div>
           <h1>{embedded ? 'สิทธิ์ลูกค้า' : 'สิทธิ์การเข้าถึง'}</h1>
-          <p className="muted">เปิดให้ลูกค้าดูกล้องได้ในช่วงที่กำหนด เพิกถอนได้ทันที</p>
+          <p className="muted">หลังรับฝากแล้ว ให้สิทธิ์ด้วยบัญชีลูกค้าที่อีเมลตรงกับบัญชี PetCare ของผู้จอง เพิกถอนได้ทันที</p>
         </div>
         <button
           className="button ghost"
@@ -1607,7 +1607,7 @@ export function UsersPanel({ mode, session }) {
             <div className="card-top">
               <div>
                 <h2>เพิ่มลูกค้า</h2>
-                <p className="muted tiny">สร้างบัญชีให้ลูกค้าเข้าดูกล้องได้</p>
+                <p className="muted tiny">ใช้อีเมลเดียวกับที่ลูกค้าจองใน PetCare แล้วค่อยให้สิทธิ์กล้องหลังรับฝาก</p>
               </div>
               <button className="button ghost" type="button" onClick={closeComposer}>ปิด</button>
             </div>

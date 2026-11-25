@@ -16,6 +16,14 @@ const SEED_ADMIN = {
   phone: '0200000000',
 };
 
+const SEED_ACCOUNTANT = {
+  email: 'accountant@petcare.local',
+  password: 'Account1234',
+  firstName: 'ฝ่าย',
+  lastName: 'บัญชี',
+  phone: '0200000001',
+};
+
 const SEED_DRIVER = {
   id: DEMO_DRIVER_ID,
   email: 'driver@petcare.local',
@@ -83,6 +91,29 @@ async function ensureUsersBootstrapped() {
       createdAt: new Date().toISOString(),
       salt,
       passwordHash: await hashPassword(SEED_ADMIN.password, salt),
+    });
+    changed = true;
+  }
+
+  if (!users.some((u) => u.email === SEED_ACCOUNTANT.email)) {
+    const salt = newId();
+    users.push({
+      id: newId(),
+      firstName: SEED_ACCOUNTANT.firstName,
+      lastName: SEED_ACCOUNTANT.lastName,
+      email: SEED_ACCOUNTANT.email,
+      phone: SEED_ACCOUNTANT.phone,
+      address: '',
+      emergencyName: '',
+      emergencyPhone: '',
+      avatar: '',
+      points: 0,
+      role: ROLES.accountant,
+      vehicle: '',
+      active: true,
+      createdAt: new Date().toISOString(),
+      salt,
+      passwordHash: await hashPassword(SEED_ACCOUNTANT.password, salt),
     });
     changed = true;
   }
@@ -408,4 +439,9 @@ export const DEMO_ADMIN_LOGIN = {
 export const DEMO_DRIVER_LOGIN = {
   email: SEED_DRIVER.email,
   password: SEED_DRIVER.password,
+};
+
+export const DEMO_ACCOUNTANT_LOGIN = {
+  email: SEED_ACCOUNTANT.email,
+  password: SEED_ACCOUNTANT.password,
 };

@@ -15,9 +15,7 @@ export default function HotelSection({ go }) {
             <div className="col-md-4" key={room.name}>
               <div className={`hotel-card ${room.featured ? 'featured' : ''}`}>
                 {room.featured && <span className="ribbon">ยอดนิยม</span>}
-                <div className="room-ic" style={{ background: room.bg, color: room.fg }}>
-                  <i className={`bi ${room.icon}`} />
-                </div>
+                <img className="room-photo" src={room.image} alt={room.name} />
                 <div className="mitr fs-5">{room.name}</div>
                 <div className="price">
                   ฿{room.price.toLocaleString()}

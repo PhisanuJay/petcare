@@ -109,8 +109,12 @@ export default function Player({ cameraId, mode, tile = false, minimal = false, 
           ? `/api/admin/cameras/${cameraId}/whep`
           : `/api/cameras/${cameraId}/whep`;
         if (mode !== 'admin') {
-          const session = await api(`/api/cameras/${cameraId}/session`, { method: 'POST' });
+          const session = await api(`/api/cameras/${cameraId}/session`, {
+            method: 'POST',
+            headers: { 'X-Stay-View': '1' },
+          });
           headers['X-Stream-Token'] = session.token;
+          headers['X-Stay-View'] = '1';
         }
         const response = await fetch(path, {
           method: 'POST',

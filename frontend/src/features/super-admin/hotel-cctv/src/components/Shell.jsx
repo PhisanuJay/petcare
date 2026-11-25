@@ -22,6 +22,7 @@ const ADMIN_NAV = [
   { id: 'live', label: 'ดูภาพสด', Icon: IconMonitor, permission: 'view_cameras' },
   { id: 'rooms', label: 'จัดการกล้อง', Icon: IconDoor, permission: 'manage_rooms' },
   { id: 'users', label: 'จัดการผู้ใช้', Icon: IconUser, permission: 'manage_customers' },
+  { id: 'stays', label: 'ใบจอง', Icon: IconList, permission: 'manage_customers' },
   { id: 'logs', label: 'บันทึกกิจกรรม', Icon: IconList, permission: 'view_logs' },
   { id: 'settings', label: 'ตั้งค่า', Icon: IconGear, permission: 'view_settings' },
 ];

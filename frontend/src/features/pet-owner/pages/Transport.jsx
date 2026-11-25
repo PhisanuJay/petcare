@@ -9,6 +9,7 @@ import TransportSubnav from '../../pet-transport/components/TransportSubnav.jsx'
 import { SERVICE_TYPES } from '../../pet-transport/constants.js';
 import { quotePrice, zoneFromDistance } from '../../pet-transport/pricing.js';
 import { useTransport } from '../../pet-transport/useTransport.js';
+import { createPayment, PAY_KIND } from '../../payments/store.js';
 import '../../pet-transport/transport.css';
 
 const OWNER_NAV = [
@@ -96,7 +97,17 @@ export default function TransportPage() {
         returnPickupTime,
         returnDropoffTime: null,
       });
-      navigate(`/pet-owner/transport/${booking.id}`);
+      const payment = createPayment({
+        kind: PAY_KIND.transport,
+        refId: booking.id,
+        ownerId: currentUser.id,
+        ownerName: booking.ownerName,
+        email: currentUser.email,
+        title: 'รับ–ส่งสัตว์',
+        detail: `${booking.petName} · ${SERVICE_TYPES.find((item) => item.id === booking.serviceType)?.label || booking.serviceType}`,
+        total: booking.estimatedQuote?.total,
+      });
+      navigate(`/pet-owner/pay/${payment.id}`);
     } catch (err) {
       setError(err.message || 'จองไม่สำเร็จ');
     }

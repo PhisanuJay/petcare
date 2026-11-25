@@ -30,6 +30,13 @@ function authRoutes(config, requireAuth) {
     legacyHeaders: false,
     message: { error: { code: 'RATE_LIMITED', message: 'พยายามเข้าสู่ระบบบ่อยเกินไป รอสักครู่แล้วลองใหม่' } },
   });
+  const ownerLinkLimit = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: { code: 'RATE_LIMITED', message: 'ตรวจสิทธิ์บ่อยเกินไป รอสักครู่แล้วลองใหม่' } },
+  });
 
   router.get('/brand', (req, res) => {
     res.json({ hotelName: config.hotelName });
@@ -68,6 +75,27 @@ function authRoutes(config, requireAuth) {
       return;
     }
     setCookie(res, config, user);
+    res.json({ user: publicUser(user) });
+  }));
+
+  // ลูกค้า PetCare ไม่ใส่รหัสกล้อง ผูกด้วยอีเมลบัญชีที่มีอยู่แล้ว และออกเฉพาะสิทธิ์ลูกค้า
+  router.post('/owner-link', ownerLinkLimit, asyncHandler(async (req, res) => {
+    const body = z.object({
+      email: z.string().trim().email().max(255),
+    }).parse(req.body);
+    const user = await findUserByEmail(body.email.toLowerCase());
+    if (!user || user.role !== 'customer' || !user.is_active) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'ยังไม่ได้รับสิทธิ์ดูกล้อง' } });
+      return;
+    }
+    const token = jwt.sign({ sub: user.id, role: user.role }, config.jwtSecret, { expiresIn: '12h' });
+    res.cookie('cathotel_owner', token, {
+      httpOnly: true,
+      secure: config.cookieSecure,
+      sameSite: 'lax',
+      maxAge: 12 * 60 * 60 * 1000,
+      path: '/',
+    });
     res.json({ user: publicUser(user) });
   }));
 

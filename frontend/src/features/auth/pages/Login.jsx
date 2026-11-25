@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, useAuth } from '../AuthContext.jsx';
+import { DEMO_ACCOUNTANT_LOGIN, DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, useAuth } from '../AuthContext.jsx';
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
 import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
 
@@ -127,6 +127,8 @@ export default function LoginPage() {
           คนขับ: {DEMO_DRIVER_LOGIN.email} / {DEMO_DRIVER_LOGIN.password}
           {' · '}
           แอดมิน: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
+          {' · '}
+          บัญชี: {DEMO_ACCOUNTANT_LOGIN.email} / {DEMO_ACCOUNTANT_LOGIN.password}
         </p>
       </form>
     </AuthCard>

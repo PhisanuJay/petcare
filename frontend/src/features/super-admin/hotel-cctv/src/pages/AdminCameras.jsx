@@ -6,6 +6,7 @@ import WatchBoard from '../components/WatchBoard';
 import { IconCamera, IconSearch } from '../components/Marks';
 import { api, formatWhen } from '../api';
 import { LogsPanel, RoomsHub, SettingsPanel, UsersPanel } from './AdminSections';
+import HotelStayDesk from '../../../../pet-owner/HotelStayDesk.jsx';
 
 export default function AdminCameras() {
   return (
@@ -38,6 +39,7 @@ function AdminBody({ session, section }) {
       />
     );
   }
+  if (section === 'stays') return <HotelStayDesk />;
   if (section === 'logs') return <LogsPanel />;
   if (section === 'settings') return <SettingsPanel session={session} />;
   return (

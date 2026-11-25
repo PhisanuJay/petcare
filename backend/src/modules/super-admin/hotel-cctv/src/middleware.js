@@ -6,7 +6,10 @@ const { hasPermission } = require('./permissions');
 function createAuth(config) {
   return async function requireAuth(req, res, next) {
     try {
-      const token = req.cookies && req.cookies.cathotel;
+      const stayView = req.get('x-stay-view') === '1';
+      const token = stayView
+        ? req.cookies && req.cookies.cathotel_owner
+        : req.cookies && req.cookies.cathotel;
       if (!token) throw new HttpError(401, 'UNAUTHORIZED', 'กรุณาเข้าสู่ระบบ');
       const payload = jwt.verify(token, config.jwtSecret);
       const user = await findUserById(payload.sub);

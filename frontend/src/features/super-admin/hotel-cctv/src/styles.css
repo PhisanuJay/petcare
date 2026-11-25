@@ -363,7 +363,7 @@ svg { display: block; }
 .page-head h1 { font-size: 1.55rem; display: flex; align-items: center; gap: 10px; }
 .page-tools { flex-wrap: wrap; justify-content: flex-end; }
 
-.panel, .stat-card, .login-card, .modal, .empty, .banner {
+.panel, .stat-card, .login-card, .overlay .modal, .empty, .banner {
   background: var(--card);
   border-radius: 16px;
   border: 1px solid #edf2f7;
@@ -502,8 +502,8 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
   opacity: 0;
   transition: opacity 0.25s ease;
 }
-.room-art { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.85; }
-.room-photo {
+.cam-preview .room-art { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.85; }
+.cam-preview .room-photo {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -594,7 +594,7 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
   font-size: 0.72rem;
   opacity: 0.9;
 }
-.thumb-card.is-off .room-photo {
+.thumb-card.is-off .cam-preview .room-photo {
   filter: saturate(0.7) brightness(0.82);
 }
 .thumb-card.is-off .cam-preview::after {
@@ -855,14 +855,14 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
   padding: 16px;
   background: rgba(15, 23, 42, 0.45);
 }
-.modal {
+.overlay .modal {
   width: min(520px, 100%);
   max-height: calc(100vh - 32px);
   overflow: auto;
   padding: 22px;
 }
-.modal.wide { width: min(900px, 100%); }
-.modal form, .split form { display: grid; gap: 12px; }
+.overlay .modal.wide { width: min(900px, 100%); }
+.overlay .modal form, .split form { display: grid; gap: 12px; }
 .split { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
 .grant-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 10px; }
 .grant-list li {
@@ -2402,7 +2402,7 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
 }
 .theme-admin .panel,
 .theme-admin .stat-card,
-.theme-admin .modal,
+.theme-admin .overlay .modal,
 .theme-admin .empty,
 .theme-admin .banner {
   border-radius: 24px;
@@ -2686,4 +2686,28 @@ label input:focus, label select:focus, label textarea:focus, .toolbar input:focu
     border-radius: 22px;
   }
   .theme-admin .nav-item { border-radius: 999px; }
+}
+
+.stay-desk {
+  display: grid;
+}
+
+.stay-desk-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.stay-desk-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.stay-desk-row p {
+  margin: 4px 0 0;
+  color: var(--muted, #64748b);
+  font-size: 0.85rem;
 }
