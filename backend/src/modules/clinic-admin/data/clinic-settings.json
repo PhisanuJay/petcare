@@ -1,0 +1,51 @@
+{
+  "hours": {
+    "0": {
+      "open": "09:00",
+      "close": "21:00"
+    },
+    "1": {
+      "open": "08:00",
+      "close": "22:00"
+    },
+    "2": {
+      "open": "08:00",
+      "close": "22:00"
+    },
+    "3": {
+      "open": "08:00",
+      "close": "22:00"
+    },
+    "4": {
+      "open": "08:00",
+      "close": "22:00"
+    },
+    "5": {
+      "open": "08:00",
+      "close": "22:00"
+    },
+    "6": {
+      "open": "09:00",
+      "close": "21:00"
+    }
+  },
+  "services": {
+    "checkup": {
+      "online": true
+    },
+    "vaccine": {
+      "online": true
+    },
+    "parasite": {
+      "online": true
+    },
+    "followup": {
+      "online": true
+    },
+    "other": {
+      "online": true
+    }
+  },
+  "closures": [],
+  "updatedAt": "2026-11-25T18:20:24.593Z"
+}

@@ -11,6 +11,11 @@ export default function AdoptionSection({ go }) {
         </div>
 
         <div className="row g-4">
+          {!ADOPT_ANIMALS.length && (
+            <div className="col-12">
+              <p className="text-muted mb-0">ยังไม่มีรายชื่อสัตว์รอรับเลี้ยงในระบบ — ดูรายการล่าสุดได้หลังมีข้อมูลจากฝ่ายรับเลี้ยง</p>
+            </div>
+          )}
           {ADOPT_ANIMALS.map((a) => (
             <div className="col-sm-6 col-lg-3" key={a.name}>
               <div className="adopt-card">

@@ -3,7 +3,7 @@ import vet2 from '../../assets/vet-2.jpg';
 import vet3 from '../../assets/vet-3.jpg';
 import vet4 from '../../assets/vet-4.jpg';
 
-/** Mock content for the home page until the backend provides real data. */
+/** Static marketing copy for the landing page (not live DB records). */
 
 export const STATS = [
   { num: '12+', label: 'ปีที่เปิดให้บริการ' },
@@ -56,48 +56,8 @@ export const HOTEL_PERKS = [
   { icon: 'bi-truck', title: 'บริการรับ-ส่งถึงบ้าน', desc: 'สะดวก ไม่ต้องเดินทาง' },
 ];
 
-export const ADOPT_ANIMALS = [
-  {
-    name: 'น้องถั่วเหลือง',
-    emoji: '🐕',
-    bg: '#fff1c9',
-    breed: 'สุนัขพันธุ์ผสม',
-    sex: 'female',
-    age: '1 ปี',
-    personality: 'ขี้อ้อน ชอบเล่นกับเด็ก',
-    tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
-  },
-  {
-    name: 'น้องมะลิ',
-    emoji: '🐈',
-    bg: '#e7f1ff',
-    breed: 'แมวขาวมณี',
-    sex: 'female',
-    age: '8 เดือน',
-    personality: 'เรียบร้อย ชอบนอนตัก',
-    tags: ['ฉีดวัคซีนแล้ว'],
-  },
-  {
-    name: 'น้องดำ',
-    emoji: '🐶',
-    bg: '#dff5e8',
-    breed: 'สุนัขพันธุ์ไทย',
-    sex: 'male',
-    age: '2 ปี',
-    personality: 'ฉลาด เฝ้าบ้านเก่ง',
-    tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
-  },
-  {
-    name: 'น้องส้มโอ',
-    emoji: '🐱',
-    bg: '#ffe6d9',
-    breed: 'แมวส้ม',
-    sex: 'male',
-    age: '3 เดือน',
-    personality: 'ซน ขี้เล่น เข้ากับแมวอื่นได้',
-    tags: ['ถ่ายพยาธิแล้ว'],
-  },
-];
+/** Live animals should come from /api/adoption — no hardcoded samples. */
+export const ADOPT_ANIMALS = [];
 
 export const ADOPT_STEPS = [
   { icon: 'bi-search-heart', title: 'เลือกน้องที่ใช่' },
