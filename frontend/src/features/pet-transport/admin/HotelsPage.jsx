@@ -7,13 +7,17 @@ export default function HotelsPage() {
   const [address, setAddress] = useState('');
   const [err, setErr] = useState('');
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     setErr('');
     if (!name.trim() || !address.trim()) return setErr('กรอกชื่อและที่อยู่');
-    addHotel({ name, address });
-    setName('');
-    setAddress('');
+    try {
+      await addHotel({ name, address });
+      setName('');
+      setAddress('');
+    } catch (error) {
+      setErr(error.message);
+    }
     return undefined;
   }
 
@@ -34,7 +38,7 @@ export default function HotelsPage() {
             <input id="haddr" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
         </div>
-        <button type="submit" className="tp-btn">เพิ่ม</button>
+        <button type="submit" className="btn btn-sky">เพิ่ม</button>
       </form>
 
       <div className="tp-list" style={{ marginTop: '1rem' }}>
@@ -44,7 +48,7 @@ export default function HotelsPage() {
               <strong>{h.name}</strong>
               <div className="tp-list-item__meta">{h.address}</div>
             </div>
-            <button type="button" className="tp-btn tp-btn--ghost" onClick={() => removeHotel(h.id)}>ลบ</button>
+            <button type="button" className="btn btn-soft" onClick={() => removeHotel(h.id)}>ลบ</button>
           </div>
         ))}
       </div>

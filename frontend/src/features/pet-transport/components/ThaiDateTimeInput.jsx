@@ -1,9 +1,13 @@
 import DatePicker, { registerLocale } from 'react-datepicker';
 import { th } from 'date-fns/locale/th';
-import { format, isValid, parse } from 'date-fns';
+import { format, isValid, parse, setHours, setMinutes, setSeconds } from 'date-fns';
 import 'react-datepicker/dist/react-datepicker.css';
 
 registerLocale('th', th);
+
+/** Pickup window: 09:00–21:00 (9 โมง – 3 ทุ่ม) */
+export const PICKUP_TIME_MIN = '09:00';
+export const PICKUP_TIME_MAX = '21:00';
 
 /**
  * Date วว/ดด/ปปปป + time 24h as HH:mm น. via react-datepicker.
@@ -22,10 +26,16 @@ function normalizeTimeStr(timeStr) {
   return `${pad(hour)}:${pad(minute)}`;
 }
 
+export function isAllowedPickupTime(timeStr) {
+  const time = normalizeTimeStr(timeStr);
+  if (!time) return false;
+  return time >= PICKUP_TIME_MIN && time <= PICKUP_TIME_MAX;
+}
+
 export function parseThaiDateTime(dateStr, timeStr) {
   const m = String(dateStr || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   const time = normalizeTimeStr(timeStr);
-  if (!m || !time) return null;
+  if (!m || !time || !isAllowedPickupTime(time)) return null;
   const day = Number(m[1]);
   const month = Number(m[2]);
   const year = Number(m[3]);
@@ -62,6 +72,10 @@ function toTimeDate(timeStr) {
   return isValid(parsed) ? parsed : null;
 }
 
+function pickupTimeBound(hours, minutes = 0) {
+  return setSeconds(setMinutes(setHours(new Date(), hours), minutes), 0);
+}
+
 export default function ThaiDateTimeInput({
   id,
   date,
@@ -69,7 +83,7 @@ export default function ThaiDateTimeInput({
   onDateChange,
   onTimeChange,
   dateLabel = 'วันที่ (วว/ดด/ปปปป)',
-  timeLabel = 'เวลา (น.)',
+  timeLabel = 'เวลา (09:00–21:00 น.)',
 }) {
   return (
     <div className="row-2">
@@ -94,7 +108,14 @@ export default function ThaiDateTimeInput({
         <DatePicker
           id={`${id}-time`}
           selected={toTimeDate(time)}
-          onChange={(value) => onTimeChange(value && isValid(value) ? format(value, 'HH:mm') : '')}
+          onChange={(value) => {
+            if (!value || !isValid(value)) {
+              onTimeChange('');
+              return;
+            }
+            const next = format(value, 'HH:mm');
+            onTimeChange(isAllowedPickupTime(next) ? next : '');
+          }}
           showTimeSelect
           showTimeSelectOnly
           timeIntervals={15}
@@ -102,12 +123,17 @@ export default function ThaiDateTimeInput({
           timeFormat="HH:mm"
           dateFormat="HH:mm 'น.'"
           locale="th"
-          placeholderText="14:30 น."
+          placeholderText="09:00–21:00 น."
           className="tp-datepicker-input"
           calendarClassName="tp-datepicker-calendar"
           showPopperArrow={false}
           isClearable
+          minTime={pickupTimeBound(9, 0)}
+          maxTime={pickupTimeBound(21, 0)}
         />
+        <p className="tp-muted" style={{ marginTop: '0.35rem', marginBottom: 0 }}>
+          เลือกรับได้ตั้งแต่ 09:00–21:00 น. (9 โมง – 3 ทุ่ม)
+        </p>
       </div>
     </div>
   );

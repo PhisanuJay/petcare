@@ -6,8 +6,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: true,
-    port: 5182,
+    port: 5177,
     proxy: {
+      '/api/pet-transport': 'http://localhost:3001',
       '/api': 'http://localhost:3000',
     },
   },

@@ -1,4 +1,45 @@
-import { LOCATION_KINDS } from '../constants.js';
+import {
+  LOCATION_KINDS,
+  SERVICE_DISTRICTS,
+  SERVICE_SUBDISTRICTS,
+  ZONES,
+  isFacilityKind,
+  normalizePlaceKind,
+} from '../constants.js';
+import { districtLabel, subdistrictById, zoneIdFromSubdistrict } from '../pricing.js';
+
+export function emptyZonePlace(address = '', kind = 'custom') {
+  return {
+    kind: normalizePlaceKind(kind),
+    refId: '',
+    name: kind === 'home' ? 'บ้าน' : '',
+    districtId: SERVICE_DISTRICTS[0]?.id || 'chatuchak',
+    subdistrictId: '',
+    zoneId: null,
+    address: address || '',
+    mapUrl: '',
+  };
+}
+
+export function placeFromCatalog(item, kind = 'facility') {
+  if (!item) return emptyZonePlace('', kind);
+  return {
+    kind: normalizePlaceKind(kind),
+    refId: item.id,
+    name: item.name || '',
+    districtId: item.districtId || SERVICE_DISTRICTS[0]?.id || 'chatuchak',
+    subdistrictId: item.subdistrictId || '',
+    zoneId: item.zoneId || zoneIdFromSubdistrict(item.subdistrictId) || null,
+    address: item.address || '',
+    mapUrl: item.mapUrl || '',
+    catalogType: item.catalogType || null,
+  };
+}
+
+/** Partner places for booking = clinics only */
+export function mergeFacilities(clinics = [], _hotels = []) {
+  return clinics.map((c) => ({ ...c, catalogType: 'clinic' }));
+}
 
 export default function PlaceFields({
   prefix,
@@ -6,94 +47,260 @@ export default function PlaceFields({
   onChange,
   clinics = [],
   hotels = [],
-  defaultAddress = '',
+  allowedKinds = null,
+  locked = false,
 }) {
-  const set = (key, val) => onChange({ ...value, [key]: val });
+  const kinds = allowedKinds?.length
+    ? LOCATION_KINDS.filter((k) => allowedKinds.includes(k.id))
+    : LOCATION_KINDS;
+  const districtId = value.districtId || SERVICE_DISTRICTS[0]?.id || 'chatuchak';
+  const subs = SERVICE_SUBDISTRICTS.filter((s) => s.districtId === districtId);
+  const zoneMeta = ZONES.find((z) => z.id === value.zoneId);
+  const kind = normalizePlaceKind(value.kind || 'custom');
+  const catalogLocked = isFacilityKind(kind);
+  const facilities = mergeFacilities(clinics, hotels);
+  const subMeta = value.subdistrictId ? subdistrictById(value.subdistrictId) : null;
+  const forceFacilityUi = locked && allowedKinds?.length === 1 && allowedKinds[0] === 'facility';
+  const showClinicReadonly = forceFacilityUi || (locked && catalogLocked);
 
-  function onKind(kind) {
-    if (kind === 'home') {
-      onChange({ kind, refId: '', name: 'บ้าน', address: defaultAddress || value.address || '' });
+  function setKind(nextKind) {
+    if (locked) return;
+    const normalized = normalizePlaceKind(nextKind);
+    if (normalized === kind) return;
+
+    if (normalized === 'home') {
+      onChange({
+        ...emptyZonePlace(value.address || '', 'home'),
+        address: value.address || '',
+        mapUrl: value.mapUrl || '',
+      });
       return;
     }
-    if (kind === 'clinic' && clinics[0]) {
-      onChange({ kind, refId: clinics[0].id, name: clinics[0].name, address: clinics[0].address });
+    if (normalized === 'facility') {
+      const item = facilities.find((f) => f.id === value.refId) || facilities[0];
+      onChange(item ? placeFromCatalog(item, 'facility') : emptyZonePlace('', 'facility'));
       return;
     }
-    if (kind === 'hotel' && hotels[0]) {
-      onChange({ kind, refId: hotels[0].id, name: hotels[0].name, address: hotels[0].address });
-      return;
-    }
-    onChange({ kind, refId: '', name: '', address: '' });
+    onChange({
+      ...emptyZonePlace(value.address || '', normalized),
+      mapUrl: value.mapUrl || '',
+    });
   }
 
-  function onRef(refId) {
-    if (value.kind === 'clinic') {
-      const c = clinics.find((x) => x.id === refId);
-      if (c) onChange({ ...value, refId, name: c.name, address: c.address });
-      return;
-    }
-    if (value.kind === 'hotel') {
-      const h = hotels.find((x) => x.id === refId);
-      if (h) onChange({ ...value, refId, name: h.name, address: h.address });
-    }
+  function setCatalogRef(refId) {
+    if (locked) return;
+    const item = facilities.find((x) => x.id === refId);
+    if (item) onChange(placeFromCatalog(item, 'facility'));
+  }
+
+  function setDistrict(nextDistrictId) {
+    onChange({
+      ...value,
+      kind,
+      districtId: nextDistrictId,
+      subdistrictId: '',
+      zoneId: null,
+      refId: '',
+    });
+  }
+
+  function setSubdistrict(subdistrictId) {
+    onChange({
+      ...value,
+      kind,
+      districtId,
+      subdistrictId,
+      zoneId: zoneIdFromSubdistrict(subdistrictId),
+      refId: '',
+    });
+  }
+
+  if (showClinicReadonly) {
+    return (
+      <div className="tp-card tp-card--muted">
+        <h3>{prefix}</h3>
+        <div className="tp-form">
+          <div className="field">
+            <label>ประเภทสถานที่</label>
+            <div className="tp-readonly-value">คลินิก</div>
+          </div>
+          <div className="field">
+            <label>ชื่อคลินิก</label>
+            <div className="tp-readonly-value">{value.name || facilities[0]?.name || '—'}</div>
+          </div>
+          <div className="field">
+            <label>รายละเอียดที่อยู่</label>
+            <div className="tp-readonly-value tp-readonly-value--block">
+              {value.address || facilities[0]?.address || '—'}
+            </div>
+          </div>
+          {(value.mapUrl || facilities[0]?.mapUrl) ? (
+            <div className="field">
+              <label>ลิงก์แผนที่</label>
+              <div className="tp-readonly-value tp-readonly-value--block">
+                <a href={value.mapUrl || facilities[0]?.mapUrl} target="_blank" rel="noreferrer">
+                  {value.mapUrl || facilities[0]?.mapUrl}
+                </a>
+              </div>
+            </div>
+          ) : null}
+          <div className="field">
+            <label>เขต / แขวง</label>
+            <div className="tp-readonly-value">
+              {[districtLabel(value.districtId || facilities[0]?.districtId), subMeta?.label || subdistrictById(facilities[0]?.subdistrictId)?.label]
+                .filter(Boolean)
+                .join(' · ') || '—'}
+            </div>
+          </div>
+          <div className="field">
+            <label>Zone</label>
+            <div className="tp-zone-badge" aria-live="polite">
+              {zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))) ? (
+                <>
+                  <strong>
+                    {(zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))))?.label}
+                  </strong>
+                  <span className="tp-muted">
+                    {' '}
+                    · ฿{(zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))))?.price} ฐาน
+                  </span>
+                </>
+              ) : (
+                <span className="tp-muted">—</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="tp-card">
+    <div className={`tp-card ${locked ? 'tp-card--muted' : ''}`}>
       <h3>{prefix}</h3>
       <div className="tp-form">
         <div className="field">
-          <label htmlFor={`${prefix}-kind`}>ประเภทสถานที่</label>
-          <select id={`${prefix}-kind`} value={value.kind} onChange={(e) => onKind(e.target.value)}>
-            {LOCATION_KINDS.map((k) => (
-              <option key={k.id} value={k.id}>{k.label}</option>
+          <span className="tp-field-label" id={`${prefix}-kind-label`}>ประเภทสถานที่</span>
+          <div
+            className="tp-kind-toggle"
+            role="radiogroup"
+            aria-labelledby={`${prefix}-kind-label`}
+          >
+            {kinds.map((k) => (
+              <button
+                key={k.id}
+                type="button"
+                role="radio"
+                aria-checked={kind === k.id}
+                className={`tp-kind-toggle__btn ${kind === k.id ? 'is-active' : ''}`}
+                disabled={locked}
+                onClick={() => setKind(k.id)}
+              >
+                {k.label}
+              </button>
             ))}
-          </select>
+          </div>
         </div>
 
-        {value.kind === 'clinic' && (
+        {catalogLocked && (
           <div className="field">
-            <label htmlFor={`${prefix}-clinic`}>คลินิก</label>
-            <select id={`${prefix}-clinic`} value={value.refId} onChange={(e) => onRef(e.target.value)}>
-              {clinics.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+            <label htmlFor={`${prefix}-facility`}>คลินิกในระบบ</label>
+            <select
+              id={`${prefix}-facility`}
+              value={value.refId || facilities[0]?.id || ''}
+              disabled={locked}
+              onChange={(e) => setCatalogRef(e.target.value)}
+            >
+              {facilities.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
               ))}
             </select>
           </div>
         )}
 
-        {value.kind === 'hotel' && (
-          <div className="field">
-            <label htmlFor={`${prefix}-hotel`}>โรงแรมสัตว์</label>
-            <select id={`${prefix}-hotel`} value={value.refId} onChange={(e) => onRef(e.target.value)}>
-              {hotels.map((h) => (
-                <option key={h.id} value={h.id}>{h.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {!catalogLocked && (
+          <>
+            <div className="field">
+              <label htmlFor={`${prefix}-district`}>เขต</label>
+              <select
+                id={`${prefix}-district`}
+                value={districtId}
+                disabled={locked}
+                onChange={(e) => setDistrict(e.target.value)}
+              >
+                {SERVICE_DISTRICTS.map((d) => (
+                  <option key={d.id} value={d.id}>{d.label}</option>
+                ))}
+              </select>
+            </div>
 
-        {(value.kind === 'custom' || value.kind === 'home') && (
-          <div className="field">
-            <label htmlFor={`${prefix}-name`}>ชื่อสถานที่</label>
-            <input
-              id={`${prefix}-name`}
-              value={value.name}
-              onChange={(e) => set('name', e.target.value)}
-              placeholder={value.kind === 'home' ? 'บ้าน' : 'เช่น คอนโด / สำนักงาน'}
-            />
-          </div>
+            <div className="field">
+              <label htmlFor={`${prefix}-subdistrict`}>แขวง</label>
+              <select
+                id={`${prefix}-subdistrict`}
+                value={value.subdistrictId || ''}
+                disabled={locked}
+                onChange={(e) => setSubdistrict(e.target.value)}
+              >
+                <option value="">— เลือกแขวง —</option>
+                {subs.map((s) => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+          </>
         )}
 
         <div className="field">
-          <label htmlFor={`${prefix}-address`}>ที่อยู่</label>
+          <label>Zone</label>
+          <div className="tp-zone-badge" aria-live="polite">
+            {zoneMeta ? (
+              <>
+                <strong>{zoneMeta.label}</strong>
+                <span className="tp-muted"> · ฿{zoneMeta.price} ฐาน</span>
+              </>
+            ) : (
+              <span className="tp-muted">
+                {catalogLocked ? 'เลือกรายการเพื่อดู Zone' : 'เลือกแขวงเพื่อดู Zone'}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="field">
+          <label htmlFor={`${prefix}-address`}>รายละเอียดที่อยู่</label>
           <textarea
             id={`${prefix}-address`}
             rows={2}
-            value={value.address}
-            onChange={(e) => set('address', e.target.value)}
-            readOnly={value.kind === 'clinic' || value.kind === 'hotel'}
+            value={value.address || ''}
+            readOnly={catalogLocked || locked}
+            onChange={(e) => onChange({ ...value, address: e.target.value })}
+            placeholder="บ้านเลขที่ ซอย ถนน จุดสังเกต"
           />
+          {catalogLocked && !locked && (
+            <p className="tp-muted">ที่อยู่จากคลินิกในระบบ — แก้ไขไม่ได้</p>
+          )}
+        </div>
+
+        <div className="field">
+          <label htmlFor={`${prefix}-map`}>ลิงก์แผนที่ (Google Maps)</label>
+          <input
+            id={`${prefix}-map`}
+            type="url"
+            inputMode="url"
+            value={value.mapUrl || ''}
+            readOnly={catalogLocked || locked}
+            onChange={(e) => onChange({ ...value, mapUrl: e.target.value })}
+            placeholder="วางลิงก์จาก Google Maps เช่น https://maps.google.com/..."
+          />
+          {!catalogLocked && !locked ? (
+            <p className="tp-muted">ช่วยให้คนขับเปิดเส้นทางไปยังจุดรับ–ส่งได้ทันที</p>
+          ) : null}
+          {value.mapUrl && !catalogLocked && !locked ? (
+            <p className="tp-muted" style={{ marginTop: '0.35rem' }}>
+              <a href={value.mapUrl} target="_blank" rel="noreferrer">เปิดดูลิงก์นี้</a>
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import {
   subscribeTransport,
   createBooking,
   confirmPrice,
+  setBookingOtherService,
   assignDriver as assignDriverStore,
   ownerConfirmPayment,
   adminMarkPaid,
@@ -14,11 +15,17 @@ import {
   requestCancel,
   resolveCancel,
   reportIssue,
+  updateTripSchedule,
+  notificationsForDriver,
+  unreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
+  ensureUpcomingReminders,
   updateZones,
   addHotel,
   removeHotel,
   resetTransportDemo,
-  ensureDemoDriverJobs,
+  purgeDemoDriverJobs,
   toAssignDriver,
 } from './store.js';
 
@@ -70,6 +77,16 @@ export function useTransport() {
     return assignDriverStore(tripId, driverId, label);
   }, [drivers]);
 
+  const driverNotifications = useCallback(
+    (driverId) => notificationsForDriver(driverId),
+    [state.notifications],
+  );
+
+  const driverUnreadCount = useCallback(
+    (driverId) => unreadNotificationCount(driverId),
+    [state.notifications],
+  );
+
   return {
     ...state,
     drivers,
@@ -77,8 +94,11 @@ export function useTransport() {
     bookings,
     getBooking,
     tripsForDriver,
+    driverNotifications,
+    driverUnreadCount,
     createBooking,
     confirmPrice,
+    setBookingOtherService,
     assignDriver,
     ownerConfirmPayment,
     adminMarkPaid,
@@ -87,10 +107,14 @@ export function useTransport() {
     requestCancel,
     resolveCancel,
     reportIssue,
+    updateTripSchedule,
+    markNotificationRead,
+    markAllNotificationsRead,
+    ensureUpcomingReminders,
     updateZones,
     addHotel,
     removeHotel,
     resetTransportDemo,
-    ensureDemoDriverJobs,
+    purgeDemoDriverJobs,
   };
 }

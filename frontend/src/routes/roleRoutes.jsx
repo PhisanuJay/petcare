@@ -44,6 +44,8 @@ import AssignedJobsPage from '../features/pet-transport/pages/AssignedJobs.jsx';
 import JobDetailPage from '../features/pet-transport/pages/JobDetail.jsx';
 import TrackingPage from '../features/pet-transport/pages/Tracking.jsx';
 import HistoryPage from '../features/pet-transport/pages/History.jsx';
+import DriverProfilePage from '../features/pet-transport/pages/DriverProfile.jsx';
+import DriverNotificationsPage from '../features/pet-transport/pages/DriverNotifications.jsx';
 import AdminTransportLayout from '../features/pet-transport/admin/AdminTransportLayout.jsx';
 import TransportDashboard from '../features/pet-transport/admin/TransportDashboard.jsx';
 import BookingManagement from '../features/pet-transport/admin/BookingManagement.jsx';
@@ -106,7 +108,6 @@ export const adminTransportRoutes = (
       <Route index element={<TransportDashboard />} />
       <Route path="bookings" element={<BookingManagement />} />
       <Route path="bookings/:bookingId" element={<BookingAdminDetail />} />
-      <Route path="payments" element={<PaymentVerification />} />
       <Route path="cancellations" element={<CancellationPage />} />
       <Route path="pricing" element={<TransportPricingPage />} />
       <Route path="hotels" element={<HotelsPage />} />
@@ -130,6 +131,16 @@ export const driverTransportRoutes = (
     <Route path="jobs/:tripId/status" element={<TrackingPage />} />
     <Route path="tracking" element={<TrackingPage />} />
     <Route path="history" element={<HistoryPage />} />
+    <Route path="notifications" element={<DriverNotificationsPage />} />
+    <Route path="profile" element={<DriverProfilePage />} />
+  </>
+);
+
+/** Finance routes — nested under `/finance` + StaffShell + RequireRole(finance). */
+export const financeRoutes = (
+  <>
+    <Route index element={<PaymentVerification />} />
+    <Route path="payments" element={<PaymentVerification />} />
   </>
 );
 

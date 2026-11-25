@@ -9,12 +9,17 @@ import RequireRole from './features/auth/RequireRole.jsx';
 import RoleHomeRedirect from './features/auth/RoleHomeRedirect.jsx';
 import ProfilePage from './features/profile/pages/Profile.jsx';
 import { ROLES } from './features/auth/roles.js';
-import { petOwnerRoutes, adminTransportRoutes, driverTransportRoutes } from './routes/roleRoutes.jsx';
+import {
+  petOwnerRoutes,
+  adminTransportRoutes,
+  driverTransportRoutes,
+  financeRoutes,
+} from './routes/roleRoutes.jsx';
 import HotelCctvMount from './features/super-admin/HotelCctvMount.jsx';
 import AccountingPage from './features/accounting/AccountingPage.jsx';
 
 /**
- * Customer site for owners; Admin/Driver use StaffShell with role guards.
+ * Customer site for owners; Admin/Driver/Finance use StaffShell with role guards.
  * Super Admin Pet Hotel CCTV mounts at /super-admin/* (from Super-Admin branch).
  */
 export default function App() {
@@ -54,6 +59,14 @@ export default function App() {
         <Route element={<RequireRole roles={[ROLES.driver]} />}>
           <Route path="pet-transport" element={<StaffShell variant="driver" />}>
             {driverTransportRoutes}
+          </Route>
+        </Route>
+      </Route>
+
+      <Route element={<RequireAuth />}>
+        <Route element={<RequireRole roles={[ROLES.finance]} />}>
+          <Route path="finance" element={<StaffShell variant="finance" />}>
+            {financeRoutes}
           </Route>
         </Route>
       </Route>

@@ -49,11 +49,11 @@ export default function TrackingPage() {
   const next = nextTripStatus(trip.status);
   const paid = booking?.paymentStatus === 'paid';
 
-  function advance() {
+  async function advance() {
     setErr('');
     try {
       const n = nextTripStatus(trip.status);
-      advanceTripStatus(trip.id, note);
+      await advanceTripStatus(trip.id, note);
       setNote('');
       setMsg(n ? `อัปเดตเป็น: ${tripStatusMeta(n.id).label}` : 'อัปเดตแล้ว');
     } catch (e) {
@@ -68,7 +68,7 @@ export default function TrackingPage() {
       <p className="tp-lead">อัปเดต 7 สถานะของทริป · {booking?.petName}</p>
       {msg && <div className="tp-alert tp-alert--ok">{msg}</div>}
       {err && <div className="tp-alert tp-alert--danger">{err}</div>}
-      {!paid && <div className="tp-alert tp-alert--info">รอ Admin Mark as Paid ก่อนเริ่ม</div>}
+      {!paid && <div className="tp-alert tp-alert--info">รอฝ่ายการเงินยืนยันชำระก่อนเริ่ม</div>}
 
       <div className="tp-card">
         <TripStatusTimeline status={trip.status} />

@@ -30,7 +30,7 @@ export default function TransportHistoryPage() {
             <div className="tp-card">
               <p className="tp-muted" style={{ margin: 0 }}>ยังไม่มีการจอง</p>
               <div className="tp-actions">
-                <Link className="tp-btn" to="/pet-owner/transport">จองรับ–ส่ง</Link>
+                <Link className="btn btn-sky" to="/pet-owner/transport">จองรับ–ส่ง</Link>
               </div>
             </div>
           )}
@@ -41,7 +41,15 @@ export default function TransportHistoryPage() {
                 <div>
                   <strong>{b.petName}</strong>
                   <div className="tp-list-item__meta">
-                    {b.serviceType === 'round_trip' ? 'ไป–กลับ' : 'เที่ยวเดียว'} · Zone {b.zoneId} ·{' '}
+                    {{
+                      outbound: 'ไปส่ง',
+                      inbound: 'รับกลับ',
+                      round_trip: 'ไป–กลับ',
+                      one_way: 'ไปส่ง',
+                    }[b.serviceType] || b.serviceType}
+                    {' · '}
+                    Zone {b.fromZoneId || '?'}→{b.toZoneId || '?'}
+                    {' · '}
                     {formatBaht(b.quote?.total)}
                   </div>
                   <div className="tp-list-item__meta">

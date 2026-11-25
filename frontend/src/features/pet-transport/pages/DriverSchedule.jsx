@@ -1,59 +1,93 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useMemo, useState } from 'react';
+import DatePicker, { registerLocale } from 'react-datepicker';
+import { th } from 'date-fns/locale/th';
 import { Link } from 'react-router-dom';
 import IssueFields from '../components/IssueFields.jsx';
-import PetKind from '../components/PetKind.jsx';
 import { nextTripStatus, tripStatusMeta } from '../constants.js';
-import { ensureDemoDriverJobs, placeParts } from '../store.js';
+import { placeParts, purgeDemoDriverJobs } from '../store.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { speciesOf } from '../../pet-owner/petUtils.js';
+import { STORAGE_KEYS, readJSON } from '../../../shared/utils/storage.js';
 import { useTransport } from '../useTransport.js';
+import 'react-datepicker/dist/react-datepicker.css';
 import '../transport.css';
 
+registerLocale('th', th);
+
 const JOB_KIND = {
-  pickup: 'รับขึ้นโรงแรม',
+  pickup: 'รับสัตว์ไปโรงแรม',
   dropoff: 'ส่งกลับบ้าน',
 };
 
-function dayKey(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'unknown';
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
+const SPECIES_SHORT = {
+  dog: 'หมา',
+  cat: 'แมว',
+};
+
+function findPet(petId) {
+  if (!petId) return null;
+  const pets = readJSON(STORAGE_KEYS.pets, []);
+  return pets.find((p) => p.id === petId) || null;
 }
 
-function dayOffset(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const that = new Date(date);
-  that.setHours(0, 0, 0, 0);
-  return Math.round((that.getTime() - today.getTime()) / 86400000);
+function startOfDay(value = new Date()) {
+  const date = value instanceof Date ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(0, 0, 0, 0);
+  return date;
 }
 
-function dayTitle(value) {
-  const offset = dayOffset(value);
-  if (offset === 0) return 'วันนี้';
-  if (offset === 1) return 'พรุ่งนี้';
-  return new Date(value).toLocaleDateString('th-TH', {
-    weekday: 'short',
+function dayOffset(value, base = new Date()) {
+  const that = startOfDay(value);
+  const origin = startOfDay(base);
+  if (!that || !origin) return 0;
+  return Math.round((that.getTime() - origin.getTime()) / 86400000);
+}
+
+function sameDay(left, right) {
+  const a = startOfDay(left);
+  const b = startOfDay(right);
+  return Boolean(a && b && a.getTime() === b.getTime());
+}
+
+function formatThaiDate(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString('th-TH', {
+    weekday: 'long',
     day: 'numeric',
-    month: 'short',
+    month: 'long',
+    year: 'numeric',
   });
 }
 
-function clockLabel(value, overdue) {
+const DateTrigger = forwardRef(function DateTrigger({ label, onClick }, ref) {
+  return (
+    <button
+      type="button"
+      className="dv-date dv-date--picker"
+      onClick={onClick}
+      ref={ref}
+      aria-label="เลือกวันที่ดูงาน"
+    >
+      <span aria-hidden="true">📅</span>
+      <span>{label}</span>
+      <span className="dv-date__caret" aria-hidden="true">▾</span>
+    </button>
+  );
+});
+
+function formatWhen(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  if (overdue) {
-    return date.toLocaleString('th-TH', {
-      day: 'numeric',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-  return date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+  return `${date.toLocaleDateString('th-TH', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })} ${date.toLocaleTimeString('th-TH', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })} น.`;
 }
 
 function phoneHref(phone) {
@@ -61,39 +95,50 @@ function phoneHref(phone) {
   return digits ? `tel:${digits}` : '';
 }
 
-function Stop({ label, place, state }) {
-  const parts = placeParts(place, state);
+function ClockIcon() {
   return (
-    <div className="driver-stop">
-      <span>{label}</span>
-      <strong>{parts.name || 'ไม่ระบุสถานที่'}</strong>
-      <p>{parts.address || 'ยังไม่มีเลขที่อยู่'}</p>
-    </div>
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M12 8v4.5l3 1.8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
-function groupJobs(jobs) {
-  const overdue = jobs.filter((job) => dayOffset(job.pickupTime) < 0);
-  const todayJobs = jobs.filter((job) => dayOffset(job.pickupTime) === 0);
-  const laterKeys = [...new Set(
-    jobs.filter((job) => dayOffset(job.pickupTime) > 0).map((job) => dayKey(job.pickupTime)),
-  )].sort();
-  const groups = [];
-  if (overdue.length) {
-    groups.push({ id: 'overdue', title: 'เลยกำหนด', jobs: overdue, overdue: true });
-  }
-  if (jobs.length) {
-    groups.push({ id: dayKey(new Date()), title: 'วันนี้', jobs: todayJobs, today: true });
-  }
-  laterKeys.forEach((key) => {
-    const sample = jobs.find((job) => dayKey(job.pickupTime) === key);
-    groups.push({
-      id: key,
-      title: dayTitle(sample.pickupTime),
-      jobs: jobs.filter((job) => dayKey(job.pickupTime) === key),
-    });
-  });
-  return groups;
+function PawIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="8" cy="9" r="1.6" fill="currentColor" />
+      <circle cx="12" cy="7.5" r="1.6" fill="currentColor" />
+      <circle cx="16" cy="9" r="1.6" fill="currentColor" />
+      <ellipse cx="12" cy="15.2" rx="3.4" ry="2.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 11.5 12 5l8 6.5V20a1 1 0 0 1-1 1h-5v-5H10v5H5a1 1 0 0 1-1-1v-8.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 21s6-5.2 6-10a6 6 0 1 0-12 0c0 4.8 6 10 6 10Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="11" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12Z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
 }
 
 export default function DriverSchedule() {
@@ -102,33 +147,68 @@ export default function DriverSchedule() {
   const { tripsForDriver, advanceTripStatus, reportIssue } = transport;
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
-  const [activeDay, setActiveDay] = useState(() => dayKey(new Date()));
+  const [tab, setTab] = useState('today');
   const [issueId, setIssueId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
 
   useEffect(() => {
-    if (currentUser?.id) ensureDemoDriverJobs(currentUser.id);
-  }, [currentUser?.id]);
+    purgeDemoDriverJobs();
+  }, []);
 
   const all = tripsForDriver(currentUser?.id);
-  const jobs = all
-    .filter((job) => job.status !== 'completed')
-    .sort((left, right) => String(left.pickupTime).localeCompare(String(right.pickupTime)));
-  const groups = groupJobs(jobs);
-  const selected = groups.find((group) => group.id === activeDay) || groups[0];
-  const visible = selected ? [selected] : [];
-  const todayJobs = jobs.filter((job) => dayOffset(job.pickupTime) === 0);
+  const openJobs = useMemo(
+    () => all
+      .filter((job) => job.status !== 'completed')
+      .sort((a, b) => String(a.pickupTime).localeCompare(String(b.pickupTime))),
+    [all],
+  );
+
+  const selected = selectedDate || startOfDay(new Date());
+  const selectedOffset = dayOffset(selected, new Date());
+  const todayJobs = openJobs.filter((job) => dayOffset(job.pickupTime) === 0);
+  const tomorrowJobs = openJobs.filter((job) => dayOffset(job.pickupTime) === 1);
+  const selectedJobs = openJobs.filter((job) => sameDay(job.pickupTime, selected));
+  const upcoming = openJobs.filter((job) => dayOffset(job.pickupTime) > 0).length;
+  const done = all.filter((job) => job.status === 'completed').length;
   const moving = todayJobs.filter((job) => {
     const step = tripStatusMeta(job.status).step;
     return step >= 2 && step < 7;
   }).length;
-  const upcoming = jobs.filter((job) => dayOffset(job.pickupTime) > 0).length;
-  const done = all.filter((job) => job.status === 'completed').length;
 
-  function markNext(job) {
+  const visible = tab === 'today'
+    ? todayJobs
+    : tab === 'tomorrow'
+      ? tomorrowJobs
+      : tab === 'selected'
+        ? selectedJobs
+        : openJobs;
+  const firstName = currentUser?.firstName || 'คนขับ';
+  const dateLabel = formatThaiDate(selected);
+
+  function onPickDate(next) {
+    const day = startOfDay(next || new Date());
+    setSelectedDate(day);
+    const offset = dayOffset(day, new Date());
+    if (offset === 0) setTab('today');
+    else if (offset === 1) setTab('tomorrow');
+    else setTab('selected');
+  }
+
+  function pickTab(nextTab) {
+    setTab(nextTab);
+    if (nextTab === 'today') setSelectedDate(startOfDay(new Date()));
+    else if (nextTab === 'tomorrow') {
+      const tmr = startOfDay(new Date());
+      tmr.setDate(tmr.getDate() + 1);
+      setSelectedDate(tmr);
+    }
+  }
+
+  async function markNext(job) {
     setError('');
     setNote('');
     try {
-      advanceTripStatus(job.id);
+      await advanceTripStatus(job.id);
       const next = nextTripStatus(job.status);
       setNote(next ? `${job.booking?.petName} · ${next.label}` : 'อัปเดตแล้ว');
     } catch (err) {
@@ -136,119 +216,236 @@ export default function DriverSchedule() {
     }
   }
 
-  function submitIssue(job, reasonId, message) {
-    reportIssue({
-      tripId: job.id,
-      driverId: currentUser.id,
-      reasonId,
-      message,
-    });
-    setIssueId('');
-    setError('');
-    setNote(`${job.booking?.petName || 'งานนี้'} · ส่งปัญหาให้แอดมินแล้ว`);
-  }
-
-  function showDay(id) {
-    setActiveDay(id);
-    setIssueId('');
+  async function submitIssue(job, reasonId, message) {
+    try {
+      await reportIssue({
+        tripId: job.id,
+        driverId: currentUser.id,
+        reasonId,
+        message,
+      });
+      setIssueId('');
+      setError('');
+      setNote(`${job.booking?.petName || 'งานนี้'} · ส่งปัญหาให้แอดมินแล้ว`);
+    } catch (err) {
+      setError(err.message);
+    }
   }
 
   return (
-    <section className="tp-page driver-page">
-      <header className="driver-board">
+    <section className="driver-page dv-light">
+      <header className="dv-hero">
         <div>
-          <p>ตารางรับส่ง</p>
-          <h1>{new Date().toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long' })}</h1>
+          <h1>
+            สวัสดี, {firstName}
+            <span aria-hidden="true"> 👋</span>
+          </h1>
+          <p>พร้อมดูแลน้อง ๆ ให้เดินทางปลอดภัย</p>
         </div>
-        <ul className="driver-stats">
-          <li><strong>{todayJobs.length}</strong><span>งานค้างวันนี้</span></li>
-          <li><strong>{moving}</strong><span>กำลังเดินทาง</span></li>
-          <li><strong>{done}</strong><span>ส่งแล้ว</span></li>
-          <li><strong>{upcoming}</strong><span>จองวันหน้า</span></li>
-        </ul>
       </header>
+
+      <div className="dv-kpis">
+        <article className="dv-kpi is-blue">
+          <img className="dv-kpi__icon" src="/driver/kpi-pending.png" alt="" />
+          <div>
+            <span>งานค้างวันนี้</span>
+            <strong>{todayJobs.length}</strong>
+          </div>
+        </article>
+        <article className="dv-kpi is-orange">
+          <img className="dv-kpi__icon" src="/driver/kpi-moving.png" alt="" />
+          <div>
+            <span>กำลังดำเนินการ</span>
+            <strong>{moving}</strong>
+          </div>
+        </article>
+        <article className="dv-kpi is-green">
+          <img className="dv-kpi__icon" src="/driver/kpi-done.png" alt="" />
+          <div>
+            <span>ส่งแล้ว</span>
+            <strong>{done}</strong>
+          </div>
+        </article>
+        <article className="dv-kpi is-violet">
+          <img className="dv-kpi__icon" src="/driver/kpi-upcoming.png" alt="" />
+          <div>
+            <span>จองวันหน้า</span>
+            <strong>{upcoming}</strong>
+          </div>
+        </article>
+      </div>
+
+      <div className="dv-toolbar">
+        <div className="dv-tabs" aria-label="ตัวกรองวัน">
+          <button type="button" className={tab === 'today' ? 'is-active' : ''} onClick={() => pickTab('today')}>
+            วันนี้ <b>{todayJobs.length}</b>
+          </button>
+          <button type="button" className={tab === 'tomorrow' ? 'is-active' : ''} onClick={() => pickTab('tomorrow')}>
+            พรุ่งนี้ <b>{tomorrowJobs.length}</b>
+          </button>
+          {tab === 'selected' && selectedOffset !== 0 && selectedOffset !== 1 ? (
+            <button type="button" className="is-active" onClick={() => setTab('selected')}>
+              วันที่เลือก <b>{selectedJobs.length}</b>
+            </button>
+          ) : null}
+          <button type="button" className={tab === 'all' ? 'is-active' : ''} onClick={() => pickTab('all')}>
+            ทั้งหมด
+          </button>
+        </div>
+        <DatePicker
+          selected={selected}
+          onChange={onPickDate}
+          locale="th"
+          dateFormat="dd/MM/yyyy"
+          customInput={<DateTrigger label={dateLabel} />}
+          calendarClassName="dv-datepicker"
+          popperPlacement="bottom-end"
+          showPopperArrow={false}
+        />
+      </div>
+
       {note ? <div className="tp-alert tp-alert--ok">{note}</div> : null}
       {error ? <div className="tp-alert tp-alert--danger">{error}</div> : null}
-      {groups.length ? (
-        <div className="driver-days" aria-label="วันที่มีงาน">
-          {groups.map((group) => (
-            <button
-              key={group.id}
-              type="button"
-              className={selected?.id === group.id ? 'is-active' : ''}
-              aria-pressed={selected?.id === group.id}
-              onClick={() => showDay(group.id)}
-            >
-              {group.title}
-              <b>{group.jobs.length}</b>
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <div className="driver-days-list">
-        {visible.map((group) => (
-          <section className="driver-day" id={`driver-day-${group.id}`} key={group.id}>
-            <h2 className={group.overdue ? 'is-overdue' : ''}>
-              {group.title}
-              <small>{group.jobs.length} งาน</small>
-            </h2>
-            <div className="driver-jobs">
-              {group.jobs.map((job) => {
-                const next = nextTripStatus(job.status);
-                const meta = tripStatusMeta(job.status);
-                const phone = phoneHref(job.booking?.ownerPhone);
-                return (
-                  <article className={`driver-job is-${job.type}`} key={job.id}>
-                    <header className="driver-job__top">
-                      <time>{clockLabel(job.pickupTime, group.overdue)}</time>
-                      <div className="driver-job__who">
-                        <strong>{job.booking?.petName || 'สัตว์เลี้ยง'}</strong>
-                        <div className="driver-job__meta">
-                          <em className={`driver-kind is-${job.type}`}>{JOB_KIND[job.type] || 'งานส่งสัตว์'}</em>
-                          <PetKind booking={job.booking} />
-                        </div>
-                      </div>
-                      <span className={`driver-status step-${meta.step}`}>{meta.label}</span>
-                    </header>
-                    <div className="driver-stops">
-                      <Stop label="รับจาก" place={job.from} state={transport} />
-                      <Stop label="ส่งที่" place={job.to} state={transport} />
-                    </div>
-                    <footer>
-                      <div className="driver-contact">
-                        <span>{job.booking?.ownerName || 'เจ้าของ'}</span>
-                        {phone ? <a href={phone}>{job.booking.ownerPhone}</a> : <span>ไม่มีเบอร์</span>}
-                        {job.booking?.petNotes ? <p>{job.booking.petNotes}</p> : null}
-                      </div>
-                      <div className="driver-job__actions">
-                        <button type="button" className="tp-btn" disabled={!next} onClick={() => markNext(job)}>
-                          {next ? next.label : 'ส่งแล้ว'}
-                        </button>
-                        <Link className="tp-btn tp-btn--ghost" to={`/pet-transport/jobs/${job.id}`}>รายละเอียด</Link>
-                        <button
-                          type="button"
-                          className="tp-btn tp-btn--ghost"
-                          aria-expanded={issueId === job.id}
-                          onClick={() => setIssueId(issueId === job.id ? '' : job.id)}
-                        >
-                          แจ้งปัญหา
-                        </button>
-                      </div>
-                    </footer>
-                    {issueId === job.id ? (
-                      <IssueFields
-                        onClose={() => setIssueId('')}
-                        onSubmit={(reasonId, message) => submitIssue(job, reasonId, message)}
-                      />
-                    ) : null}
-                  </article>
-                );
-              })}
-              {!group.jobs.length && group.today ? <div className="driver-empty">วันนี้ไม่มีงานค้าง</div> : null}
-            </div>
-          </section>
-        ))}
-        {!jobs.length ? <div className="driver-empty">วันนี้ยังไม่มีงานค้าง</div> : null}
+
+      <div className="dv-appt-list">
+        {visible.map((job) => {
+          const next = nextTripStatus(job.status);
+          const meta = tripStatusMeta(job.status);
+          const phone = phoneHref(job.booking?.ownerPhone);
+          const paid = job.booking?.paymentStatus === 'paid';
+          const from = placeParts(job.from, transport);
+          const to = placeParts(job.to, transport);
+          const pet = findPet(job.booking?.petId);
+          const speciesKey = pet?.species || job.booking?.petSpecies;
+          const speciesLabel = SPECIES_SHORT[speciesKey] || speciesOf(speciesKey).label;
+          const breed = pet?.breed || job.booking?.petBreed || '';
+          const kindLine = [speciesLabel, breed].filter(Boolean).join(' · ')
+            || JOB_KIND[job.type]
+            || 'สัตว์เลี้ยง';
+          const photo = pet?.photo || job.booking?.petPhoto || '';
+          const pendingToday = dayOffset(job.pickupTime) === 0;
+          const badgeClass = meta.step >= 7 ? 'is-done' : pendingToday ? 'is-pending' : 'is-info';
+          const badgeLabel = meta.step >= 2 && meta.step < 7
+            ? meta.label
+            : pendingToday
+              ? 'งานค้างวันนี้'
+              : meta.label;
+
+          return (
+            <article className={`dv-appt dv-appt--live is-${job.type}`} key={job.id}>
+              <div className="dv-appt__row">
+                {photo ? (
+                  <img className="dv-appt__photo" src={photo} alt="" />
+                ) : (
+                  <span className="dv-appt__photo is-fallback" aria-hidden="true">
+                    {speciesOf(speciesKey).emoji}
+                  </span>
+                )}
+
+                <div className="dv-appt__info">
+                  <time>
+                    <ClockIcon />
+                    {formatWhen(job.pickupTime)}
+                  </time>
+                  <strong>{job.booking?.petName || pet?.name || 'สัตว์เลี้ยง'}</strong>
+                  <span className="dv-appt__kind">
+                    <PawIcon />
+                    {kindLine}
+                  </span>
+                </div>
+
+                <div className="dv-appt__addr">
+                  <div className="dv-appt__place">
+                    <HomeIcon />
+                    <span>รับจาก</span>
+                    <strong>{from.name || 'ไม่ระบุสถานที่'}</strong>
+                  </div>
+                  <p>
+                    <PinIcon />
+                    <span>{from.address || 'ยังไม่มีที่อยู่'}</span>
+                  </p>
+                  <div className="dv-appt__place is-drop">
+                    <HomeIcon />
+                    <span>ส่งที่</span>
+                    <strong>{to.name || 'ไม่ระบุสถานที่'}</strong>
+                  </div>
+                  <p>
+                    <PinIcon />
+                    <span>{to.address || 'ยังไม่มีที่อยู่'}</span>
+                  </p>
+                </div>
+
+                <div className="dv-appt__side">
+                  <span className={`dv-appt__badge ${badgeClass}`}>
+                    <ClockIcon />
+                    {badgeLabel}
+                  </span>
+                  <em className={`dv-chip is-${job.type}`}>{JOB_KIND[job.type] || 'งานส่งสัตว์'}</em>
+                </div>
+              </div>
+
+              {!paid ? (
+                <p className="dv-banner">รอตรวจสอบการชำระ</p>
+              ) : (
+                <p className="dv-banner is-ok">รอเข้ารับน้องตามเวลานัด และอัปเดตสถานะงาน</p>
+              )}
+
+              <footer className="dv-appt__foot">
+                <div className="dv-contact">
+                  <strong>{job.booking?.ownerName || 'เจ้าของ'}</strong>
+                  {phone ? (
+                    <a className="dv-phone" href={phone}>{job.booking.ownerPhone}</a>
+                  ) : (
+                    <span className="dv-phone is-muted">ไม่มีเบอร์</span>
+                  )}
+                </div>
+                <div className="dv-actions">
+                  <button
+                    type="button"
+                    className="dv-btn dv-btn--primary"
+                    disabled={!next || !paid}
+                    onClick={() => markNext(job)}
+                  >
+                    {next ? next.label : 'ส่งแล้ว'}
+                  </button>
+                  <Link className="dv-appt__detail" to={`/pet-transport/jobs/${job.id}`}>
+                    <EyeIcon />
+                    ดูรายละเอียด
+                    <span aria-hidden="true">›</span>
+                  </Link>
+                  <button
+                    type="button"
+                    className="dv-btn dv-btn--warn"
+                    aria-expanded={issueId === job.id}
+                    onClick={() => setIssueId(issueId === job.id ? '' : job.id)}
+                  >
+                    แจ้งปัญหา
+                  </button>
+                </div>
+              </footer>
+
+              {issueId === job.id ? (
+                <IssueFields
+                  onClose={() => setIssueId('')}
+                  onSubmit={(reasonId, message) => submitIssue(job, reasonId, message)}
+                />
+              ) : null}
+            </article>
+          );
+        })}
+
+        {!visible.length ? (
+          <div className="dv-empty">
+            {tab === 'today'
+              ? 'วันนี้ยังไม่มีงานค้าง'
+              : tab === 'tomorrow'
+                ? 'พรุ่งนี้ยังไม่มีงาน'
+                : tab === 'selected'
+                  ? `ไม่มีงานในวันที่ ${dateLabel}`
+                  : 'ยังไม่มีงานที่ได้รับมอบหมาย'}
+            <small>รอ Admin Assign จากรายการจองของ Owner แล้วงานจะขึ้นที่นี่</small>
+          </div>
+        ) : null}
       </div>
     </section>
   );

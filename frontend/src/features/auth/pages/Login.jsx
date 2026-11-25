@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+<<<<<<< HEAD
 import { DEMO_ACCOUNTANT_LOGIN, DEMO_ADMIN_LOGIN, DEMO_DRIVER_LOGIN, useAuth } from '../AuthContext.jsx';
+=======
+import {
+  DEMO_ADMIN_LOGIN,
+  DEMO_DRIVER_LOGIN,
+  DEMO_FINANCE_LOGIN,
+  DEMO_OWNER_LOGIN,
+  useAuth,
+} from '../AuthContext.jsx';
+>>>>>>> origin/Pet-Transport
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
 import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
 
@@ -51,7 +61,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ)">
+    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / Admin / คนขับ / การเงิน)">
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <div className="alert-soft danger mb-3">
@@ -124,11 +134,17 @@ export default function LoginPage() {
           คนขับไม่สามารถสมัครเองได้ — ให้แอดมินสร้างบัญชีให้
         </p>
         <p className="text-center small text-muted mt-2 mb-0">
+          Owner: {DEMO_OWNER_LOGIN.email} / {DEMO_OWNER_LOGIN.password}
+        </p>
+        <p className="text-center small text-muted mt-1 mb-0">
           คนขับ: {DEMO_DRIVER_LOGIN.email} / {DEMO_DRIVER_LOGIN.password}
           {' · '}
           แอดมิน: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
           {' · '}
           บัญชี: {DEMO_ACCOUNTANT_LOGIN.email} / {DEMO_ACCOUNTANT_LOGIN.password}
+        </p>
+        <p className="text-center small text-muted mt-1 mb-0">
+          การเงิน: {DEMO_FINANCE_LOGIN.email} / {DEMO_FINANCE_LOGIN.password}
         </p>
       </form>
     </AuthCard>

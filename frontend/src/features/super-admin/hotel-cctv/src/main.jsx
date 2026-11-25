@@ -5,6 +5,8 @@ import './styles.css';
 
 createRoot(document.getElementById('root')).render(
   <BrowserRouter>
-    <App />
+    <div className="hotel-cctv">
+      <App />
+    </div>
   </BrowserRouter>,
 );

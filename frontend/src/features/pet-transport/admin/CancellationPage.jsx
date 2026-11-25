@@ -28,10 +28,10 @@ export default function CancellationPage() {
               </div>
             </div>
             <div className="tp-actions">
-              <button type="button" className="tp-btn tp-btn--danger" onClick={() => resolveCancel(b.id, true, notes[b.id])}>
+              <button type="button" className="btn btn-soft-danger" onClick={() => resolveCancel(b.id, true, notes[b.id])}>
                 อนุมัติยกเลิก
               </button>
-              <button type="button" className="tp-btn tp-btn--ghost" onClick={() => resolveCancel(b.id, false, notes[b.id])}>
+              <button type="button" className="btn btn-soft" onClick={() => resolveCancel(b.id, false, notes[b.id])}>
                 ปฏิเสธ
               </button>
             </div>

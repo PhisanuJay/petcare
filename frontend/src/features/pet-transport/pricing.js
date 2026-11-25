@@ -1,12 +1,39 @@
-import { ROUND_TRIP_DISCOUNT, ZONES } from './constants.js';
+import {
+  SERVICE_SUBDISTRICTS,
+  ZONES,
+  isRoundTrip,
+} from './constants.js';
 
-/** Resolve zone from distance (km). Admin may override later. */
-export function zoneFromDistance(km) {
-  const n = Number(km);
-  if (!Number.isFinite(n) || n < 0) return null;
-  // Zone A includes 0; others use (min, max]
-  if (n <= 5) return ZONES.find((z) => z.id === 'A');
-  return ZONES.find((z) => n > z.minKm && n <= z.maxKm) ?? ZONES[ZONES.length - 1];
+export function zoneIdFromSubdistrict(subdistrictId) {
+  const sub = SERVICE_SUBDISTRICTS.find((s) => s.id === subdistrictId);
+  return sub?.zoneId ?? null;
+}
+
+export function subdistrictById(subdistrictId) {
+  return SERVICE_SUBDISTRICTS.find((s) => s.id === subdistrictId) ?? null;
+}
+
+export function districtLabel(districtId) {
+  if (districtId === 'chatuchak') return 'เขตจตุจักร';
+  return districtId || '';
+}
+
+/**
+ * Fare matrix (one-way):
+ * Z1–Z1 → Zone 1 price
+ * any leg involving Z2 → Zone 2 price
+ */
+export function fareZoneId(fromZoneId, toZoneId) {
+  if (!fromZoneId || !toZoneId) return null;
+  if (fromZoneId === '1' && toZoneId === '1') return '1';
+  return '2';
+}
+
+export function fareForZones(fromZoneId, toZoneId, zones = ZONES) {
+  const fareId = fareZoneId(fromZoneId, toZoneId);
+  if (!fareId) return null;
+  const zone = zones.find((z) => z.id === fareId);
+  return zone?.price ?? null;
 }
 
 export function priceForZone(zoneId, zones = ZONES) {
@@ -16,18 +43,66 @@ export function priceForZone(zoneId, zones = ZONES) {
 }
 
 /**
- * Quote for one trip or round trip.
- * Round trip = 2 legs, 10% off total fare.
+ * Quote from pickup/dropoff zones.
+ * Round trip = sum of both legs, no discount.
+ * outbound / inbound / one_way = single leg.
+ * outbound / round_trip may include otherService (clinic/hotel) from Pet-Owner-Vet catalog.
+ * inbound = transport only.
  */
-export function quotePrice({ zoneId, serviceType, zones = ZONES, customPerTrip = null }) {
-  const zone = zones.find((z) => z.id === zoneId);
-  const perTrip = customPerTrip ?? zone?.price ?? null;
-  if (perTrip == null) {
+export function quotePrice({
+  fromZoneId,
+  toZoneId,
+  returnFromZoneId = null,
+  returnToZoneId = null,
+  serviceType,
+  zones = ZONES,
+  customPerTrip = null,
+  fareZoneOverride = null,
+  otherService = null,
+}) {
+  const outboundFareZone = fareZoneOverride || fareZoneId(fromZoneId, toZoneId);
+  let outboundPerTrip = null;
+  if (customPerTrip != null && customPerTrip !== '') {
+    outboundPerTrip = Number(customPerTrip);
+  } else if (fareZoneOverride) {
+    outboundPerTrip = priceForZone(fareZoneOverride, zones);
+  } else {
+    outboundPerTrip = fareForZones(fromZoneId, toZoneId, zones);
+  }
+
+  const round = isRoundTrip(serviceType);
+  const inboundOnly = serviceType === 'inbound';
+  const retFrom = returnFromZoneId || toZoneId;
+  const retTo = returnToZoneId || fromZoneId;
+  const returnFareZone = round ? fareZoneId(retFrom, retTo) : null;
+  const returnPerTrip = round ? fareForZones(retFrom, retTo, zones) : null;
+
+  const addon = !inboundOnly && otherService?.amount != null ? otherService : null;
+  const otherServicesTotal = addon ? Number(addon.amount) : 0;
+
+  if (
+    outboundPerTrip == null
+    || !Number.isFinite(outboundPerTrip)
+    || (round && (returnPerTrip == null || !Number.isFinite(returnPerTrip)))
+  ) {
     return {
-      zoneId,
+      fromZoneId,
+      toZoneId,
+      returnFromZoneId: round ? retFrom : null,
+      returnToZoneId: round ? retTo : null,
+      zoneId: outboundFareZone,
+      fareZoneId: outboundFareZone,
       serviceType,
-      trips: serviceType === 'round_trip' ? 2 : 1,
-      perTrip: null,
+      trips: round ? 2 : 1,
+      perTrip: outboundPerTrip,
+      outboundPerTrip,
+      returnPerTrip: round ? returnPerTrip : null,
+      outboundFareZone,
+      returnFareZone,
+      transportTotal: null,
+      otherServicesTotal: inboundOnly ? 0 : otherServicesTotal || null,
+      otherService: inboundOnly ? null : addon,
+      lines: [],
       subtotal: null,
       discount: 0,
       total: null,
@@ -35,17 +110,45 @@ export function quotePrice({ zoneId, serviceType, zones = ZONES, customPerTrip =
     };
   }
 
-  const trips = serviceType === 'round_trip' ? 2 : 1;
-  const subtotal = perTrip * trips;
-  const discount = serviceType === 'round_trip' ? Math.round(subtotal * ROUND_TRIP_DISCOUNT) : 0;
+  const trips = round ? 2 : 1;
+  const transportTotal = round ? outboundPerTrip + returnPerTrip : outboundPerTrip;
+  const lines = [
+    {
+      type: 'transport',
+      label: round ? 'ค่ารถรับ–ส่ง (ไป–กลับ)' : 'ค่ารถรับ–ส่ง',
+      amount: transportTotal,
+    },
+  ];
+  if (addon && Number.isFinite(otherServicesTotal) && otherServicesTotal > 0) {
+    lines.push({
+      type: addon.kind || 'other',
+      label: addon.label || 'ค่าบริการอื่น',
+      amount: otherServicesTotal,
+    });
+  }
+
+  const subtotal = transportTotal + (Number.isFinite(otherServicesTotal) ? otherServicesTotal : 0);
   return {
-    zoneId,
+    fromZoneId,
+    toZoneId,
+    returnFromZoneId: round ? retFrom : null,
+    returnToZoneId: round ? retTo : null,
+    zoneId: outboundFareZone,
+    fareZoneId: outboundFareZone,
     serviceType,
     trips,
-    perTrip,
+    perTrip: outboundPerTrip,
+    outboundPerTrip,
+    returnPerTrip: round ? returnPerTrip : null,
+    outboundFareZone,
+    returnFareZone,
+    transportTotal,
+    otherServicesTotal: inboundOnly ? 0 : otherServicesTotal,
+    otherService: inboundOnly ? null : addon,
+    lines,
     subtotal,
-    discount,
-    total: subtotal - discount,
+    discount: 0,
+    total: subtotal,
     needsAdminReview: false,
   };
 }
@@ -53,4 +156,18 @@ export function quotePrice({ zoneId, serviceType, zones = ZONES, customPerTrip =
 export function formatBaht(n) {
   if (n == null || Number.isNaN(n)) return 'รอ Admin พิจารณา';
   return `฿${Number(n).toLocaleString('th-TH')}`;
+}
+
+/** Preview matrix rows for admin pricing page */
+export function fareMatrixPreview(zones = ZONES) {
+  const pairs = [
+    { from: '1', to: '1', label: 'Zone 1 → Zone 1' },
+    { from: '1', to: '2', label: 'Zone 1 → Zone 2' },
+    { from: '2', to: '1', label: 'Zone 2 → Zone 1' },
+    { from: '2', to: '2', label: 'Zone 2 → Zone 2' },
+  ];
+  return pairs.map((p) => ({
+    ...p,
+    price: fareForZones(p.from, p.to, zones),
+  }));
 }

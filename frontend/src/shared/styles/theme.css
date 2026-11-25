@@ -90,11 +90,16 @@
 .pc-navbar .nav-link i {
   color: var(--sky);
 }
-.pc-navbar .nav-link:hover {
-  background: var(--cloud);
+.pc-navbar .nav-link:hover,
+.pc-navbar .nav-link:focus {
+  background: transparent;
+  color: var(--ink);
 }
-.pc-navbar .nav-link.active {
+.pc-navbar .nav-link.active,
+.pc-navbar .nav-link.active:hover,
+.pc-navbar .nav-link.active:focus {
   background: var(--baby);
+  color: var(--ink);
   font-weight: 500;
 }
 @media (min-width: 1200px) {

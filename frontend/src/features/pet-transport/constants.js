@@ -1,14 +1,27 @@
-/** Domain constants for Pet Transportation MVP */
+/** Domain constants for Pet Transportation MVP — Chatuchak zone pricing */
 
 export const ZONES = [
-  { id: 'A', label: 'Zone A', minKm: 0, maxKm: 5, price: 100 },
-  { id: 'B', label: 'Zone B', minKm: 5, maxKm: 10, price: 180 },
-  { id: 'C', label: 'Zone C', minKm: 10, maxKm: 20, price: 300 },
-  { id: 'OUT', label: 'นอกพื้นที่', minKm: 20, maxKm: Infinity, price: null },
+  { id: '1', label: 'Zone 1', price: 100 },
+  { id: '2', label: 'Zone 2', price: 150 },
 ];
 
-export const ROUND_TRIP_DISCOUNT = 0.1;
+/** Service area: Chatuchak district only (MVP) */
+export const SERVICE_DISTRICTS = [
+  { id: 'chatuchak', label: 'เขตจตุจักร' },
+];
 
+/** 4 subdistricts in Chatuchak — Zone mapped for fare matrix */
+export const SERVICE_SUBDISTRICTS = [
+  { id: 'chatuchak', districtId: 'chatuchak', label: 'แขวงจตุจักร', zoneId: '1' },
+  { id: 'chomphon', districtId: 'chatuchak', label: 'แขวงจอมพล', zoneId: '1' },
+  { id: 'latyao', districtId: 'chatuchak', label: 'แขวงลาดยาว', zoneId: '2' },
+  { id: 'chantharakasem', districtId: 'chatuchak', label: 'แขวงจันทรเกษม', zoneId: '2' },
+];
+
+/** Round trip no longer uses a discount — kept at 0 for legacy reads */
+export const ROUND_TRIP_DISCOUNT = 0;
+
+/** Fixed demo driver id — used by seed auth + sample jobs */
 export const DEMO_DRIVER_ID = 'driver-seed';
 
 /** 7 trip statuses — per trip, not per booking */
@@ -46,16 +59,54 @@ export const PAYMENT_STATUSES = {
 };
 
 export const SERVICE_TYPES = [
-  { id: 'one_way', label: 'เที่ยวเดียว' },
-  { id: 'round_trip', label: 'ไป–กลับ' },
+  {
+    id: 'outbound',
+    label: 'ไปส่ง',
+    icon: 'bi-truck',
+    hint: 'รับจากบ้าน → ส่งไปคลินิก หรือปลายทาง',
+  },
+  {
+    id: 'inbound',
+    label: 'รับกลับ',
+    icon: 'bi-house-door',
+    hint: 'รับจากคลินิก → ส่งกลับบ้าน',
+  },
+  {
+    id: 'round_trip',
+    label: 'ไป–กลับ',
+    icon: 'bi-arrow-left-right',
+    hint: 'บ้าน → คลินิก แล้วรับกลับ (เวลากลับนัดภายหลัง)',
+  },
 ];
 
 export const LOCATION_KINDS = [
-  { id: 'home', label: 'บ้าน Owner' },
-  { id: 'clinic', label: 'คลินิก' },
-  { id: 'hotel', label: 'โรงแรมสัตว์' },
+  { id: 'home', label: 'บ้าน' },
+  { id: 'facility', label: 'คลินิก' },
   { id: 'custom', label: 'สถานที่อื่น' },
 ];
+
+/** Normalize legacy clinic/hotel kinds → facility */
+export function normalizePlaceKind(kind) {
+  if (kind === 'clinic' || kind === 'hotel') return 'facility';
+  return kind || 'custom';
+}
+
+export function isFacilityKind(kind) {
+  return normalizePlaceKind(kind) === 'facility';
+}
+
+export function serviceTypeMeta(id) {
+  if (id === 'one_way') return SERVICE_TYPES.find((s) => s.id === 'outbound');
+  return SERVICE_TYPES.find((s) => s.id === id) ?? SERVICE_TYPES[0];
+}
+
+export function isRoundTrip(serviceType) {
+  return serviceType === 'round_trip';
+}
+
+export function isSingleLeg(serviceType) {
+  return serviceType === 'outbound' || serviceType === 'inbound' || serviceType === 'one_way';
+}
 
 export const ISSUE_REASONS = [
   { id: 'vehicle', label: 'รถเสีย' },
@@ -67,13 +118,33 @@ export const ISSUE_REASONS = [
 ];
 
 export const DEMO_CLINICS = [
-  { id: 'clinic-1', name: 'คลินิกมะแอ่ว สาขาหลัก', address: '123 ถ.สุขุมวิท กรุงเทพฯ' },
-  { id: 'clinic-2', name: 'คลินิกมะแอ่ว สาขาลาดพร้าว', address: '88 ถ.ลาดพร้าว กรุงเทพฯ' },
+  {
+    id: 'clinic-1',
+    name: 'คลินิกมะแอ่ว',
+    address: '99/9 ถนนพหลโยธิน แขวงจตุจักร เขตจตุจักร กรุงเทพฯ 10900',
+    districtId: 'chatuchak',
+    subdistrictId: 'chatuchak',
+    zoneId: '1',
+  },
 ];
 
 export const DEMO_HOTELS = [
-  { id: 'hotel-1', name: 'PetCare Hotel Ari', address: '99 ซอยอารีย์ 1 แขวงพญาไท กรุงเทพฯ' },
-  { id: 'hotel-2', name: 'Cat Nest Thonglor', address: '18 ซอยทองหล่อ 10 แขวงคลองตันเหนือ กรุงเทพฯ' },
+  {
+    id: 'hotel-1',
+    name: 'PetCare Hotel ลาดยาว',
+    address: '45 ถ.วิภาวดี แขวงลาดยาว',
+    districtId: 'chatuchak',
+    subdistrictId: 'latyao',
+    zoneId: '2',
+  },
+  {
+    id: 'hotel-2',
+    name: 'Cat Nest จันทรเกษม',
+    address: '12 ถ.ประดิพัทธ์ แขวงจันทรเกษม',
+    districtId: 'chatuchak',
+    subdistrictId: 'chantharakasem',
+    zoneId: '2',
+  },
 ];
 
 export function tripStatusMeta(id) {

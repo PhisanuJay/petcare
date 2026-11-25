@@ -1,7 +1,10 @@
+import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../features/auth/AuthContext.jsx';
 import { ROLE_LABELS, ROLES, homePathForRole } from '../../features/auth/roles.js';
+import { useTransport } from '../../features/pet-transport/useTransport.js';
 import '../../features/pet-transport/transport.css';
+import '../../features/pet-transport/driver-refresh.css';
 
 function ScheduleIcon() {
   return (
@@ -21,73 +24,50 @@ function DoneIcon() {
   );
 }
 
+function ProfileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M5.5 19c1.6-3 4-4.5 6.5-4.5S16.9 16 18.5 19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.2 1.8H4.8L6 16.5Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /**
- * Minimal shell for Admin / Driver after login (not the customer site).
+ * Minimal shell for Admin / Driver / Finance after login (not the customer site).
  */
 export default function StaffShell({ variant }) {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const path = useLocation().pathname;
   const isAdmin = variant === 'admin' || currentUser?.role === ROLES.admin;
+  const isFinance = variant === 'finance' || currentUser?.role === ROLES.finance;
 
-  const links = [
+  const adminLinks = [
     { to: '/admin/transport', label: 'Transport Dashboard' },
     { to: '/admin/transport/bookings', label: 'Bookings' },
     { to: '/admin/transport/drivers', label: 'จัดการคนขับ' },
-    { to: '/admin/transport/payments', label: 'Payment' },
     { to: '/admin/transport/pricing', label: 'Pricing' },
   ];
 
-  if (!isAdmin) {
-    const name = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'คนขับ';
-    return (
-      <div className="app-shell driver-shell">
-        <header className="driver-bar">
-          <div className="driver-brand">
-            <span className="driver-brand__mark">
-              <img src="/brand-mark.jpg" alt="" />
-            </span>
-            <strong>PetCare</strong>
-          </div>
-          <span className="driver-bar__rule" aria-hidden="true" />
-          <nav aria-label="เมนูคนขับ">
-            <NavLink
-              to="/pet-transport"
-              className={() => (path === '/pet-transport' || path.includes('/jobs/') ? 'active' : undefined)}
-            >
-              <ScheduleIcon />
-              <span>ตารางงาน</span>
-            </NavLink>
-            <NavLink to="/pet-transport/history">
-              <DoneIcon />
-              <span>ส่งแล้ว</span>
-            </NavLink>
-          </nav>
-          <div className="driver-who">
-            <div className="driver-who__card">
-              <span className="driver-avatar" aria-hidden="true">{name.slice(0, 1)}</span>
-              <div>
-                <strong>{name}</strong>
-                <small>{currentUser?.vehicle || 'ยังไม่ระบุรถ'}</small>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                logout();
-                navigate('/login', { replace: true });
-              }}
-            >
-              ออก
-            </button>
-          </div>
-        </header>
-        <main>
-          <Outlet />
-        </main>
-      </div>
-    );
+  const financeLinks = [
+    { to: '/finance', label: 'ตรวจชำระเงิน' },
+  ];
+
+  if (!isAdmin && !isFinance) {
+    return <DriverShell currentUser={currentUser} path={path} logout={logout} navigate={navigate} />;
   }
+
+  const links = isFinance ? financeLinks : adminLinks;
 
   return (
     <div className="app-shell">
@@ -130,6 +110,115 @@ export default function StaffShell({ variant }) {
       <main>
         <Outlet />
       </main>
+    </div>
+  );
+}
+
+function driverPageTitle(path) {
+  if (path.includes('/history')) return 'ส่งแล้ว';
+  if (path.includes('/notifications')) return 'แจ้งเตือน';
+  if (path.includes('/profile')) return 'โปรไฟล์';
+  if (path.includes('/jobs/')) return 'รายละเอียดงาน';
+  return 'ตารางงาน';
+}
+
+function DriverShell({ currentUser, path, logout, navigate }) {
+  const { driverUnreadCount, ensureUpcomingReminders } = useTransport();
+  const name = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || 'คนขับ';
+  const unread = driverUnreadCount(currentUser?.id);
+  const vehicle = [currentUser?.vehicle, currentUser?.plateNumber].filter(Boolean).join(' · ') || 'คนขับ';
+  const pageTitle = driverPageTitle(path);
+
+  useEffect(() => {
+    if (currentUser?.id) ensureUpcomingReminders(currentUser.id);
+    const timer = window.setInterval(() => {
+      if (currentUser?.id) ensureUpcomingReminders(currentUser.id);
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [currentUser?.id, ensureUpcomingReminders]);
+
+  const onJobs = path === '/pet-transport' || path.includes('/jobs/');
+
+  function doLogout() {
+    logout();
+    navigate('/login', { replace: true });
+  }
+
+  return (
+    <div className="app-shell driver-shell driver-shell--side">
+      <aside className="driver-side">
+        <div className="driver-side__top">
+          <div className="driver-side__brand">
+            <span className="driver-brand__mark">
+              <img src="/brand-mark.jpg" alt="" />
+            </span>
+            <div>
+              <strong>PetCare</strong>
+              <small>Driver Panel</small>
+            </div>
+          </div>
+
+          <nav className="driver-side__nav" aria-label="เมนูคนขับ">
+            <NavLink to="/pet-transport" className={() => (onJobs ? 'active' : undefined)}>
+              <ScheduleIcon />
+              <span>ตารางงาน</span>
+            </NavLink>
+            <NavLink to="/pet-transport/history">
+              <DoneIcon />
+              <span>ส่งแล้ว</span>
+            </NavLink>
+            <NavLink to="/pet-transport/notifications">
+              <BellIcon />
+              <span>แจ้งเตือน</span>
+              {unread > 0 ? <b className="driver-nav-badge">{unread > 9 ? '9+' : unread}</b> : null}
+            </NavLink>
+            <NavLink to="/pet-transport/profile">
+              <ProfileIcon />
+              <span>โปรไฟล์</span>
+            </NavLink>
+          </nav>
+        </div>
+
+        <div className="driver-side__foot">
+          <div className="driver-side__user">
+            {currentUser?.avatar ? (
+              <img className="driver-avatar driver-avatar--img driver-side__avatar" src={currentUser.avatar} alt="" />
+            ) : (
+              <span className="driver-avatar driver-side__avatar" aria-hidden="true">{name.slice(0, 1)}</span>
+            )}
+            <div>
+              <strong>{name}</strong>
+              <small>{vehicle}</small>
+            </div>
+            <button type="button" className="driver-side__logout" onClick={doLogout}>
+              ออก
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <div className="driver-side__main">
+        <header className="driver-topbar">
+          <div>
+            <p className="driver-topbar__kicker">PetCare Driver</p>
+            <strong className="driver-topbar__title">{pageTitle}</strong>
+          </div>
+          <Link className="driver-topbar__who" to="/pet-transport/profile" aria-label="ไปหน้าโปรไฟล์">
+            {currentUser?.avatar ? (
+              <img className="driver-avatar driver-avatar--img driver-side__avatar" src={currentUser.avatar} alt="" />
+            ) : (
+              <span className="driver-avatar driver-side__avatar" aria-hidden="true">{name.slice(0, 1)}</span>
+            )}
+            <div>
+              <strong>{name}</strong>
+              <small>{vehicle}</small>
+            </div>
+          </Link>
+        </header>
+        <main className="driver-side__content">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
