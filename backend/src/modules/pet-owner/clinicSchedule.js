@@ -4,7 +4,9 @@ import {
   DEFAULT_WEEKEND_HOURS,
   getClosure,
   getHoursForDay,
+  slotTimesForDate,
 } from '../clinic-admin/clinicSettings.js';
+import { vetsOnDuty } from '../clinic-admin/rosterStore.js';
 import { httpError } from './jsonCollection.js';
 
 /**
@@ -37,19 +39,20 @@ function safeGetClosure(dateString) {
   }
 }
 
-/** 30-minute slots ('HH:MM') for a 'YYYY-MM-DD' date. Empty when closed by hours or closure. */
+function safeVetsOnDuty(dateString) {
+  try {
+    return vetsOnDuty(dateString);
+  } catch {
+    return [{ id: 'fallback', name: 'สัตวแพทย์' }];
+  }
+}
+
+/** Appointment slots ('HH:MM') for a date; skips lunch break; empty when closed or no vet on duty. */
 export function bookableSlots(dateString) {
   if (!isDateString(dateString)) return [];
   if (safeGetClosure(dateString)) return [];
-  const [y, m, d] = dateString.split('-').map(Number);
-  const day = new Date(y, m - 1, d).getDay(); // 0 = Sunday, 6 = Saturday
-  const hours = safeGetHoursForDay(day);
-  if (!hours) return [];
-  const slots = [];
-  for (let t = toMinutes(hours.open); t + 30 <= toMinutes(hours.close); t += 30) {
-    slots.push(`${pad(Math.floor(t / 60))}:${pad(t % 60)}`);
-  }
-  return slots;
+  if (!safeVetsOnDuty(dateString).length) return [];
+  return slotTimesForDate(dateString);
 }
 
 /** Local date 'YYYY-MM-DD'. */
@@ -75,6 +78,10 @@ export function validateSlot(date, time) {
   const [y, m, d] = date.split('-').map(Number);
   const day = new Date(y, m - 1, d).getDay();
   if (safeGetHoursForDay(day) === null) throw httpError(400, 'คลินิกปิดทำการวันนี้');
+
+  if (!safeVetsOnDuty(date).length) {
+    throw httpError(400, 'วันนี้ไม่มีสัตวแพทย์เข้าเวร');
+  }
 
   if (typeof time !== 'string' || !time) throw httpError(400, 'กรุณาเลือกเวลา');
   if (!bookableSlots(date).includes(time)) throw httpError(400, 'เวลานี้อยู่นอกเวลาทำการของคลินิก');

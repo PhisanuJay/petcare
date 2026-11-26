@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
-import { adoptionStaffFetch, readAdoptionResponse, updateAdoptionAnimalStatus } from '../api.js';
+import { adoptionStaffFetch, moderateAdoptionAnimal, readAdoptionResponse, updateAdoptionAnimalStatus } from '../api.js';
+import { adoptionListingPhoto } from './findHomeDialogs.jsx';
 
-function animalStatusLabel(status) {
-  return status === 'adopted' ? 'มีบ้านแล้ว' : 'ยังหาบ้านอยู่';
+function listingLabel(animal) {
+  const key = animal.listingStatus || animal.status;
+  if (key === 'pending_review') return { text: 'รอตรวจสอบ', className: 'pending' };
+  if (key === 'rejected') return { text: 'ไม่อนุมัติ', className: 'rejected' };
+  if (key === 'adopted' || key === 'adopted') return { text: 'มีบ้านแล้ว', className: 'adopted' };
+  if (key === 'has_interest') return { text: 'มีผู้สนใจ', className: 'available' };
+  return { text: 'กำลังประกาศ', className: 'available' };
 }
 
 export default function AnimalsPage() {
@@ -30,6 +36,30 @@ export default function AnimalsPage() {
     return () => controller.abort();
   }, []);
 
+  async function runModeration(animal, action) {
+    const note = action === 'reject'
+      ? window.prompt('เหตุผลที่ไม่อนุมัติ (ถ้ามี)', '') || ''
+      : '';
+    if (!window.confirm(
+      action === 'approve'
+        ? `อนุมัติประกาศของ ${animal.name}?`
+        : `ปฏิเสธประกาศของ ${animal.name}?`,
+    )) return;
+
+    setUpdating(animal.id);
+    setError('');
+    try {
+      const result = await moderateAdoptionAnimal(animal.id, action, note);
+      setAnimals((current) =>
+        current.map((item) => item.id === result.animal.id ? result.animal : item),
+      );
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setUpdating('');
+    }
+  }
+
   async function toggleStatus(animal) {
     const status = animal.status === 'adopted' ? 'available' : 'adopted';
     const confirmation = status === 'adopted'
@@ -54,8 +84,8 @@ export default function AnimalsPage() {
   return (
     <section>
       <div className="adoption-staff-page-title">
-        <h1>จัดการสถานะสัตว์</h1>
-        <p>เปลี่ยนสถานะระหว่าง “ยังหาบ้านอยู่” และ “มีบ้านแล้ว”</p>
+        <h1>จัดการประกาศหาบ้าน</h1>
+        <p>ตรวจสอบประกาศใหม่ อนุมัติเผยแพร่ หรือปิดเมื่อน้องมีบ้านแล้ว</p>
       </div>
       {error && <div className="alert alert-danger" role="alert">{error}</div>}
       {loading && <p role="status">กำลังโหลดข้อมูล...</p>}
@@ -63,36 +93,60 @@ export default function AnimalsPage() {
         <div className="adoption-staff-panel">ยังไม่มีข้อมูลสัตว์</div>
       )}
       <div className="adoption-staff-list">
-        {animals.map((animal) => (
-          <article className="adoption-staff-card d-flex flex-wrap align-items-center gap-3" key={animal.id}>
-            {animal.photo ? (
-              <img className="adoption-staff-animal-photo" src={animal.photo} alt={`รูป${animal.name}`} />
-            ) : (
-              <div className="adoption-staff-animal-photo adoption-staff-animal-placeholder" aria-hidden="true">
-                {animal.emoji || '🐾'}
+        {animals.map((animal) => {
+          const chip = listingLabel(animal);
+          const listing = animal.listingStatus || animal.status;
+          return (
+            <article className="adoption-staff-card d-flex flex-wrap align-items-center gap-3" key={animal.id}>
+              <img
+                className="adoption-staff-animal-photo"
+                src={adoptionListingPhoto(animal)}
+                alt={`รูป${animal.name}`}
+                loading="lazy"
+                decoding="async"
+              />
+              <div className="flex-grow-1">
+                <h2>{animal.name}</h2>
+                <p className="adoption-staff-muted mb-2">
+                  {animal.species} · {animal.age} · จังหวัด {animal.address || animal.location}
+                </p>
+                <span className={`adoption-staff-status ${chip.className}`}>{chip.text}</span>
               </div>
-            )}
-            <div className="flex-grow-1">
-              <h2>{animal.name}</h2>
-              <p className="adoption-staff-muted mb-2">{animal.species} · {animal.age} · จังหวัด {animal.address || animal.location}</p>
-              <span className={`adoption-staff-status ${animal.status}`}>
-                {animalStatusLabel(animal.status)}
-              </span>
-            </div>
-            <button
-              className={`btn ${animal.status === 'adopted' ? 'btn-soft' : 'btn-sky'}`}
-              type="button"
-              onClick={() => toggleStatus(animal)}
-              disabled={updating === animal.id}
-            >
-              {updating === animal.id
-                ? 'กำลังบันทึก...'
-                : animal.status === 'adopted'
-                  ? 'เปิดรับบ้านอีกครั้ง'
-                  : 'ทำเครื่องหมายว่ามีบ้านแล้ว'}
-            </button>
-          </article>
-        ))}
+              <div className="d-flex flex-wrap gap-2">
+                {listing === 'pending_review' && (
+                  <>
+                    <button
+                      className="btn btn-sky btn-sm"
+                      type="button"
+                      onClick={() => runModeration(animal, 'approve')}
+                      disabled={updating === animal.id}
+                    >
+                      อนุมัติประกาศ
+                    </button>
+                    <button
+                      className="btn btn-soft-danger btn-sm"
+                      type="button"
+                      onClick={() => runModeration(animal, 'reject')}
+                      disabled={updating === animal.id}
+                    >
+                      ไม่อนุมัติ
+                    </button>
+                  </>
+                )}
+                {(listing === 'published' || listing === 'has_interest' || animal.status === 'available') && (
+                  <button
+                    className="btn btn-sky btn-sm"
+                    type="button"
+                    onClick={() => toggleStatus(animal)}
+                    disabled={updating === animal.id}
+                  >
+                    ทำเครื่องหมายว่ามีบ้านแล้ว
+                  </button>
+                )}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

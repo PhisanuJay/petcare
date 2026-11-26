@@ -5,10 +5,11 @@ export const PAY_ACCOUNT = {
   bank: 'พร้อมเพย์',
 };
 
+/** Legacy field name on payment records; amount due equals full total (no partial deposit). */
 export function depositOf(total) {
   const amount = Number(total);
-  if (!Number.isFinite(amount) || amount <= 0) return 200;
-  return Math.max(100, Math.round(amount * 0.3));
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.round(amount);
 }
 
 function field(id, value) {

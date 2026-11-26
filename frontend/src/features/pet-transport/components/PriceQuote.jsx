@@ -3,10 +3,10 @@ import { isRoundTrip, serviceTypeMeta } from '../constants.js';
 import zonesMapUrl from '../assets/service-zones-map.jpg';
 
 /** Zone map image only (separate from price summary). */
-export function ServiceZonesMap() {
+export function ServiceZonesMap({ compact = false }) {
   return (
     <img
-      className="tp-quote__map tp-quote__map--solo"
+      className={`tp-quote__map tp-quote__map--solo${compact ? ' tp-quote__map--compact' : ''}`}
       src={zonesMapUrl}
       alt="พื้นที่ให้บริการเขตจตุจักร Zone 1 ฿100 · Zone 2 ฿150"
       width={1024}

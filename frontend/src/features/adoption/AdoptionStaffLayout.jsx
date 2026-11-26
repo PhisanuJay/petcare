@@ -7,7 +7,9 @@ export default function AdoptionStaffLayout() {
       <aside className="adoption-staff-sidebar">
         <nav className="adoption-staff-nav" aria-label="เมนูพนักงานหาบ้าน">
           <NavLink to="/adoption" end>ภาพรวม</NavLink>
+          <NavLink to="/adoption/animals">ประกาศหาบ้าน</NavLink>
           <NavLink to="/adoption/requests">คำร้องขอรับเลี้ยง</NavLink>
+          <NavLink to="/adoption/history">ประวัติรับเลี้ยง</NavLink>
         </nav>
       </aside>
       <div className="adoption-staff-content">

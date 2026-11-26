@@ -9,7 +9,7 @@ function NeedLoginModal({ next, onClose }) {
       <div className="modal d-block need-login" tabIndex={-1} role="dialog" onClick={onClose}>
         <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
           <div className="modal-content border-0 text-center">
-            <div style={{ fontSize: '3rem' }}>🐾</div>
+            <img src="/pets/default-pet.jpg" alt="" width={96} height={96} className="rounded-circle mb-2" style={{ objectFit: 'cover' }} />
             <h5 className="mitr">เข้าสู่ระบบก่อนนะ</h5>
             <p className="text-muted small">สมัครสมาชิกฟรี จองคิว จองโรงแรม และขอรับเลี้ยงน้องได้ทันที แถมรับแต้มสะสม</p>
             <div className="d-flex justify-content-center gap-2">

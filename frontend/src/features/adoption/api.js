@@ -31,3 +31,15 @@ export async function updateAdoptionAnimalStatus(animalId, status) {
   );
   return readAdoptionResponse(response, 'เปลี่ยนสถานะไม่สำเร็จ');
 }
+
+export async function moderateAdoptionAnimal(animalId, action, note = '') {
+  const response = await adoptionStaffFetch(
+    `/animals/${encodeURIComponent(animalId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, note }),
+    },
+  );
+  return readAdoptionResponse(response, 'บันทึกไม่สำเร็จ');
+}

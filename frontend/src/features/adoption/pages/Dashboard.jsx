@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   adoptionStaffFetch,
   readAdoptionResponse,
   updateAdoptionAnimalStatus,
 } from '../api.js';
+import { adoptionListingPhoto } from './findHomeDialogs.jsx';
 
 export default function AdoptionDashboardPage() {
   const [overview, setOverview] = useState(null);
@@ -64,7 +66,7 @@ export default function AdoptionDashboardPage() {
     <section>
       <div className="adoption-staff-page-title">
         <h1>ภาพรวมการหาบ้าน</h1>
-        <p>จัดการคำร้องและติดตามสถานะน้องๆ</p>
+        <p>จัดการคำร้องและติดตามสถานะน้องๆ · <Link to="/adoption/history">ประวัติรับเลี้ยง</Link></p>
       </div>
       {error && <div className="alert alert-danger" role="alert">{error}</div>}
       {loading && <p role="status">กำลังโหลดข้อมูล...</p>}
@@ -97,13 +99,13 @@ export default function AdoptionDashboardPage() {
       <div className="adoption-staff-list">
         {animals.map((animal) => (
           <article className="adoption-staff-card d-flex flex-wrap align-items-center gap-3" key={animal.id}>
-            {animal.photo ? (
-              <img className="adoption-staff-animal-photo" src={animal.photo} alt={`รูป${animal.name}`} />
-            ) : (
-              <div className="adoption-staff-animal-photo adoption-staff-animal-placeholder" aria-hidden="true">
-                {animal.emoji || '🐾'}
-              </div>
-            )}
+            <img
+              className="adoption-staff-animal-photo"
+              src={adoptionListingPhoto(animal)}
+              alt={`รูป${animal.name}`}
+              loading="lazy"
+              decoding="async"
+            />
             <div className="flex-grow-1">
               <h2>{animal.name}</h2>
               <p className="adoption-staff-muted mb-2">

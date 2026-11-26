@@ -28,10 +28,8 @@ import {
   REJECT_REASONS,
   TRIAGE_LEVELS,
   VITAL_LIMITS,
-  minutesToTime,
-  overlaps,
-  toMinutes,
 } from './maRules.js';
+import { findVetConflict } from './vetScheduling.js';
 import { addNote, deleteNote, getEntry, listEntries, setFlags } from './patientNoteStore.js';
 import { backfillVetIds, getVisit, listVisits, upsertVisit } from './visitStore.js';
 
@@ -139,41 +137,6 @@ function appointmentView(booking, visit, pet) {
     visibleToVet: VET_VISIBLE_STATUSES.includes(booking.status),
     closure: closure ? { reason: closure.reason } : null,
   };
-}
-
-function sameVet(visit, { vetId, vet }) {
-  if (vetId && visit.vetId) return visit.vetId === vetId;
-  if (vetId && !visit.vetId) return visit.vet === vet;
-  return Boolean(vet && visit.vet === vet);
-}
-
-function findVetConflict(
-  bookings,
-  visitsMap,
-  { vetId = null, vet, date, time, durationMin },
-  excludeId = null,
-) {
-  const targetStart = toMinutes(time);
-  const targetDur = Number(durationMin) || 30;
-  if (Number.isNaN(targetStart)) return null;
-
-  for (const b of bookings) {
-    if (b.id === excludeId) continue;
-    if (b.status !== 'confirmed' && b.status !== 'completed') continue;
-    if (b.date !== date) continue;
-    const v = visitsMap.get(b.id);
-    if (!v || !sameVet(v, { vetId, vet })) continue;
-
-    const bStart = toMinutes(b.time);
-    const bDur = Number(v.durationMin) || 30;
-    if (overlaps(targetStart, targetDur, bStart, bDur)) {
-      return {
-        booking: b,
-        rangeText: `${b.time}–${minutesToTime(bStart + bDur)} น.`,
-      };
-    }
-  }
-  return null;
 }
 
 const byDateTimeAsc = (a, b) =>

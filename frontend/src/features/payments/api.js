@@ -4,6 +4,19 @@ import { readStaffSession } from '../auth/staffSession.js';
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 const IMPORT_MARKER = 'petcare_payments_imported_owner:';
 
+function ownerAuthHeaders(ownerId, extra = {}) {
+  const remembered = readJSON(STORAGE_KEYS.session, null);
+  const temporary = readJSON(STORAGE_KEYS.session, null, sessionStorage);
+  const session = remembered?.authToken ? remembered : temporary;
+  const headers = { ...extra };
+  if (session?.authToken) {
+    headers.Authorization = `Bearer ${session.authToken}`;
+  } else if (ownerId) {
+    headers['x-owner-id'] = ownerId;
+  }
+  return headers;
+}
+
 async function request(path, options = {}, headers = {}) {
   let response;
   try {
@@ -25,7 +38,7 @@ async function request(path, options = {}, headers = {}) {
 
 function ownerHeaders(ownerId) {
   if (!ownerId) throw new Error('กรุณาเข้าสู่ระบบ');
-  return { 'x-owner-id': ownerId };
+  return ownerAuthHeaders(ownerId);
 }
 
 function staffHeaders(role) {

@@ -548,6 +548,14 @@
   justify-content: center;
   font-size: 4rem;
   position: relative;
+  overflow: hidden;
+}
+.adopt-card .pic .adopt-card-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .adopt-card .pic .sex {
   position: absolute;
@@ -651,6 +659,11 @@
   justify-content: center;
   font-size: 1.3rem;
 }
+.reviewer .av.av-photo {
+  object-fit: cover;
+  font-size: 0;
+  flex-shrink: 0;
+}
 .stars {
   color: #ffb020;
 }
@@ -723,6 +736,44 @@
   justify-content: center;
   margin-right: 0.4rem;
   color: var(--sky-dark) !important;
+}
+
+.quick-add-pet__photo-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f0f8ff 0%, #fff 70%);
+  border: 1px dashed #b8d4ec;
+}
+
+.quick-add-pet__photo-wrap .pet-photo.md {
+  width: 96px;
+  height: 96px;
+  font-size: 2.6rem;
+}
+
+.quick-add-pet__photo-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-add-pet.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  background: rgba(15, 40, 65, 0.35);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .need-login.modal {
@@ -1026,6 +1077,126 @@
   font-size: 0.8rem;
   color: var(--muted);
 }
+
+/* ---------- Owner health log (Medical page) ---------- */
+.health-toolbar {
+  background: #fff;
+  border-radius: 22px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 8px 24px rgba(var(--shadow), 0.05);
+  margin-bottom: 1.25rem;
+}
+.health-toolbar .pet-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+.health-toolbar .kind-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--baby);
+}
+.health-toolbar .kind-tabs .btn {
+  border-radius: 999px;
+  font-size: 0.88rem;
+}
+.health-upcoming {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.health-upcoming-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 6px 20px rgba(var(--shadow), 0.05);
+  text-decoration: none;
+  color: inherit;
+}
+.health-upcoming-item:hover {
+  background: var(--cloud);
+}
+.health-log-month {
+  font-family: 'Mitr', sans-serif;
+  font-size: 0.95rem;
+  color: var(--sky-dark);
+  margin: 1.5rem 0 0.5rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px dashed var(--baby);
+}
+.health-log-month:first-child {
+  margin-top: 0;
+}
+.health-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 0.9rem 0;
+  border-bottom: 1px solid var(--baby);
+}
+.health-log-item:last-child {
+  border-bottom: none;
+}
+.health-log-date {
+  flex: 0 0 48px;
+  text-align: center;
+  line-height: 1.15;
+}
+.health-log-date .day {
+  font-family: 'Mitr', sans-serif;
+  font-size: 1.35rem;
+  color: var(--sky-dark);
+}
+.health-log-date .mon {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+.health-log-icon {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+.health-log-icon.vaccine {
+  background: #dcecfc;
+  color: #2f7fc8;
+}
+.health-log-icon.parasite {
+  background: #dff5e8;
+  color: #2a9d64;
+}
+.health-log-icon.treatment {
+  background: #fff1c9;
+  color: #c48f00;
+}
+.health-log-body {
+  flex: 1;
+  min-width: 0;
+}
+.health-log-title {
+  font-weight: 600;
+  margin-bottom: 0.15rem;
+}
+.health-log-meta {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.health-log-meta span + span::before {
+  content: ' · ';
+}
+
 .alert-soft {
   border-radius: 18px;
   padding: 0.8rem 1rem;

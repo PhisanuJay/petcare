@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { usePets } from '../pet-owner/usePets.js';
 import { CLINIC_SERVICES, useClinicBookings } from '../pet-owner/useClinicBookings.js';
-import { createPayment, PAY_KIND } from './store.js';
 import './payment.css';
 
 export default function ClinicBookPage() {
@@ -32,17 +31,7 @@ export default function ClinicBookPage() {
         when,
         note,
       });
-      const payment = await createPayment({
-        kind: PAY_KIND.clinic,
-        refId: booking.id,
-        ownerId: currentUser.id,
-        ownerName: booking.ownerName,
-        email: currentUser.email,
-        title: service.name,
-        detail: `${booking.petName} · ${when}`,
-        total: service.price,
-      });
-      navigate(`/pet-owner/pay/${payment.id}`);
+      navigate('/pet-owner/history');
     } catch (err) {
       setError(err.message);
     }
@@ -79,8 +68,8 @@ export default function ClinicBookPage() {
           <label className="form-label" htmlFor="clinic-note">บันทึกถึงคลินิก</label>
           <input id="clinic-note" className="form-control" value={note} onChange={(event) => setNote(event.target.value)} />
           {error ? <p className="pay-warn">{error}</p> : null}
-          <p className="pay-note">ขั้นต่อไปเป็นหน้ามัดจำ ใช้สลิปเดียวกับโรงแรมและรับส่ง</p>
-          <button className="btn btn-sky" type="submit">ไปชำระมัดจำ</button>
+          <p className="pay-note">ยืนยันแล้วดูสถานะได้ที่ประวัติการจอง ชำระค่าบริการเมื่อมาที่คลินิก</p>
+          <button className="btn btn-sky" type="submit">ยืนยันการจอง</button>
         </form>
       </div>
     </div>

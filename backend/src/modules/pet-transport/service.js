@@ -89,6 +89,30 @@ export async function getHotelRoomPrices() {
   )).map((room) => ({ ...room, price: Number(room.price) }));
 }
 
+export async function getHotelRoomCatalog() {
+  const rows = await queryAll(
+    `SELECT t.id, t.species, t.size_code AS sizeCode, t.title_th AS titleTh,
+            t.description_th AS descriptionTh, t.image_url AS imageUrl,
+            t.max_pets_per_unit AS maxPetsPerUnit, t.total_units AS totalUnits, t.sort_order AS sortOrder,
+            p.price
+     FROM dbo.hotel_room_types t
+     INNER JOIN dbo.hotel_room_prices p ON p.room_id = t.id
+     ORDER BY t.sort_order`,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    species: row.species,
+    sizeCode: row.sizeCode,
+    titleTh: row.titleTh,
+    descriptionTh: row.descriptionTh,
+    imageUrl: row.imageUrl,
+    maxPetsPerUnit: Number(row.maxPetsPerUnit),
+    totalUnits: Number(row.totalUnits),
+    sortOrder: Number(row.sortOrder),
+    price: Number(row.price),
+  }));
+}
+
 async function listBookings() {
   return (await queryAll('SELECT * FROM dbo.bookings ORDER BY created_at DESC')).map(mapBooking);
 }
@@ -255,6 +279,17 @@ export async function createBooking(input) {
     throw new Error('คำนวณราคาไม่สำเร็จ');
   }
 
+  const petIdList = Array.isArray(input.petIds) && input.petIds.length
+    ? [...new Set(input.petIds.map((id) => String(id).trim()).filter(Boolean))]
+    : (input.petId ? [String(input.petId).trim()] : []);
+  const estimateStored = {
+    ...estimate,
+    meta: {
+      ...(estimate.meta && typeof estimate.meta === 'object' ? estimate.meta : {}),
+      petIds: petIdList,
+    },
+  };
+
   const bookingId = newId();
   const now = new Date().toISOString();
 
@@ -281,7 +316,7 @@ export async function createBooking(input) {
         isRoundTrip(input.serviceType) ? returnFrom.zoneId : null,
         isRoundTrip(input.serviceType) ? returnTo.zoneId : null,
         estimate.fareZoneId,
-        stringifyJson(estimate),
+        stringifyJson(estimateStored),
         now,
         now,
       ],
@@ -711,8 +746,9 @@ export async function updateZones(zones) {
 }
 
 export async function updateHotelRoomPrices(rooms) {
-  if (!Array.isArray(rooms) || rooms.length !== SEED_HOTEL_ROOM_PRICES.length) {
-    throw new Error('กรุณาระบุราคาห้องพักให้ครบทุกประเภท');
+  const expectedCount = SEED_HOTEL_ROOM_PRICES.length;
+  if (!Array.isArray(rooms) || rooms.length !== expectedCount) {
+    throw new Error(`กรุณาระบุราคาห้องพักให้ครบ ${expectedCount} ประเภท`);
   }
 
   const expectedRooms = new Map(SEED_HOTEL_ROOM_PRICES.map((room) => [room.id, room]));

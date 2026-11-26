@@ -24,6 +24,7 @@ import {
 } from './clinicSettings.js';
 import { buildReport } from './reports.js';
 import { addLeave, getRoster, isVetOnDuty, removeLeave, setWeekdays, vetsOnDuty } from './rosterStore.js';
+import { availableOnlineSlots } from '../pet-owner/onlineSlots.js';
 
 /**
  * Clinic Admin API module (`clinic_admin`)
@@ -59,9 +60,60 @@ router.get('/public/clinic-info', (_req, res) => {
     services: listServices()
       .filter((s) => s.online)
       .map(({ code, label }) => ({ code, label })),
+    vets: listStaff('veterinarian').map(({ id, name }) => ({ id, name })),
     closures: settings.closures.filter((c) => c.date >= t && c.date <= limit90),
-    slotMinutes: 30,
+    slotMinutes: settings.slotMinutes ?? 60,
+    lunchBreak: settings.lunchBreak ?? { start: '12:00', end: '13:00' },
+    vetRosterEnabled: true,
   });
+});
+
+router.get('/public/clinic-slots', async (req, res, next) => {
+  try {
+    const date = typeof req.query.date === 'string' ? req.query.date.trim() : '';
+    const vetId = typeof req.query.vetId === 'string' ? req.query.vetId.trim() : '';
+    if (!isDateString(date)) {
+      return res.status(400).json({ error: 'กรุณาระบุวันที่ YYYY-MM-DD' });
+    }
+    res.json(await availableOnlineSlots(date, vetId));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/public/clinic-availability', (req, res) => {
+  const date = typeof req.query.date === 'string' ? req.query.date.trim() : '';
+  if (!isDateString(date)) {
+    return res.status(400).json({ error: 'กรุณาระบุวันที่ YYYY-MM-DD' });
+  }
+  const closure = getClosure(date);
+  if (closure) {
+    return res.json({
+      date,
+      bookable: false,
+      reason: `คลินิกปิดทำการ: ${closure.reason}`,
+      vetsOnDuty: [],
+    });
+  }
+  const day = dayOfWeek(date);
+  if (getHoursForDay(day) === null) {
+    return res.json({
+      date,
+      bookable: false,
+      reason: 'คลินิกปิดทำการวันนี้',
+      vetsOnDuty: [],
+    });
+  }
+  const vets = vetsOnDuty(date).map(({ id, name }) => ({ id, name }));
+  if (!vets.length) {
+    return res.json({
+      date,
+      bookable: false,
+      reason: 'วันนี้ไม่มีสัตวแพทย์เข้าเวร',
+      vetsOnDuty: [],
+    });
+  }
+  return res.json({ date, bookable: true, reason: null, vetsOnDuty: vets });
 });
 
 /* ---------- Protected Admin Routes ---------- */

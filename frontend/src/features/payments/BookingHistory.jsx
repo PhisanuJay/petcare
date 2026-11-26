@@ -1,21 +1,29 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext.jsx';
-import { HOTEL_STATUS_LABEL, useHotelBookings } from '../pet-owner/useHotelBookings.js';
-import { BOOKING_STATUS } from '../pet-owner/bookingOptions.js';
 import { useBookings } from '../pet-owner/useBookings.js';
+import { useHotelStays } from '../pet-owner/useHotelStays.js';
 import { useTransport } from '../pet-transport/useTransport.js';
-import { bookingStatusMeta } from '../pet-transport/constants.js';
 import CancellationSummary from '../cancellations/CancellationSummary.jsx';
 import {
   cancellationFor,
   useCancellationRequests,
 } from '../cancellations/store.js';
-import { PAY_KIND, PAY_KIND_LABEL, PAY_STATUS, PAY_STATUS_LABEL, paymentFor, usePayments } from './store.js';
+import {
+  PAY_KIND,
+  PAY_STATUS,
+  PAY_STATUS_LABEL,
+  paymentFor,
+  paymentForRef,
+  reloadOwnerPayments,
+  usePayments,
+} from './store.js';
+import { buildBookingHistoryRows, filterHistoryTab } from './bookingHistoryRows.js';
 import './payment.css';
 
 const TABS = [
   { id: 'all', label: 'ทั้งหมด' },
+  { id: PAY_KIND.hub, label: 'จองรวม' },
   { id: PAY_KIND.hotel, label: 'โรงแรม' },
   { id: PAY_KIND.transport, label: 'รับส่ง' },
   { id: PAY_KIND.clinic, label: 'จองคิวคลินิก' },
@@ -28,89 +36,126 @@ function when(value) {
   return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }
 
+/** ประวัติแสดงเฉพาะ flow ที่ชำระก่อนจอง — ไม่แสดง «รอชำระเงิน» */
+const HISTORY_PAID_OK = { text: PAY_STATUS_LABEL.approved, tone: 'is-ok' };
+
 function payState(payment) {
-  if (!payment) return { text: 'ยังไม่เข้าสู่การชำระ', tone: 'is-wait' };
-  if (payment.status === PAY_STATUS.approved) return { text: PAY_STATUS_LABEL.approved, tone: 'is-ok' };
-  if (payment.status === PAY_STATUS.cancelled) return { text: PAY_STATUS_LABEL.cancelled, tone: 'is-wait' };
-  if (payment.status === PAY_STATUS.rejected) return { text: `ยังไม่อนุมัติ${payment.note ? ` · ${payment.note}` : ''}`, tone: 'is-wait' };
-  return { text: 'ยังไม่อนุมัติ', tone: 'is-wait' };
+  if (!payment) return HISTORY_PAID_OK;
+  if (payment.status === PAY_STATUS.approved || payment.status === PAY_STATUS.review) {
+    return HISTORY_PAID_OK;
+  }
+  if (payment.status === PAY_STATUS.awaiting) return HISTORY_PAID_OK;
+  if (payment.status === PAY_STATUS.cancelled) {
+    return { text: PAY_STATUS_LABEL.cancelled, tone: 'is-wait' };
+  }
+  if (payment.status === PAY_STATUS.rejected) {
+    return {
+      text: `ชำระไม่สำเร็จ${payment.note ? ` · ${payment.note}` : ''}`,
+      tone: 'is-wait',
+    };
+  }
+  return HISTORY_PAID_OK;
 }
 
 export function useBookingHistory(ownerId) {
-  const { all } = usePayments(ownerId);
+  const { all, loadError: paymentsError } = usePayments(ownerId);
   const cancellations = useCancellationRequests(ownerId);
-  const { bookings: hotels } = useHotelBookings();
-  const { bookings: trips } = useTransport();
+  const { stays, loading: staysLoading, error: staysError, reload: reloadStays } = useHotelStays();
+  const { bookings: trips, loading: transportLoading, error: transportError } = useTransport();
   const { bookings: clinics, loading: clinicsLoading, error: clinicsError, reload: reloadClinics } = useBookings();
-  const rows = useMemo(() => {
-    const payments = all.filter((row) => row.ownerId === ownerId);
-    const rows = payments.map((payment) => ({
-      id: payment.id,
-      kind: payment.kind,
-      title: payment.title,
-      detail: payment.detail,
-      when: payment.createdAt,
-      pay: payState(payment),
-      cancellation: cancellationFor(payment.kind, payment.refId, cancellations),
-      href: payment.kind === PAY_KIND.hotel && payment.refId
-        ? `/pet-owner/cat-hotel/bookings/${payment.refId}`
-        : `/pet-owner/pay/${payment.id}`,
-    }));
-    hotels.forEach((booking) => {
-      if (paymentFor(PAY_KIND.hotel, booking.id, ownerId)) return;
-      rows.push({
-        id: booking.id,
-        kind: PAY_KIND.hotel,
-        title: booking.petName,
-        detail: HOTEL_STATUS_LABEL[booking.status] || '',
-        when: booking.createdAt,
-        pay: { text: 'การจองก่อนมีมัดจำ', tone: 'is-ok' },
-        cancellation: cancellationFor(PAY_KIND.hotel, booking.id, cancellations),
-        href: `/pet-owner/cat-hotel/bookings/${booking.id}`,
-      });
-    });
-    trips.filter((booking) => booking.ownerId === ownerId).forEach((booking) => {
-      if (paymentFor(PAY_KIND.transport, booking.id, ownerId)) return;
-      const meta = bookingStatusMeta(booking.status);
-      rows.push({
-        id: booking.id,
-        kind: PAY_KIND.transport,
-        title: booking.petName,
-        detail: meta?.label || booking.status,
-        when: booking.createdAt,
-        pay: { text: booking.paymentStatus === 'paid' ? 'อนุมัติแล้ว' : 'ยังไม่อนุมัติ', tone: booking.paymentStatus === 'paid' ? 'is-ok' : 'is-wait' },
-        cancellation: cancellationFor(PAY_KIND.transport, booking.id, cancellations),
-        href: `/pet-owner/transport/${booking.id}`,
-      });
-    });
-    clinics.forEach((booking) => {
-      if (paymentFor(PAY_KIND.clinic, booking.id, ownerId)) return;
-      const status = BOOKING_STATUS[booking.status] || BOOKING_STATUS.pending;
-      rows.push({
-        id: booking.id,
-        kind: PAY_KIND.clinic,
-        title: booking.petName || 'นัดหมายคลินิก',
-        detail: `${booking.serviceLabel || booking.service || 'นัดคลินิก'} · ${booking.time || ''} น. · ${status.label}`,
-        when: booking.date || booking.createdAt,
-        pay: { text: 'ไม่ต้องชำระมัดจำ', tone: '' },
-        cancellation: cancellationFor(PAY_KIND.clinic, booking.id, cancellations),
-        href: '/pet-owner/booking',
-      });
-    });
-    return rows.sort((a, b) => String(b.when).localeCompare(String(a.when)));
-  }, [all, hotels, trips, clinics, cancellations, ownerId]);
 
-  return { rows, clinicsLoading, clinicsError, reloadClinics };
+  const payStateFn = useCallback((payment) => payState(payment), []);
+
+  const resolvePay = useCallback((kind, refId, _booking) => {
+    const payment = paymentForRef(kind, refId, ownerId) || paymentFor(kind, refId, ownerId);
+    return payState(payment);
+  }, [ownerId]);
+
+  const cancellationBridge = useMemo(() => ({
+    forKind: (kind, refId) => cancellationFor(kind, refId, cancellations),
+  }), [cancellations]);
+
+  const rows = useMemo(() => {
+    if (!ownerId) return [];
+    const payments = all.filter((row) => row.ownerId === ownerId);
+    return buildBookingHistoryRows({
+      ownerId,
+      payments,
+      payStateFn,
+      resolvePay,
+      cancellations: cancellationBridge,
+      clinics,
+      stays,
+      legacyHotels: [],
+      transports: trips.filter((b) => b.ownerId === ownerId),
+    });
+  }, [
+    all,
+    ownerId,
+    trips,
+    clinics,
+    stays,
+    payStateFn,
+    resolvePay,
+    cancellationBridge,
+  ]);
+
+  const reloadPayments = useCallback(() => {
+    if (ownerId) reloadOwnerPayments(ownerId);
+  }, [ownerId]);
+
+  return {
+    rows,
+    clinicsLoading,
+    clinicsError,
+    reloadClinics,
+    staysLoading,
+    staysError,
+    reloadStays,
+    transportLoading,
+    transportError,
+    paymentsError,
+    reloadPayments,
+  };
 }
 
 export default function BookingHistory({ embedded = false }) {
   const { currentUser } = useAuth();
-  const { rows, clinicsLoading, clinicsError, reloadClinics } = useBookingHistory(currentUser?.id);
+  const {
+    rows,
+    clinicsLoading,
+    clinicsError,
+    reloadClinics,
+    staysLoading,
+    staysError,
+    reloadStays,
+    transportLoading,
+    transportError,
+    paymentsError,
+    reloadPayments,
+  } = useBookingHistory(currentUser?.id);
   const [tab, setTab] = useState('all');
-  const visible = tab === 'all' ? rows : rows.filter((row) => row.kind === tab);
+  const visible = filterHistoryTab(rows, tab);
   const clinicTabSelected = tab === 'all' || tab === PAY_KIND.clinic;
+  const hotelTabSelected = tab === 'all' || tab === PAY_KIND.hotel;
+  const transportTabSelected = tab === 'all' || tab === PAY_KIND.transport;
+
   const waitingForClinics = clinicsLoading && clinicTabSelected;
+  const waitingForStays = staysLoading && hotelTabSelected;
+  const waitingForTransport = transportLoading && transportTabSelected;
+  const anyLoading = waitingForClinics || waitingForStays || waitingForTransport;
+
   const clinicLoadFailed = Boolean(clinicsError) && clinicTabSelected;
+  const staysLoadFailed = Boolean(staysError) && hotelTabSelected;
+  const transportLoadFailed = Boolean(transportError) && transportTabSelected;
+  const paymentsLoadFailed = Boolean(paymentsError);
+  const anyLoadFailed = clinicLoadFailed || staysLoadFailed || transportLoadFailed || paymentsLoadFailed;
+
+  function retryAll() {
+    reloadClinics();
+    reloadStays();
+    reloadPayments();
+  }
 
   return (
     <section className={embedded ? 'hist-embed' : 'hist-page page-wrap'} aria-label="ประวัติการจอง">
@@ -128,24 +173,52 @@ export default function BookingHistory({ embedded = false }) {
             </button>
           ))}
         </div>
-        {waitingForClinics && <p role="status">กำลังโหลดนัดหมายคลินิก...</p>}
+        {anyLoading && <p role="status">กำลังโหลดข้อมูลการจอง...</p>}
         {clinicLoadFailed && (
           <div className="alert alert-danger d-flex align-items-center justify-content-between" role="alert">
             <span>โหลดนัดหมายคลินิกไม่สำเร็จ: {clinicsError}</span>
             <button type="button" className="btn btn-sm btn-outline-danger" onClick={reloadClinics}>ลองใหม่</button>
           </div>
         )}
-        {visible.length === 0 && !waitingForClinics && !clinicLoadFailed ? (
+        {staysLoadFailed && (
+          <div className="alert alert-danger d-flex align-items-center justify-content-between" role="alert">
+            <span>โหลดการจองโรงแรมไม่สำเร็จ: {staysError}</span>
+            <button type="button" className="btn btn-sm btn-outline-danger" onClick={reloadStays}>ลองใหม่</button>
+          </div>
+        )}
+        {transportLoadFailed && (
+          <div className="alert alert-danger d-flex align-items-center justify-content-between" role="alert">
+            <span>โหลดรับ–ส่งไม่สำเร็จ: {transportError}</span>
+          </div>
+        )}
+        {paymentsLoadFailed && (
+          <div className="alert alert-warning d-flex align-items-center justify-content-between" role="alert">
+            <span>โหลดรายการชำระเงินไม่สำเร็จ: {paymentsError}</span>
+            <button type="button" className="btn btn-sm btn-outline-warning" onClick={reloadPayments}>ลองใหม่</button>
+          </div>
+        )}
+        {visible.length === 0 && !anyLoading && !anyLoadFailed ? (
           <div className="hist-empty">
             <p>ยังไม่มีรายการในหมวดนี้</p>
+          </div>
+        ) : visible.length === 0 && !anyLoading && anyLoadFailed ? (
+          <div className="hist-empty">
+            <p>โหลดข้อมูลไม่ครบ — กดลองใหม่เพื่อดูรายการ</p>
+            <button type="button" className="btn btn-soft btn-sm mt-2" onClick={retryAll}>โหลดใหม่ทั้งหมด</button>
           </div>
         ) : visible.length > 0 ? (
           <div className="hist-list">
             {visible.map((row) => (
-              <article key={`${row.kind}-${row.id}`} className="hist-card">
+              <article
+                key={`${row.kind}-${row.id}${row.hubOnly ? '-hub' : ''}${row.hubPaymentId || ''}`}
+                className="hist-card"
+              >
                 <header>
                   <div>
-                    <span className="hist-chip">{PAY_KIND_LABEL[row.kind]}</span>
+                    <span className="hist-chips">
+                      <span className="hist-chip">{row.chip || row.kind}</span>
+                      {row.fromHub ? <span className="hist-chip hist-chip-hub">จองรวม</span> : null}
+                    </span>
                     <strong>{row.title}</strong>
                     <p>{row.detail}{row.when ? ` · ${when(row.when)}` : ''}</p>
                   </div>

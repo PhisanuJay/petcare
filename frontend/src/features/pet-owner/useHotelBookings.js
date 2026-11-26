@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { HOTEL_ROOMS, HOTEL_STAY_PROMO } from '../../shared/data/homeContent.js';
-import { STORAGE_KEYS, newId, readJSON, writeJSON } from '../../shared/utils/storage.js';
 
 /** Stay status only. Camera access is a separate grant in the hotel CCTV app. */
 export const HOTEL_STATUS = {
@@ -63,34 +62,12 @@ export function quoteStay({ roomName, checkIn, checkOut, cages = 1, pricePerNigh
   };
 }
 
-const listeners = new Set();
-let cache = null;
-
-function getAll() {
-  if (cache === null) cache = readJSON(STORAGE_KEYS.hotelBookings, []);
-  return cache;
-}
-
-function setAll(next) {
-  writeJSON(STORAGE_KEYS.hotelBookings, next);
-  cache = next;
-  listeners.forEach((listener) => listener());
-}
-
-function subscribe(listener) {
-  listeners.add(listener);
-  const onStorage = (event) => {
-    if (event.key === STORAGE_KEYS.hotelBookings) {
-      cache = null;
-      listener();
-    }
-  };
-  window.addEventListener('storage', onStorage);
-  return () => {
-    listeners.delete(listener);
-    window.removeEventListener('storage', onStorage);
-  };
-}
+/** Legacy localStorage hotel bookings — retired; stays use useHotelStays + MSSQL. */
+const EMPTY_HOTEL_BOOKINGS = [];
+const noopSubscribe = (listener) => {
+  listener();
+  return () => {};
+};
 
 function assertStay(checkIn, checkOut) {
   if (!checkIn || !checkOut) throw new Error('กรุณาระบุวันเข้าพักและวันรับกลับ');
@@ -118,101 +95,33 @@ function normalizeLinkedBookings(items) {
  */
 export function useHotelBookings() {
   const { currentUser } = useAuth();
-  const all = useSyncExternalStore(subscribe, getAll);
+  useSyncExternalStore(noopSubscribe, () => EMPTY_HOTEL_BOOKINGS);
   const ownerId = currentUser?.id;
 
-  const bookings = useMemo(
-    () => (ownerId ? all.filter((row) => row.ownerId === ownerId) : [])
-      .slice()
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [all, ownerId],
-  );
+  const bookings = useMemo(() => EMPTY_HOTEL_BOOKINGS, [ownerId]);
 
-  const createBooking = useCallback((data) => {
-    if (!currentUser) throw new Error('กรุณาเข้าสู่ระบบ');
-    const pets = (Array.isArray(data.pets) ? data.pets : [])
-      .map((pet) => ({
-        id: pet.id || '',
-        name: String(pet.name || '').trim(),
-        species: pet.species || 'other',
-      }))
-      .filter((pet) => pet.name);
-    if (!pets.length) throw new Error('เลือกสัตว์เลี้ยงอย่างน้อย 1 ตัว');
-    const checkIn = String(data.checkIn || '');
-    const checkOut = String(data.checkOut || '');
-    assertStay(checkIn, checkOut);
-    const plan = cagePlan(pets);
-    const quote = quoteStay({
-      roomName: data.roomName,
-      checkIn,
-      checkOut,
-      cages: plan.cages,
-      pricePerNight: data.pricePerNight,
-    });
-    if (!quote) throw new Error('กรุณาเลือกวันเข้าพักและวันรับกลับ');
-    const booking = {
-      id: newId(),
-      ownerId: currentUser.id,
-      email: currentUser.email,
-      petName: pets.map((pet) => pet.name).join(', '),
-      petId: pets[0].id,
-      petIds: pets.map((pet) => pet.id),
-      pets,
-      cageNote: plan.note,
-      checkIn,
-      checkOut,
-      status: HOTEL_STATUS.waiting,
-      linkedBookings: normalizeLinkedBookings(data.linkedBookings),
-      createdAt: new Date().toISOString(),
-      ...quote,
-    };
-    setAll([booking, ...getAll()]);
-    return booking;
-  }, [currentUser]);
+  const createBooking = useCallback(() => {
+    throw new Error('จองโรงแรมผ่านหน้าจองบริการ (Stay) แทน — ไม่รองรับการบันทึกในเครื่องแล้ว');
+  }, []);
 
-  const linkRelatedBooking = useCallback((id, linkedBooking) => {
-    if (!ownerId) throw new Error('กรุณาเข้าสู่ระบบ');
-    const [related] = normalizeLinkedBookings([linkedBooking]);
-    if (!related) throw new Error('ข้อมูลบริการที่เชื่อมไม่ถูกต้อง');
-    const rows = getAll();
-    const current = rows.find((row) => row.id === id && row.ownerId === ownerId);
-    if (!current) throw new Error('ไม่พบการจองโรงแรมนี้');
-    const linkedBookings = normalizeLinkedBookings(current.linkedBookings);
-    if (linkedBookings.some((item) => item.kind === related.kind && item.id === related.id)) {
-      return current;
-    }
-    const updated = { ...current, linkedBookings: [...linkedBookings, related] };
-    setAll(rows.map((row) => (row.id === id ? updated : row)));
-    return updated;
-  }, [ownerId]);
+  const linkRelatedBooking = useCallback((_id, _linkedBooking) => {
+    /* stays are linked via payment hub refId — legacy localStorage removed */
+    return null;
+  }, []);
 
-  const setStatus = useCallback((id, status) => {
-    if (!Object.values(HOTEL_STATUS).includes(status)) throw new Error('สถานะไม่ถูกต้อง');
-    const rows = getAll();
-    const current = rows.find((row) => row.id === id && row.ownerId === ownerId);
-    if (!current) throw new Error('ไม่พบการจองนี้');
-    setAll(rows.map((row) => (row.id === id ? { ...row, status } : row)));
-  }, [ownerId]);
+  const setStatus = useCallback(() => {
+    throw new Error('อัปเดตสถานะโรงแรมผ่านระบบ stays เท่านั้น');
+  }, []);
 
   return { bookings, createBooking, linkRelatedBooking, setStatus };
 }
 
 /** Every stay, for the hotel desk. Status changes here, not on the customer page. */
 export function useAllHotelBookings() {
-  const all = useSyncExternalStore(subscribe, getAll);
-  const bookings = useMemo(
-    () => all.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
-    [all],
-  );
-  const setStatus = useCallback((id, status) => {
-    if (!Object.values(HOTEL_STATUS).includes(status)) throw new Error('สถานะไม่ถูกต้อง');
-    const rows = getAll();
-    if (!rows.some((row) => row.id === id)) throw new Error('ไม่พบการจองนี้');
-    setAll(rows.map((row) => (
-      row.id === id
-        ? { ...row, status, updatedAt: new Date().toISOString() }
-        : row
-    )));
+  useSyncExternalStore(noopSubscribe, () => EMPTY_HOTEL_BOOKINGS);
+  const bookings = useMemo(() => EMPTY_HOTEL_BOOKINGS, []);
+  const setStatus = useCallback(() => {
+    throw new Error('จัดการสถานะโรงแรมผ่านระบบ stays ในหลังบ้าน');
   }, []);
   return { bookings, setStatus };
 }

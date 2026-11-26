@@ -4,6 +4,9 @@ import { registerRoutes } from './routes/index.js';
 import { config } from './config/index.js';
 import { connectionLabel, getPool } from './db/mssql.js';
 import { ensurePetTransportReady } from './modules/pet-transport/routes.js';
+import { ensureAdoptionReady } from './modules/adoption/routes.js';
+import { migrateHotelReservationsFromJson } from './modules/pet-owner/hotelLegacyMigrate.js';
+import { reportTransportLegacyRequests } from './modules/pet-owner/transportLegacyMigrate.js';
 
 const app = express();
 const PORT = config.port;
@@ -33,6 +36,13 @@ registerRoutes(app);
 
 async function start() {
   await ensurePetTransportReady();
+  await ensureAdoptionReady();
+  try {
+    await migrateHotelReservationsFromJson();
+    await reportTransportLegacyRequests();
+  } catch (error) {
+    console.warn('[hotel] legacy reservation migrate skipped:', error.message);
+  }
   app.listen(PORT, () => {
     console.log(`PetCare backend listening on http://localhost:${PORT}`);
     console.log(`SQL Server: ${connectionLabel()}`);

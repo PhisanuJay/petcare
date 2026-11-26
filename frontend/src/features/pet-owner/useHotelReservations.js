@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext.jsx';
 import { ownerRequest } from './api.js';
 
-/** Cat hotel reservations of the logged-in user (`/api/pet-owner/cat-hotel/reservations`). */
+/**
+ * Legacy hook name — loads MSSQL stays (`/cat-hotel/stays`) after reservation API was retired.
+ */
 export function useHotelReservations() {
   const { currentUser } = useAuth();
   const ownerId = currentUser?.id ?? null;
@@ -15,7 +17,9 @@ export function useHotelReservations() {
     setLoading(true);
     setError('');
     try {
-      setReservations(await ownerRequest(ownerId, '/cat-hotel/reservations'));
+      const stays = await ownerRequest(ownerId, '/cat-hotel/stays');
+      const list = Array.isArray(stays) ? stays : stays?.items ?? [];
+      setReservations(list);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -27,29 +31,13 @@ export function useHotelReservations() {
     reload();
   }, [reload]);
 
-  const addReservation = useCallback(
-    async (data) => {
-      const reservation = await ownerRequest(ownerId, '/cat-hotel/reservations', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
-      setReservations((list) => [...list, reservation]);
-      return reservation;
-    },
-    [ownerId],
-  );
+  const addReservation = useCallback(async () => {
+    throw new Error('ใช้เมนูฝากโรงแรม (/pet-owner/cat-hotel/book) แทนการจองแบบเก่า');
+  }, []);
 
-  const requestCancel = useCallback(
-    async (id, cancellationId, reason) => {
-      const reservation = await ownerRequest(ownerId, `/cat-hotel/reservations/${id}/request-cancel`, {
-        method: 'POST',
-        body: JSON.stringify({ cancellationId, reason }),
-      });
-      setReservations((list) => list.map((r) => (r.id === id ? reservation : r)));
-      return reservation;
-    },
-    [ownerId],
-  );
+  const requestCancel = useCallback(async () => {
+    throw new Error('ยกเลิกการฝากผ่านรายละเอียดการจองและระบบชำระเงิน');
+  }, []);
 
   return { reservations, loading, error, reload, addReservation, requestCancel };
 }

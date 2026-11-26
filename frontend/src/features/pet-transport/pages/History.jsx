@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { speciesOf } from '../../pet-owner/petUtils.js';
-import { STORAGE_KEYS, readJSON } from '../../../shared/utils/storage.js';
+import { bookingPetPhotoSrc, speciesOf } from '../../pet-owner/petUtils.js';
 import { placeParts } from '../store.js';
 import { useTransport } from '../useTransport.js';
 import '../transport.css';
@@ -11,10 +10,10 @@ const SPECIES_SHORT = {
   cat: 'แมว',
 };
 
-function findPet(petId) {
-  if (!petId) return null;
-  const pets = readJSON(STORAGE_KEYS.pets, []);
-  return pets.find((p) => p.id === petId) || null;
+function petLabel(booking) {
+  if (booking?.petNames?.length) return booking.petNames.join(', ');
+  if (booking?.petName) return booking.petName;
+  return 'สัตว์เลี้ยง';
 }
 
 function formatWhen(value) {
@@ -122,30 +121,24 @@ export default function HistoryPage() {
 
       <div className="dv-appt-list">
         {jobs.map((job) => {
-          const pet = findPet(job.booking?.petId);
+          const petName = petLabel(job.booking);
           const from = placeParts(job.from, transport);
-          const speciesKey = pet?.species || job.booking?.petSpecies;
+          const speciesKey = job.booking?.petSpecies;
           const speciesLabel = SPECIES_SHORT[speciesKey] || speciesOf(speciesKey).label;
-          const breed = pet?.breed || job.booking?.petBreed || '';
+          const breed = job.booking?.petBreed || '';
           const kindLine = [speciesLabel, breed].filter(Boolean).join(' · ') || 'สัตว์เลี้ยง';
-          const photo = pet?.photo || job.booking?.petPhoto || '';
+          const photo = bookingPetPhotoSrc(job.booking);
 
           return (
             <article className="dv-appt" key={job.id}>
-              {photo ? (
-                <img className="dv-appt__photo" src={photo} alt="" />
-              ) : (
-                <span className="dv-appt__photo is-fallback" aria-hidden="true">
-                  {speciesOf(speciesKey).emoji}
-                </span>
-              )}
+              <img className="dv-appt__photo" src={photo} alt="" loading="lazy" decoding="async" />
 
               <div className="dv-appt__info">
                 <time>
                   <ClockIcon />
                   {formatWhen(job.pickupTime)}
                 </time>
-                <strong>{job.booking?.petName || pet?.name || 'สัตว์เลี้ยง'}</strong>
+                <strong>{petName}</strong>
                 <span className="dv-appt__kind">
                   <PawIcon />
                   {kindLine}

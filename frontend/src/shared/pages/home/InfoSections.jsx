@@ -156,7 +156,7 @@ export function ReviewsSection() {
                 <div className="stars mb-2">{'★'.repeat(r.stars) + '☆'.repeat(5 - r.stars)}</div>
                 {r.text}
                 <div className="reviewer">
-                  <span className="av" style={{ background: r.bg }}>{r.emoji}</span>
+                  <img className="av av-photo" src={r.photo} alt="" style={{ background: r.bg }} loading="lazy" decoding="async" />
                   <div>
                     <div className="fw-medium">{r.name}</div>
                     <div className="small text-muted">{r.pet}</div>

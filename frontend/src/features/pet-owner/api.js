@@ -1,8 +1,22 @@
+import { STORAGE_KEYS, readJSON } from '../../shared/utils/storage.js';
+
 export const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
+function ownerAuthHeaders(ownerId, extra = {}) {
+  const remembered = readJSON(STORAGE_KEYS.session, null);
+  const temporary = readJSON(STORAGE_KEYS.session, null, sessionStorage);
+  const session = remembered?.authToken ? remembered : temporary;
+  const headers = { ...extra };
+  if (session?.authToken) {
+    headers.Authorization = `Bearer ${session.authToken}`;
+  } else if (ownerId) {
+    headers['x-owner-id'] = ownerId;
+  }
+  return headers;
+}
+
 /**
- * Call the Pet Owner API as `ownerId` (sent in the x-owner-id header until the backend has real auth).
- * Resolves with the parsed JSON body; rejects with an Error carrying a Thai message.
+ * Call the Pet Owner API for the logged-in owner (Bearer session, or x-owner-id fallback).
  */
 export async function ownerRequest(ownerId, url, options = {}) {
   let res;
@@ -12,7 +26,7 @@ export async function ownerRequest(ownerId, url, options = {}) {
       headers: {
         'Content-Type': 'application/json',
         ...(options.headers || {}),
-        'x-owner-id': ownerId,
+        ...ownerAuthHeaders(ownerId, {}),
       },
     });
   } catch {

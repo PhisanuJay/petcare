@@ -35,7 +35,7 @@ function ReservationForm({ cats, onSubmit }) {
   const { rooms: hotelRooms, loading: pricingLoading, error: pricingError } = useHotelPricing();
   const [form, setForm] = useState({
     petId: cats[0]?.id ?? '',
-    roomType: 'deluxe',
+    roomType: 'size_m',
     checkIn: '',
     checkOut: '',
     note: '',

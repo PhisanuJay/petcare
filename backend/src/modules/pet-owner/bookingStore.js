@@ -4,10 +4,11 @@ import { createJsonCollection, httpError } from './jsonCollection.js';
 
 /**
  * Pet owners' vet bookings.
- * Shape: { id, ownerId, petId, petName, petSpecies, ownerName, ownerPhone, service, serviceLabel,
- *          date, time, note, status, clinicNote?, createdAt, updatedAt }
+ * Shape: { id, ownerId, petId, petIds?, petLines?, petName, petSpecies, ownerName, ownerPhone, service, serviceLabel,
+ *          date, time, vetId?, vetName?, note, status, clinicNote?, createdAt, updatedAt }
  *   ownerName / ownerPhone are copied from the owner's account when booking (may be '' on older bookings).
- * status: 'pending' → 'confirmed' | 'rejected' (Medical Assistant);
+ * status: online bookings are auto-confirmed on create; legacy/manual flow may start 'pending'
+ *         → 'confirmed' | 'rejected' (Medical Assistant);
  *         'confirmed' → 'no_show' (Medical Assistant) | 'completed' (Veterinarian);
  *         'pending' / 'confirmed' → 'cancel_requested' → 'cancelled' (by Admin).
  * The Medical Assistant can also move a pending / confirmed booking to another date and time
@@ -27,6 +28,16 @@ const OWNER_CANCELLABLE = ['pending', 'confirmed'];
 const CLINIC_RESCHEDULABLE = ['pending', 'confirmed'];
 /** Bookings that no longer hold their time slot. */
 const INACTIVE = ['cancelled', 'rejected'];
+export const SLOT_BLOCKING_STATUSES = [
+  'pending',
+  'confirmed',
+  'completed',
+  'cancel_requested',
+];
+
+export function isSlotBlockingStatus(status) {
+  return SLOT_BLOCKING_STATUSES.includes(status);
+}
 export const BOOKING_STATUSES = [
   'pending',
   'confirmed',
@@ -52,16 +63,62 @@ export function listBookings(ownerId) {
   );
 }
 
+/** Remove a booking entirely (e.g. rollback failed online auto-confirm). */
+export function deleteBooking(id) {
+  return bookings.update((all) => {
+    const next = all.filter((b) => b.id !== id);
+    if (next.length === all.length) throw httpError(404, 'ไม่พบนัดหมายนี้');
+    return { records: next, result: true };
+  });
+}
+
+/** Auto-confirm online booking: pending → confirmed with assigned vet. */
+export function confirmBookingOnline(id, { vetId, vetName }) {
+  return bookings.update((all) => {
+    const index = all.findIndex((b) => b.id === id);
+    if (index === -1) throw httpError(404, 'ไม่พบนัดหมายนี้');
+    const current = all[index];
+    if (current.status !== 'pending') {
+      throw httpError(409, 'ไม่สามารถยืนยันนัดนี้ได้');
+    }
+    const booking = {
+      ...current,
+      status: 'confirmed',
+      vetId,
+      vetName,
+      confirmedBy: 'online',
+      updatedAt: new Date().toISOString(),
+    };
+    const next = all.slice();
+    next[index] = booking;
+    return { records: next, result: booking };
+  });
+}
+
 export function createBooking(ownerId, data) {
   return bookings.update((all) => {
-    const clash = all.some(
-      (b) =>
-        b.ownerId === ownerId &&
-        b.petId === data.petId &&
-        b.status !== 'cancelled' &&
-        b.date === data.date &&
-        b.time === data.time,
+    const slotTaken = all.some(
+      (b) => isSlotBlockingStatus(b.status)
+        && b.date === data.date
+        && b.time === data.time,
     );
+    if (slotTaken) {
+      throw httpError(409, 'ช่วงเวลานี้มีการจองแล้ว กรุณาเลือกใหม่');
+    }
+    const requestedPetIds = new Set(
+      (Array.isArray(data.petIds) && data.petIds.length ? data.petIds : [data.petId]).map(String),
+    );
+    const clash = all.some((b) => {
+      if (b.ownerId !== ownerId || b.status === 'cancelled') return false;
+      if (b.date !== data.date || b.time !== data.time) return false;
+      const bookedIds = new Set(
+        (Array.isArray(b.petIds) && b.petIds.length ? b.petIds : [b.petId]).map(String),
+      );
+      for (const id of requestedPetIds) {
+        if (bookedIds.has(id)) return true;
+      }
+      return false;
+    });
     if (clash) throw httpError(409, 'สัตว์เลี้ยงตัวนี้มีนัดในวันและเวลานี้แล้ว');
     const now = new Date().toISOString();
     const booking = { ...data, id: randomUUID(), ownerId, status: 'pending', createdAt: now, updatedAt: now };

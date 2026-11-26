@@ -25,7 +25,7 @@ export default function HotelSection({ go }) {
                   <span className="fs-6 text-muted"> / คืน</span>
                 </div>
                 <ul>
-                  {room.features.map((f) => (
+                  {(room.features ?? []).map((f) => (
                     <li key={f}>
                       <i className="bi bi-check-circle-fill" />
                       {f}

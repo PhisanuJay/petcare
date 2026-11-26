@@ -272,6 +272,11 @@
   font-size: 1.4rem;
   box-shadow: 0 4px 10px rgba(var(--shadow), 0.1);
 }
+.vet-site img.vet-avatar {
+  object-fit: cover;
+  padding: 0;
+  font-size: 0;
+}
 .vet-site .vet-quick {
   display: flex;
   align-items: center;

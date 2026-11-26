@@ -17,38 +17,50 @@ export const SERVICES = [
   { icon: 'bi-capsule', title: 'ฉีดวัคซีน', desc: 'แจ้งเตือนนัดอัตโนมัติ', bg: '#dff5e8', fg: '#2a9d64' },
   { icon: 'bi-bandaid', title: 'ผ่าตัด / ทำหมัน', desc: 'ห้องผ่าตัดมาตรฐาน', bg: '#e6e3ff', fg: '#5b52d6' },
   { icon: 'bi-emoji-smile', title: 'ทันตกรรม', desc: 'ขูดหินปูน ดูแลช่องปาก', bg: '#fff1c9', fg: '#c48f00' },
-  { icon: 'bi-scissors', title: 'อาบน้ำ ตัดขน', desc: 'สปาโดยมืออาชีพ', bg: '#f6e0ff', fg: '#a454d6' },
   { icon: 'bi-building', title: 'โรงแรมสัตว์', desc: 'ดูแลตลอด 24 ชม.', bg: '#dff3fb', fg: '#1f97c7' },
 ];
 
 export const HOTEL_ROOMS = [
   {
-    name: 'Standard',
-    price: 450,
-    image: '/rooms/standard.jpg',
-    icon: 'bi-house-door',
+    name: 'SizeS',
+    price: 380,
+    image: '/rooms/size-s.jpg',
+    icon: 'bi-box',
     bg: '#e7f1ff',
     fg: '#2f7fc8',
-    features: ['ห้องส่วนตัวสำหรับน้องเล็ก', 'อาหาร 2 มื้อ ตามที่เจ้าของกำหนด', 'ทำความสะอาดวันละ 2 ครั้ง', 'ส่งรูปอัปเดตทุกวัน'],
+    sizeHint: 'เหมาะน้องเล็ก เช่น แมว / สุนัขจิ๋ว',
+    features: ['กรงขนาด S ส่วนตัว', 'อาหาร 2 มื้อตามเจ้าของกำหนด', 'ทำความสะอาดวันละ 2 ครั้ง', 'ส่งรูปอัปเดตทุกวัน'],
   },
   {
-    name: 'Deluxe',
-    price: 750,
-    image: '/rooms/deluxe.jpg',
-    icon: 'bi-building',
+    name: 'SizeM',
+    price: 580,
+    image: '/rooms/size-m.jpg',
+    icon: 'bi-house-door',
     bg: '#dff3fb',
     fg: '#1f97c7',
     featured: true,
-    features: ['ห้องกว้าง มีคอนโดแมว / ของเล่น', 'แอร์ 24 ชั่วโมง', 'ดูน้องผ่าน CCTV ในแอป', 'พาเล่น / เดินเล่นวันละ 2 รอบ'],
+    sizeHint: 'น้องขนาดกลางเล็ก — ยอดนิยม',
+    features: ['กรงขนาด M กว้างสบาย', 'แอร์ตลอด 24 ชม.', 'ดูน้องผ่าน CCTV ในแอป', 'พาเล่นวันละ 2 รอบ'],
   },
   {
-    name: 'Suite',
-    price: 1200,
-    image: '/rooms/suite.jpg',
+    name: 'SizeL',
+    price: 880,
+    image: '/rooms/size-l.jpg',
+    icon: 'bi-building',
+    bg: '#e8f5ee',
+    fg: '#2a9d64',
+    sizeHint: 'น้องกลาง–ใหญ่ ต้องการพื้นที่มาก',
+    features: ['กรงขนาด L โล่ง', 'ของเล่นและที่นอนนุ่ม', 'CCTV รายกรง', 'รายงานพฤติกรรมรายวัน'],
+  },
+  {
+    name: 'SizeXL',
+    price: 1280,
+    image: '/rooms/size-xl.jpg',
     icon: 'bi-stars',
     bg: '#e6e3ff',
     fg: '#5b52d6',
-    features: ['ห้องสวีทพร้อมโซฟาและที่นอนนุ่ม', 'พี่เลี้ยงดูแลใกล้ชิด', 'CCTV + วิดีโอคอลหาน้องได้', 'อาบน้ำก่อนกลับบ้านฟรี'],
+    sizeHint: 'น้องใหญ่หรือต้องการพื้นที่มากเป็นพิเศษ',
+    features: ['กรงขนาด XL', 'พี่เลี้ยงดูแลใกล้ชิด', 'CCTV + อัปเดตวิดีโอ', 'อาบน้ำก่อนรับกลับ (ตามแพ็ก)'],
   },
 ];
 
@@ -59,8 +71,49 @@ export const HOTEL_PERKS = [
   { icon: 'bi-truck', title: 'บริการรับ-ส่งถึงบ้าน', desc: 'สะดวก ไม่ต้องเดินทาง' },
 ];
 
-/** Live animals should come from /api/adoption — no hardcoded samples. */
-export const ADOPT_ANIMALS = [];
+/** Teaser cards on homepage — full list from GET /api/adoption/animals */
+export const ADOPT_ANIMALS = [
+  {
+    name: 'น้องถั่วเหลือง',
+    breed: 'พันธุ์ผสม',
+    age: '1 ปี',
+    personality: 'ขี้อ้อน ชอบเล่นกับเด็ก',
+    sex: 'female',
+    photo: '/adoption/adopt-001.jpg',
+    bg: '#fff1c9',
+    tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
+  },
+  {
+    name: 'น้องมะลิ',
+    breed: 'ขาวมณี',
+    age: '8 เดือน',
+    personality: 'เรียบร้อย ชอบนอนตัก',
+    sex: 'female',
+    photo: '/adoption/adopt-002.jpg',
+    bg: '#e7f1ff',
+    tags: ['ฉีดวัคซีนแล้ว'],
+  },
+  {
+    name: 'น้องดำ',
+    breed: 'ไทย',
+    age: '2 ปี',
+    personality: 'ฉลาด เป็นมิตรกับคนคุ้นเคย',
+    sex: 'male',
+    photo: '/adoption/adopt-003.jpg',
+    bg: '#dff5e8',
+    tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
+  },
+  {
+    name: 'น้องส้มโอ',
+    breed: 'แมวส้ม',
+    age: '3 เดือน',
+    personality: 'ซน ขี้เล่น เข้ากับแมวตัวอื่นได้',
+    sex: 'male',
+    photo: '/adoption/adopt-004.jpg',
+    bg: '#ffe6d9',
+    tags: ['ถ่ายพยาธิแล้ว'],
+  },
+];
 
 export const ADOPT_STEPS = [
   { icon: 'bi-search-heart', title: 'เลือกน้องที่ใช่' },
@@ -103,7 +156,7 @@ export const REVIEWS = [
     text: 'คุณหมออธิบายละเอียดมาก น้องหมาที่บ้านไม่กลัวเลย จองคิวออนไลน์สะดวกสุดๆ',
     name: 'คุณมายด์',
     pet: 'เจ้าของน้องข้าวตัง',
-    emoji: '🐶',
+    photo: '/pets/default-dog.jpg',
     bg: '#dcecfc',
   },
   {
@@ -111,7 +164,7 @@ export const REVIEWS = [
     text: 'ฝากน้องแมวไว้โรงแรม 5 วัน เปิดดู CCTV ได้ตลอด มีส่งรูปอัปเดตทุกวัน ประทับใจค่ะ',
     name: 'คุณแพรว',
     pet: 'เจ้าของน้องส้มจี๊ด',
-    emoji: '🐱',
+    photo: '/pets/default-cat.jpg',
     bg: '#dff5e8',
   },
   {
@@ -119,7 +172,7 @@ export const REVIEWS = [
     text: 'รับน้องดำมาจากโครงการหาบ้าน ทีมงานช่วยแนะนำการดูแลดีมาก ตอนนี้น้องเป็นสมาชิกครอบครัวแล้วครับ',
     name: 'คุณบอส',
     pet: 'เจ้าของน้องดำ',
-    emoji: '🐕',
+    photo: '/adoption/adopt-004.jpg',
     bg: '#e6e3ff',
   },
 ];

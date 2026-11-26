@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createJsonCollection, httpError } from './jsonCollection.js';
+import { withDemoHealthIfEmpty } from './seedPetHealth.js';
 
 const pets = createJsonCollection('pets.json');
 
@@ -7,12 +8,16 @@ export function listPets(ownerId) {
   return pets.read().then((all) =>
     all
       .filter((pet) => pet.ownerId === ownerId)
+      .map(withDemoHealthIfEmpty)
       .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))),
   );
 }
 
 export function findPet(ownerId, id) {
-  return pets.read().then((all) => all.find((pet) => pet.id === id && pet.ownerId === ownerId) ?? null);
+  return pets.read().then((all) => {
+    const pet = all.find((p) => p.id === id && p.ownerId === ownerId) ?? null;
+    return pet ? withDemoHealthIfEmpty(pet) : null;
+  });
 }
 
 export function createPet(ownerId, data) {
@@ -64,12 +69,15 @@ export function deletePet(ownerId, id) {
 
 /** A pet by id regardless of owner (for the veterinarian side). */
 export function getPetById(id) {
-  return pets.read().then((all) => all.find((pet) => pet.id === id) ?? null);
+  return pets.read().then((all) => {
+    const pet = all.find((item) => item.id === id) ?? null;
+    return pet ? withDemoHealthIfEmpty(pet) : null;
+  });
 }
 
 /** Every owner's pets (for the veterinarian side). */
 export function listAllPets() {
-  return pets.read();
+  return pets.read().then((all) => all.map(withDemoHealthIfEmpty));
 }
 
 /**

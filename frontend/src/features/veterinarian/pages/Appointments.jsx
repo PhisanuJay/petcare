@@ -41,8 +41,12 @@ function addDays(dateString, days) {
 
 /** Where the vet records what was done, depending on the service the owner booked. */
 function recordLink(a) {
-  if (a.service === 'vaccine') return `/veterinarian/vaccination?pet=${a.pet.id}`;
-  if (a.service === 'parasite') return `/veterinarian/medical-records?pet=${a.pet.id}&kind=parasite`;
+  if (['vaccine', 'vaccine_combo', 'vaccine_rabies'].includes(a.service)) {
+    return `/veterinarian/vaccination?pet=${a.pet.id}`;
+  }
+  if (['parasite', 'deworming', 'flea_prevention'].includes(a.service)) {
+    return `/veterinarian/medical-records?pet=${a.pet.id}&kind=parasite`;
+  }
   return `/veterinarian/medical-records?pet=${a.pet.id}`;
 }
 

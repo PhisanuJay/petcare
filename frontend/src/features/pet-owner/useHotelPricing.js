@@ -1,15 +1,13 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { HOTEL_ROOMS as HOME_HOTEL_ROOMS } from '../../shared/data/homeContent.js';
+import {
+  HOTEL_ROOM_BY_ID,
+  HOTEL_ROOM_MATRIX,
+  pricingRoomFromMatrix,
+} from '../../shared/data/hotelRoomMatrix.js';
 import { transportApi } from '../pet-transport/api.js';
 import './hotel-pricing.css';
 
-const ROOM_IDS = ['standard', 'deluxe', 'suite'];
-
-const DEFAULT_ROOMS = HOME_HOTEL_ROOMS.map((room, index) => ({
-  ...room,
-  value: ROOM_IDS[index],
-  label: room.name,
-}));
+const DEFAULT_ROOMS = HOTEL_ROOM_MATRIX.map((row) => pricingRoomFromMatrix(row));
 
 const listeners = new Set();
 let snapshot = { rooms: DEFAULT_ROOMS, loading: true, error: '' };
@@ -29,15 +27,29 @@ function getSnapshot() {
   return snapshot;
 }
 
+function roomFromApiRow(item) {
+  const row = HOTEL_ROOM_BY_ID[item.id];
+  const price = Number(item.price);
+  const label = item.label || row?.titleTh || item.id;
+  if (!row) {
+    if (!Number.isSafeInteger(price) || price < 1) {
+      throw new Error(`ไม่พบราคาห้อง ${label} ที่ถูกต้อง`);
+    }
+    return { value: item.id, label, name: label, price, image: '/rooms/size-m.jpg', features: [] };
+  }
+  if (!Number.isSafeInteger(price) || price < 1) {
+    throw new Error(`ไม่พบราคาห้อง ${label} ที่ถูกต้อง`);
+  }
+  return pricingRoomFromMatrix(row, price);
+}
+
 function normalizeRooms(rows) {
   if (!Array.isArray(rows)) throw new Error('เซิร์ฟเวอร์ส่งข้อมูลราคาห้องพักไม่ถูกต้อง');
+  if (!rows.length) return DEFAULT_ROOMS;
   return DEFAULT_ROOMS.map((room) => {
     const saved = rows.find((item) => item.id === room.value);
-    const price = Number(saved?.price);
-    if (!saved || !Number.isSafeInteger(price) || price < 1) {
-      throw new Error(`ไม่พบราคาห้อง ${room.label} ที่ถูกต้อง`);
-    }
-    return { ...room, price };
+    if (saved) return roomFromApiRow(saved);
+    return { ...room };
   });
 }
 
@@ -48,7 +60,16 @@ export function refreshHotelPricing() {
 
   request = transportApi.getPricing()
     .then((data) => {
-      const rooms = normalizeRooms(data.hotelRoomPrices);
+      let rooms;
+      try {
+        rooms = normalizeRooms(data.hotelRoomPrices);
+      } catch (normErr) {
+        rooms = DEFAULT_ROOMS;
+        snapshot = { rooms, loading: false, error: normErr.message };
+        loaded = true;
+        notify();
+        return rooms;
+      }
       snapshot = { rooms, loading: false, error: '' };
       loaded = true;
       notify();
@@ -56,7 +77,7 @@ export function refreshHotelPricing() {
     })
     .catch((error) => {
       snapshot = {
-        ...snapshot,
+        rooms: DEFAULT_ROOMS,
         loading: false,
         error: error.message || 'โหลดราคาห้องพักไม่สำเร็จ',
       };

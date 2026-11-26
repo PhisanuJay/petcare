@@ -8,7 +8,7 @@ import {
   reviewStaffPayment,
   submitOwnerPayment,
 } from './api.js';
-import { approveTransportPayment } from '../pet-transport/store.js';
+import { approveTransportPayment, ownerConfirmPayment } from '../pet-transport/store.js';
 import { depositOf } from './promptpay.js';
 import { CANCELLATION_STATUS, cancellationFor, listCancellationRequests } from '../cancellations/store.js';
 
@@ -16,12 +16,14 @@ export const PAY_KIND = {
   hotel: 'hotel',
   transport: 'transport',
   clinic: 'clinic',
+  hub: 'hub',
 };
 
 export const PAY_KIND_LABEL = {
   hotel: 'โรงแรม',
   transport: 'รับส่ง',
   clinic: 'จองคิวคลินิก',
+  hub: 'จองรวม',
 };
 
 export const PAY_STATUS = {
@@ -33,10 +35,10 @@ export const PAY_STATUS = {
 };
 
 export const PAY_STATUS_LABEL = {
-  awaiting_slip: 'ยังไม่อนุมัติ',
-  pending_review: 'ยังไม่อนุมัติ',
-  approved: 'อนุมัติแล้ว',
-  rejected: 'ยังไม่อนุมัติ',
+  awaiting_slip: 'รอชำระเงิน',
+  pending_review: 'ชำระแล้ว',
+  approved: 'ชำระแล้ว · ใช้บริการได้',
+  rejected: 'ชำระไม่สำเร็จ',
   cancelled: 'ยกเลิกการชำระ',
 };
 
@@ -44,6 +46,7 @@ const EMPTY = [];
 const listeners = new Set();
 const caches = new Map();
 const loads = new Map();
+const loadErrors = new Map();
 
 function scopeKey(scope) {
   return scope === 'accountant' || scope === 'clinic_admin'
@@ -85,12 +88,26 @@ async function load(scope) {
     ? listStaffPayments(scope)
     : listOwnerPayments(scope))
     .then((rows) => {
+      loadErrors.delete(key);
       replaceCache(key, Array.isArray(rows) ? rows : []);
+      return readCache(key);
+    })
+    .catch((err) => {
+      const message = err instanceof Error ? err.message : 'โหลดรายการชำระเงินไม่สำเร็จ';
+      loadErrors.set(key, message);
+      listeners.forEach((listener) => listener());
       return readCache(key);
     })
     .finally(() => loads.delete(key));
   loads.set(key, operation);
   return operation;
+}
+
+export function reloadOwnerPayments(ownerId) {
+  if (!ownerId) return Promise.resolve(EMPTY);
+  const key = scopeKey(ownerId);
+  loads.delete(key);
+  return load(ownerId);
 }
 
 export function listPayments(scope) {
@@ -108,7 +125,7 @@ export function paymentFor(kind, refId, ownerId) {
     && (!ownerId || row.ownerId === ownerId)) || null;
 }
 
-/** Shared deposit for hotel, transport, and clinic. The booking itself stays in its own store. */
+/** Optional payment record for hotel / clinic (full amount). The booking itself stays in its own store. */
 export async function createPayment(input) {
   const total = Number(input.total);
   const payment = {
@@ -122,6 +139,7 @@ export async function createPayment(input) {
     detail: input.detail || '',
     total: Number.isFinite(total) ? total : null,
     deposit: depositOf(total),
+    lines: Array.isArray(input.lines) ? input.lines : undefined,
     status: PAY_STATUS.awaiting,
     slip: '',
     note: '',
@@ -147,7 +165,47 @@ export async function submitSlip(id, ownerId, slip) {
   if (!slip) throw new Error('กรุณาแนบสลิป');
   const updated = await submitOwnerPayment(ownerId, id, slip);
   replaceRecord(updated);
+  const transportLineIds = updated.kind === PAY_KIND.hub && Array.isArray(updated.lines)
+    ? updated.lines.filter((line) => line.kind === PAY_KIND.transport && line.refId).map((l) => l.refId)
+    : updated.kind === PAY_KIND.transport && updated.refId
+      ? [updated.refId]
+      : [];
+  if (updated.status === PAY_STATUS.approved && transportLineIds.length) {
+    await Promise.all(
+      transportLineIds.map(async (refId) => {
+        try {
+          await ownerConfirmPayment(refId, slip);
+        } catch {
+          /* slip may already be on file */
+        }
+        try {
+          await approveTransportPayment(refId);
+        } catch {
+          /* backend may have finalized */
+        }
+      }),
+    );
+  }
   return updated;
+}
+
+/** Payment covering this booking ref (direct or via hub bundle). */
+export function paymentForRef(kind, refId, ownerId) {
+  const direct = paymentFor(kind, refId, ownerId);
+  if (direct) return direct;
+  const rows = ownerId ? readCache(scopeKey(ownerId)) : [...caches.values()].flat();
+  return rows.find(
+    (row) => row.kind === PAY_KIND.hub
+      && row.ownerId === ownerId
+      && Array.isArray(row.lines)
+      && row.lines.some((line) => line.kind === kind && line.refId === refId),
+  ) || null;
+}
+
+export function hubLinePaymentState(kind, refId, ownerId) {
+  const hub = paymentForRef(kind, refId, ownerId);
+  if (!hub || hub.kind !== PAY_KIND.hub) return null;
+  return hub;
 }
 
 export async function reviewPayment(id, decision, note = '') {
@@ -170,6 +228,13 @@ export async function reviewPayment(id, decision, note = '') {
   }
   if (decision === PAY_STATUS.approved && row.kind === PAY_KIND.transport) {
     await approveTransportPayment(row.refId);
+  }
+  if (decision === PAY_STATUS.approved && row.kind === PAY_KIND.hub && Array.isArray(row.lines)) {
+    await Promise.all(
+      row.lines
+        .filter((line) => line.kind === PAY_KIND.transport && line.refId)
+        .map((line) => approveTransportPayment(line.refId)),
+    );
   }
   const updated = await reviewStaffPayment(id, decision, note);
   replaceRecord(updated);
@@ -195,10 +260,18 @@ export function usePayments(scope) {
     () => readCache(key),
     () => EMPTY,
   );
+  const loadError = useSyncExternalStore(
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    () => loadErrors.get(key) || '',
+    () => '',
+  );
   useEffect(() => {
-    if (scope) load(scope).catch(() => {});
+    if (scope) load(scope);
   }, [scope]);
   const mine = useCallback((ownerId) => all.filter((row) => row.ownerId === ownerId), [all]);
   const pending = useMemo(() => all.filter((row) => row.status === PAY_STATUS.review), [all]);
-  return { all, mine, pending };
+  return { all, mine, pending, loadError };
 }

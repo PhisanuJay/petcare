@@ -24,7 +24,9 @@ export default function PaymentPage() {
   useEffect(() => {
     if (!payment || payment.kind === PAY_KIND.transport) return undefined;
     let gone = false;
-    QRCode.toDataURL(promptPayPayload(PAY_ACCOUNT.promptpay, payment.deposit), {
+    const amount = Number(payment.total ?? payment.deposit);
+    if (!Number.isFinite(amount) || amount <= 0) return undefined;
+    QRCode.toDataURL(promptPayPayload(PAY_ACCOUNT.promptpay, amount), {
       margin: 1,
       width: 280,
       color: { dark: '#17324d', light: '#ffffff' },
@@ -101,20 +103,32 @@ export default function PaymentPage() {
     <div className="pay-page page-wrap">
       <div className="container">
         <header className="pay-mast">
-          <p>ชำระมัดจำ</p>
+          <p>ชำระเงิน</p>
           <h1>{payment.title || PAY_KIND_LABEL[payment.kind]}</h1>
-          <span>{PAY_KIND_LABEL[payment.kind]}</span>
+          <span>{PAY_KIND_LABEL[payment.kind] || payment.kind}</span>
         </header>
         <div className="pay-layout">
           <section className="pay-card">
             <h2>รายละเอียดการจอง</h2>
-            <p className="pay-detail">{payment.detail}</p>
+            {Array.isArray(payment.lines) && payment.lines.length > 0 ? (
+              <ul className="pay-hub-lines">
+                {payment.lines.map((line) => (
+                  <li key={`${line.kind}-${line.refId}`}>
+                    <strong>{PAY_KIND_LABEL[line.kind] || line.kind}</strong>
+                    {' · '}
+                    {line.label}
+                    {' · '}
+                    {baht(line.total)}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="pay-detail">{payment.detail}</p>
+            )}
             <dl>
-              <div><dt>ยอดเต็ม</dt><dd>{payment.total == null ? 'รอประเมิน' : baht(payment.total)}</dd></div>
-              <div><dt>มัดจำ 30%</dt><dd>{baht(payment.deposit)}</dd></div>
-              <div><dt>ส่วนที่เหลือ</dt><dd>{payment.total == null ? 'ชำระภายหลัง' : baht(Math.max(0, payment.total - payment.deposit))}</dd></div>
+              <div><dt>ยอดชำระ</dt><dd>{payment.total == null ? 'รอประเมิน' : baht(payment.total ?? payment.deposit)}</dd></div>
             </dl>
-            <p className="pay-note">มัดจำใช้ล็อกคิว ส่วนที่เหลือชำระเมื่อใช้บริการ สลิปต้องตรงกับยอดมัดจำ ฝ่ายบัญชีเป็นคนอนุมัติ</p>
+            <p className="pay-note">สลิปต้องตรงกับยอดด้านบน ฝ่ายบัญชีเป็นคนอนุมัติ</p>
           </section>
           <section className="pay-card">
             {payment.status === PAY_STATUS.approved ? (
@@ -141,12 +155,12 @@ export default function PaymentPage() {
             ) : null}
             {!locked || payment.status === PAY_STATUS.rejected ? (
               <form onSubmit={onSubmit}>
-                <h2>สแกนมัดจำ</h2>
+                <h2>สแกนชำระเงิน</h2>
                 {payment.status === PAY_STATUS.rejected ? (
                   <p className="pay-warn">สลิปยังไม่ผ่าน{payment.note ? ` · ${payment.note}` : ''} แนบสลิปใหม่ได้</p>
                 ) : null}
                 <div className="pay-qr">
-                  {qr ? <img src={qr} alt={`QR มัดจำ ${baht(payment.deposit)}`} /> : <p>กำลังสร้าง QR</p>}
+                  {qr ? <img src={qr} alt={`QR ชำระ ${baht(payment.total ?? payment.deposit)}`} /> : <p>กำลังสร้าง QR</p>}
                 </div>
                 <p className="pay-account">
                   <span>{PAY_ACCOUNT.bank} · {PAY_ACCOUNT.name}</span>

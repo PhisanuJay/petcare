@@ -2,24 +2,31 @@ import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import {
   createBooking,
+  deleteBooking,
   listBookings,
   requestBookingCancellation,
   resolveBookingCancellation,
 } from './bookingStore.js';
+import { confirmOnlineBooking } from './confirmOnlineBooking.js';
+import { availableOnlineSlots } from './onlineSlots.js';
 import { isServiceOnline } from '../clinic-admin/clinicSettings.js';
+import { vetsOnDuty } from '../clinic-admin/rosterStore.js';
 import { BOOKING_SERVICES, isDateString, todayString, validateSlot } from './clinicSchedule.js';
-import { getHotelRoomPrices } from '../pet-transport/service.js';
 import {
-  createReservation,
-  listReservations,
-  requestReservationCancellation,
-  resolveReservationCancellation,
-} from './hotelStore.js';
-import { findAdoptionAnimal, listAdoptionAnimals } from './adoptionAnimals.js';
-import { cancelAdoptionRequest, createAdoptionRequest, listAdoptionRequests } from './adoptionStore.js';
-import { cancelTransportRequest, createTransportRequest, listTransportRequests } from './transportStore.js';
+  bookingServiceLabel,
+  normalizeBookingServiceCode,
+} from './bookingServiceLabels.js';
+import { getHotelRoomCatalog } from '../pet-transport/service.js';
+import {
+  createHotelStay,
+  getHotelAvailability,
+  getStayForOwner,
+  listStaysForOwner,
+} from './hotelStayStore.js';
+import { resolveReservationCancellation } from './hotelStore.js';
 import { createPet, deletePet, findPet, listPets, updatePet } from './store.js';
 import { saveOwnerProfile } from './ownerStore.js';
+import { getCustomerSession } from '../auth/store.js';
 import { listGrantedCamerasForOwner } from '../super-admin/cctvAdmin.js';
 
 /**
@@ -47,12 +54,23 @@ function httpError(status, message) {
   return error;
 }
 
-/** Owner is identified by the x-owner-id header until real auth exists on the backend. */
-function requireOwner(req, _res, next) {
-  const ownerId = req.get('x-owner-id');
-  if (!ownerId || !ownerId.trim()) return next(httpError(401, 'กรุณาเข้าสู่ระบบ'));
-  req.ownerId = ownerId.trim();
-  next();
+/** Owner from Bearer session (preferred) or legacy x-owner-id during transition. */
+async function requireOwner(req, _res, next) {
+  try {
+    const session = await getCustomerSession(req);
+    if (session?.user?.id) {
+      req.ownerId = session.user.id;
+      return next();
+    }
+    const headerId = req.get('x-owner-id')?.trim();
+    if (headerId) {
+      req.ownerId = headerId;
+      return next();
+    }
+    return next(httpError(401, 'กรุณาเข้าสู่ระบบ'));
+  } catch (error) {
+    next(error);
+  }
 }
 
 // Records written by the clinic carry `source: 'vet'`. Owners cannot create, change or remove them,
@@ -177,28 +195,111 @@ router.post('/bookings', wrap(async (req, res) => {
   const { petId, service, date, time } = body;
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : '';
 
-  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกสัตว์เลี้ยง');
-  const pet = await findPet(req.ownerId, petId);
-  if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
-  if (!Object.hasOwn(BOOKING_SERVICES, service)) throw httpError(400, 'กรุณาเลือกบริการ');
-  if (!isServiceOnline(service)) throw httpError(400, 'บริการนี้ปิดรับจองออนไลน์ชั่วคราว');
+  let petIds = [];
+  if (Array.isArray(body.petIds) && body.petIds.length) {
+    petIds = [...new Set(body.petIds.map((id) => String(id).trim()).filter(Boolean))];
+  } else if (typeof petId === 'string' && petId.trim()) {
+    petIds = [petId.trim()];
+  }
+  if (!petIds.length) throw httpError(400, 'กรุณาเลือกสัตว์เลี้ยง');
+
+  const petsOnBooking = [];
+  for (const id of petIds) {
+    const found = await findPet(req.ownerId, id);
+    if (!found) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงบางตัวในรายการ');
+    petsOnBooking.push(found);
+  }
+  const pet = petsOnBooking[0];
+  const petsById = new Map(petsOnBooking.map((p) => [p.id, p]));
+
+  let petLines;
+  if (Array.isArray(body.petLines) && body.petLines.length) {
+    petLines = [];
+    for (const row of body.petLines) {
+      const pid = String(row?.petId || '').trim();
+      const rowPet = petsById.get(pid);
+      if (!rowPet) throw httpError(400, 'รายการสัตว์ไม่ตรงกับที่เลือก');
+      const lineService = normalizeBookingServiceCode(row.service);
+      if (!Object.hasOwn(BOOKING_SERVICES, lineService)) throw httpError(400, 'กรุณาเลือกบริการ');
+      if (!isServiceOnline(lineService)) throw httpError(400, 'บริการนี้ปิดรับจองออนไลน์ชั่วคราว');
+      petLines.push({
+        petId: rowPet.id,
+        petName: rowPet.name,
+        petSpecies: rowPet.species,
+        service: lineService,
+        serviceLabel: bookingServiceLabel(lineService, rowPet.species),
+      });
+    }
+    for (const rowPet of petsOnBooking) {
+      if (!petLines.some((line) => line.petId === rowPet.id)) {
+        throw httpError(400, 'กรุณาระบุบริการอย่างน้อย 1 รายการต่อสัตว์ที่เลือก');
+      }
+    }
+  } else {
+    const serviceCode = normalizeBookingServiceCode(service);
+    if (!Object.hasOwn(BOOKING_SERVICES, serviceCode)) throw httpError(400, 'กรุณาเลือกบริการ');
+    if (!isServiceOnline(serviceCode)) throw httpError(400, 'บริการนี้ปิดรับจองออนไลน์ชั่วคราว');
+    petLines = petsOnBooking.map((p) => ({
+      petId: p.id,
+      petName: p.name,
+      petSpecies: p.species,
+      service: serviceCode,
+      serviceLabel: bookingServiceLabel(serviceCode, p.species),
+    }));
+  }
+
+  const serviceCode = petLines.length === 1 ? petLines[0].service : 'multi';
+  const serviceLabel = petLines.length === 1
+    ? petLines[0].serviceLabel
+    : petLines.map((l) => `${l.petName}: ${l.serviceLabel}`).join(' · ');
+
   validateSlot(date, time);
+
+  const vetId = typeof body.vetId === 'string' ? body.vetId.trim() : '';
+  const slotCheck = await availableOnlineSlots(date, vetId);
+  if (!slotCheck.slots.includes(time)) {
+    throw httpError(409, slotCheck.reason || 'ช่วงเวลานี้ไม่ว่างแล้ว กรุณาเลือกใหม่');
+  }
+  let vetName = '';
+  if (vetId) {
+    const onDuty = vetsOnDuty(date);
+    const match = onDuty.find((v) => v.id === vetId);
+    if (!match) throw httpError(400, 'สัตวแพทย์ที่เลือกไม่ได้เข้าเวรวันนี้');
+    vetName = match.name ?? '';
+  }
 
   // Users live in the browser (localStorage), so the clinic only learns the owner's name and phone
   // from the booking itself. The Medical Assistant uses them to call the owner. Both are optional.
-  const booking = await createBooking(req.ownerId, {
-    petId,
-    petName: pet.name,
-    petSpecies: pet.species,
+  const pending = await createBooking(req.ownerId, {
+    petId: pet.id,
+    petIds: petsOnBooking.map((p) => p.id),
+    petName: petsOnBooking.map((p) => p.name).join(', '),
+    petSpecies:
+      petsOnBooking.length === 1
+        ? pet.species
+        : (petsOnBooking.every((p) => p.species === pet.species) ? pet.species : 'mixed'),
     ownerName: optionalText(body.ownerName, 100),
     ownerPhone: optionalText(body.ownerPhone, 30),
-    service,
-    serviceLabel: BOOKING_SERVICES[service],
+    service: serviceCode,
+    serviceLabel,
+    petLines,
     date,
     time,
     note,
+    vetId: vetId || undefined,
+    vetName: vetName || undefined,
   });
-  res.status(201).json(booking);
+  try {
+    const booking = await confirmOnlineBooking(pending);
+    res.status(201).json(booking);
+  } catch (err) {
+    try {
+      await deleteBooking(pending.id);
+    } catch {
+      // best-effort rollback
+    }
+    throw err;
+  }
 }));
 
 router.post('/bookings/:id/request-cancel', wrap(async (req, res) => {
@@ -221,60 +322,22 @@ router.post('/admin/bookings/:id/resolve-cancel', wrap(async (req, res) => {
 
 /* ---------- Cat hotel ---------- */
 
-const HOTEL_SPECIES = 'cat';
-const MAX_HOTEL_NIGHTS = 30;
+const hotelReservationsMoved = () => ({
+  error: 'ระบบจองโรงแรมแบบเก่ายกเลิกแล้ว ใช้การฝากผ่าน /api/pet-owner/cat-hotel/stays',
+  redirect: '/pet-owner/cat-hotel/book',
+});
 
-const nightsBetween = (from, to) => Math.round((new Date(to) - new Date(from)) / 86400000);
+router.get('/cat-hotel/reservations', requireOwner, (_req, res) => {
+  res.status(410).json(hotelReservationsMoved());
+});
 
-router.use('/cat-hotel/reservations', requireOwner);
+router.post('/cat-hotel/reservations', requireOwner, (_req, res) => {
+  res.status(410).json(hotelReservationsMoved());
+});
 
-router.get('/cat-hotel/reservations', wrap(async (req, res) => {
-  res.json(await listReservations(req.ownerId));
-}));
-
-router.post('/cat-hotel/reservations', wrap(async (req, res) => {
-  const body = req.body;
-  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
-  const { petId, roomType, checkIn, checkOut } = body;
-  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : '';
-
-  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกสัตว์เลี้ยง');
-  const pet = await findPet(req.ownerId, petId);
-  if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
-  if (pet.species !== HOTEL_SPECIES) throw httpError(400, 'โรงแรมนี้รับเฉพาะน้องแมว');
-  const room = getHotelRoomPrices().find((item) => item.id === roomType);
-  if (!room) throw httpError(400, 'กรุณาเลือกประเภทห้อง');
-  if (!isDateString(checkIn)) throw httpError(400, 'กรุณาเลือกวันเช็คอิน');
-  if (!isDateString(checkOut)) throw httpError(400, 'กรุณาเลือกวันเช็คเอาท์');
-  if (checkIn < todayString()) throw httpError(400, 'วันเช็คอินต้องไม่ใช่วันที่ผ่านมาแล้ว');
-  const nights = nightsBetween(checkIn, checkOut);
-  if (nights < 1) throw httpError(400, 'วันเช็คเอาท์ต้องหลังวันเช็คอินอย่างน้อย 1 วัน');
-  if (nights > MAX_HOTEL_NIGHTS) throw httpError(400, `ฝากได้ไม่เกิน ${MAX_HOTEL_NIGHTS} คืนต่อครั้ง`);
-
-  const reservation = await createReservation(req.ownerId, {
-    petId,
-    petName: pet.name,
-    petSpecies: pet.species,
-    roomType,
-    roomLabel: room.label,
-    pricePerNight: room.price,
-    checkIn,
-    checkOut,
-    nights,
-    totalPrice: room.price * nights,
-    note,
-  });
-  res.status(201).json(reservation);
-}));
-
-router.post('/cat-hotel/reservations/:id/request-cancel', wrap(async (req, res) => {
-  res.json(await requestReservationCancellation(
-    req.ownerId,
-    req.params.id,
-    req.body?.cancellationId,
-    req.body?.reason,
-  ));
-}));
+router.post('/cat-hotel/reservations/:id/request-cancel', requireOwner, (_req, res) => {
+  res.status(410).json(hotelReservationsMoved());
+});
 
 router.post('/admin/cat-hotel/reservations/:id/resolve-cancel', wrap(async (req, res) => {
   res.json(await resolveReservationCancellation(
@@ -283,6 +346,47 @@ router.post('/admin/cat-hotel/reservations/:id/resolve-cancel', wrap(async (req,
     Boolean(req.body?.approve),
     req.body?.adminNote || '',
   ));
+}));
+
+/* ---------- Cat hotel stays (multi-room, SQL) ---------- */
+
+router.get('/cat-hotel/catalog', wrap(async (_req, res) => {
+  const items = await getHotelRoomCatalog();
+  res.json({ items });
+}));
+
+router.get('/cat-hotel/availability', wrap(async (req, res) => {
+  const { checkIn, checkOut } = req.query || {};
+  if (!isDateString(checkIn) || !isDateString(checkOut)) {
+    throw httpError(400, 'กรุณาระบุวันเข้าพักและวันรับกลับ');
+  }
+  res.json({
+    checkIn,
+    checkOut,
+    items: await getHotelAvailability(checkIn, checkOut),
+  });
+}));
+
+router.use('/cat-hotel/stays', requireOwner);
+
+router.get('/cat-hotel/stays', wrap(async (req, res) => {
+  res.json({ items: await listStaysForOwner(req.ownerId) });
+}));
+
+router.get('/cat-hotel/stays/:id', wrap(async (req, res) => {
+  res.json(await getStayForOwner(req.ownerId, req.params.id));
+}));
+
+router.post('/cat-hotel/stays', wrap(async (req, res) => {
+  const pets = await listPets(req.ownerId);
+  const petsById = new Map(pets.map((pet) => [pet.id, pet]));
+  const stay = await createHotelStay(
+    req.ownerId,
+    req.headers['x-owner-email'] || '',
+    req.body,
+    petsById,
+  );
+  res.status(201).json(stay);
 }));
 
 /* ---------- Pet transport ---------- */
@@ -296,45 +400,19 @@ const TRANSPORT_DIRECTIONS = {
 
 router.use('/transport/requests', requireOwner);
 
-router.get('/transport/requests', wrap(async (req, res) => {
-  res.json(await listTransportRequests(req.ownerId));
-}));
+const transportMoved = { error: 'ใช้ระบบรับส่งใหม่ที่ /api/pet-transport แทน' };
 
-router.post('/transport/requests', wrap(async (req, res) => {
-  const body = req.body;
-  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
-  const { petId, direction, date, time } = body;
-  const address = typeof body.address === 'string' ? body.address.trim() : '';
-  const phone = typeof body.phone === 'string' ? body.phone.replace(/[-\s]/g, '') : '';
-  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : '';
+router.get('/transport/requests', (_req, res) => {
+  res.status(410).json(transportMoved);
+});
 
-  if (typeof petId !== 'string' || !petId) throw httpError(400, 'กรุณาเลือกสัตว์เลี้ยง');
-  const pet = await findPet(req.ownerId, petId);
-  if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยงนี้');
-  if (!Object.hasOwn(TRANSPORT_DIRECTIONS, direction)) throw httpError(400, 'กรุณาเลือกรูปแบบการรับ-ส่ง');
-  validateSlot(date, time);
-  if (address.length < 10) throw httpError(400, 'กรุณากรอกที่อยู่ให้ละเอียด');
-  if (address.length > 300) throw httpError(400, 'ที่อยู่ยาวเกินไป');
-  if (!/^0\d{8,9}$/.test(phone)) throw httpError(400, 'เบอร์โทร 9-10 หลัก ขึ้นต้นด้วย 0');
+router.post('/transport/requests', (_req, res) => {
+  res.status(410).json(transportMoved);
+});
 
-  const request = await createTransportRequest(req.ownerId, {
-    petId,
-    petName: pet.name,
-    petSpecies: pet.species,
-    direction,
-    directionLabel: TRANSPORT_DIRECTIONS[direction],
-    date,
-    time,
-    address,
-    phone,
-    note,
-  });
-  res.status(201).json(request);
-}));
-
-router.post('/transport/requests/:id/cancel', wrap(async (req, res) => {
-  res.json(await cancelTransportRequest(req.ownerId, req.params.id));
-}));
+router.post('/transport/requests/:id/cancel', (_req, res) => {
+  res.status(410).json(transportMoved);
+});
 
 /* ---------- Adoption ---------- */
 
@@ -342,53 +420,29 @@ router.post('/transport/requests/:id/cancel', wrap(async (req, res) => {
 const HOUSING = ['house', 'townhome', 'condo', 'apartment', 'other'];
 const EXPERIENCE = ['none', 'some', 'experienced'];
 
-router.get('/adoption/animals', wrap(async (_req, res) => {
-  res.json(await listAdoptionAnimals());
-}));
+router.get('/adoption/animals', (_req, res) => {
+  res.status(410).json({
+    error: 'ใช้ GET /api/adoption/animals แทน — ระบบหาบ้านรวมอยู่ที่โมดูล adoption แล้ว',
+  });
+});
+
+const adoptionMoved = () => ({
+  error: 'ระบบหาบ้านย้ายไปที่ /api/adoption แล้ว — ใช้ Adoption Hub แทน',
+});
 
 router.use('/adoption/requests', requireOwner);
 
-router.get('/adoption/requests', wrap(async (req, res) => {
-  res.json(await listAdoptionRequests(req.ownerId));
-}));
+router.get('/adoption/requests', (_req, res) => {
+  res.status(410).json(adoptionMoved());
+});
 
-router.post('/adoption/requests', wrap(async (req, res) => {
-  const body = req.body;
-  if (!body || typeof body !== 'object' || Array.isArray(body)) throw httpError(400, 'ข้อมูลไม่ถูกต้อง');
-  const text = (v) => (typeof v === 'string' ? v.trim() : '');
-  const fullName = text(body.fullName);
-  const phone = text(body.phone).replace(/[-\s]/g, '');
-  const address = text(body.address);
-  const reason = text(body.reason);
+router.post('/adoption/requests', (_req, res) => {
+  res.status(410).json(adoptionMoved());
+});
 
-  const animal = typeof body.animalId === 'string' ? await findAdoptionAnimal(body.animalId) : null;
-  if (!animal) throw httpError(404, 'ไม่พบน้องที่ต้องการขอรับเลี้ยง');
-  if (fullName.length < 2 || fullName.length > 100) throw httpError(400, 'กรุณากรอกชื่อ-นามสกุล');
-  if (!/^0\d{8,9}$/.test(phone)) throw httpError(400, 'เบอร์โทร 9-10 หลัก ขึ้นต้นด้วย 0');
-  if (address.length < 10 || address.length > 300) throw httpError(400, 'กรุณากรอกที่อยู่ให้ละเอียด');
-  if (!HOUSING.includes(body.housing)) throw httpError(400, 'กรุณาเลือกประเภทที่พักอาศัย');
-  if (typeof body.hasOtherPets !== 'boolean') throw httpError(400, 'กรุณาระบุว่ามีสัตว์เลี้ยงอื่นหรือไม่');
-  if (!EXPERIENCE.includes(body.experience)) throw httpError(400, 'กรุณาเลือกประสบการณ์การเลี้ยงสัตว์');
-  if (reason.length < 10) throw httpError(400, 'กรุณาเล่าเหตุผลที่อยากรับเลี้ยงอย่างน้อย 10 ตัวอักษร');
-  if (reason.length > 1000) throw httpError(400, 'เหตุผลยาวเกินไป');
-
-  const request = await createAdoptionRequest(req.ownerId, {
-    animalId: animal.id,
-    animalName: animal.name,
-    fullName,
-    phone,
-    address,
-    housing: body.housing,
-    hasOtherPets: body.hasOtherPets,
-    experience: body.experience,
-    reason,
-  });
-  res.status(201).json(request);
-}));
-
-router.post('/adoption/requests/:id/cancel', wrap(async (req, res) => {
-  res.json(await cancelAdoptionRequest(req.ownerId, req.params.id));
-}));
+router.post('/adoption/requests/:id/cancel', (_req, res) => {
+  res.status(410).json(adoptionMoved());
+});
 
 /* ---------- CCTV ---------- */
 
@@ -399,11 +453,12 @@ router.post('/adoption/requests/:id/cancel', wrap(async (req, res) => {
  *   pending  – the hotel has not confirmed the stay yet
  * `streamUrl` is null until the hotel team connects a camera to the stay (field not defined yet).
  */
-function cctvAccess(reservation, today) {
-  if (reservation.status === 'pending') return 'pending';
-  if (reservation.status !== 'confirmed') return null;
-  if (today < reservation.checkIn) return 'upcoming';
-  if (today <= reservation.checkOut) return 'live';
+function cctvAccessForStay(stay, today) {
+  if (['waiting', 'pending'].includes(stay.status)) return 'pending';
+  const active = ['waiting', 'checked_in', 'confirmed', 'pending'].includes(stay.status);
+  if (!active) return null;
+  if (today < stay.checkIn) return 'upcoming';
+  if (today <= stay.checkOut) return 'live';
   return null;
 }
 
@@ -419,19 +474,29 @@ router.get('/cctv/cameras', wrap(async (req, res) => {
 
 router.get('/cctv', wrap(async (req, res) => {
   const today = todayString();
+  const catalog = await getHotelRoomCatalog();
+  const catalogById = new Map(catalog.map((item) => [item.id, item]));
   const stays = [];
-  for (const r of await listReservations(req.ownerId)) {
-    const access = cctvAccess(r, today);
+  for (const stay of await listStaysForOwner(req.ownerId)) {
+    const access = cctvAccessForStay(stay, today);
     if (!access) continue;
+    const line = stay.lines?.[0];
+    const room = line ? catalogById.get(line.roomTypeId) : null;
+    let petName = 'สัตว์เลี้ยง';
+    const firstPetId = line?.petIds?.[0];
+    if (firstPetId) {
+      const pet = await findPet(req.ownerId, firstPetId);
+      if (pet?.name) petName = pet.name;
+    }
     stays.push({
-      id: r.id,
-      petName: r.petName,
-      roomLabel: r.roomLabel,
-      checkIn: r.checkIn,
-      checkOut: r.checkOut,
-      status: r.status,
+      id: stay.id,
+      petName,
+      roomLabel: room?.titleTh || line?.roomTypeId || 'ห้องพัก',
+      checkIn: stay.checkIn,
+      checkOut: stay.checkOut,
+      status: stay.status,
       access,
-      streamUrl: access === 'live' ? (r.streamUrl ?? null) : null,
+      streamUrl: null,
     });
   }
   res.json(stays);

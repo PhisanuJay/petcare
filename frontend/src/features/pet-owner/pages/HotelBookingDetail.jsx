@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
+import { ownerRequest } from '../api.js';
 import { PAY_KIND, PAY_STATUS, usePayments } from '../../payments/store.js';
 import { useBookings } from '../useBookings.js';
 import { todayString } from '../bookingOptions.js';
-import { HOTEL_STATUS, useHotelBookings, HOTEL_STATUS_LABEL } from '../useHotelBookings.js';
+import { HOTEL_STATUS, useHotelBookings, HOTEL_STATUS_LABEL, stayNights } from '../useHotelBookings.js';
+import { usePets } from '../usePets.js';
 import { useTransport } from '../../pet-transport/useTransport.js';
 import CancellationRequestForm from '../../cancellations/CancellationRequestForm.jsx';
 import CancellationSummary from '../../cancellations/CancellationSummary.jsx';
@@ -17,11 +19,7 @@ import {
 } from '../../cancellations/store.js';
 import '../hotel.css';
 
-const ROOM_LABELS = {
-  Standard: 'ห้องมาตรฐาน',
-  Deluxe: 'ห้องพิเศษ',
-  Suite: 'ห้องสวีท',
-};
+import { roomLabelThai, roomTypeTitleTh } from '../hotelRooms.js';
 
 const STAY_STEPS = [
   { id: 'waiting', label: 'รอนำมาฝาก' },
@@ -40,9 +38,57 @@ function formatDay(value) {
   return new Intl.DateTimeFormat('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }
 
+function formatCreatedAt(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function petNamesFromLines(lines, pets) {
+  const ids = new Set();
+  for (const line of lines || []) {
+    for (const id of line.petIds || []) ids.add(id);
+  }
+  const names = [...ids].map((id) => pets.find((p) => p.id === id)?.name).filter(Boolean);
+  return names.length ? names.join(', ') : null;
+}
+
+function mapApiStayToBooking(apiStay, ownerId, pets) {
+  const lines = apiStay.lines || [];
+  return {
+    id: apiStay.id,
+    ownerId: apiStay.ownerId || ownerId,
+    checkIn: apiStay.checkIn,
+    checkOut: apiStay.checkOut,
+    status: apiStay.status,
+    total: apiStay.total ?? apiStay.totalPrice,
+    subtotal: apiStay.subtotal,
+    discount: apiStay.discount,
+    nights: apiStay.nights ?? stayNights(apiStay.checkIn, apiStay.checkOut),
+    createdAt: apiStay.createdAt,
+    lines,
+    note: apiStay.note,
+    petName: petNamesFromLines(lines, pets),
+    petIds: [...new Set(lines.flatMap((l) => l.petIds || []))],
+    linkedBookings: [],
+  };
+}
+
+function stayProgressStatus(status) {
+  if (status === 'pending' || status === 'confirmed') return HOTEL_STATUS.waiting;
+  return status;
+}
+
 function paymentMeta(payment) {
   if (!payment) return { label: 'ยังไม่มีข้อมูลชำระเงิน', tone: 'warn' };
-  if (payment.status === PAY_STATUS.approved) return { label: 'ชำระมัดจำแล้ว', tone: 'ok' };
+  if (payment.status === PAY_STATUS.approved) return { label: 'ชำระเงินแล้ว', tone: 'ok' };
   if (payment.status === PAY_STATUS.review) return { label: 'รอตรวจสอบสลิป', tone: 'info' };
   if (payment.status === PAY_STATUS.rejected) return { label: 'สลิปไม่ผ่านการตรวจ', tone: 'warn' };
   return { label: 'รอแนบสลิป', tone: 'warn' };
@@ -52,12 +98,33 @@ export default function HotelBookingDetailPage() {
   const { bookingId } = useParams();
   const { currentUser } = useAuth();
   const { bookings } = useHotelBookings();
+  const { pets } = usePets();
   const { all: payments } = usePayments(currentUser?.id);
   const cancellations = useCancellationRequests(currentUser?.id);
   const { bookings: transportBookings } = useTransport();
   const { bookings: clinicBookings } = useBookings();
   const [showCancelForm, setShowCancelForm] = useState(false);
-  const booking = bookings.find((item) => item.id === bookingId);
+  const [apiStay, setApiStay] = useState(null);
+  const legacyBooking = bookings.find((item) => item.id === bookingId);
+
+  useEffect(() => {
+    if (legacyBooking || !currentUser?.id || !bookingId) return undefined;
+    let gone = false;
+    ownerRequest(currentUser.id, `/cat-hotel/stays/${bookingId}`)
+      .then((stay) => {
+        if (!gone) setApiStay(stay);
+      })
+      .catch(() => {
+        if (!gone) setApiStay(null);
+      });
+    return () => {
+      gone = true;
+    };
+  }, [legacyBooking, bookingId, currentUser?.id]);
+
+  const booking = legacyBooking || (apiStay
+    ? mapApiStayToBooking(apiStay, currentUser?.id, pets)
+  : null);
   const payment = payments.find((item) =>
     item.kind === PAY_KIND.hotel && item.refId === bookingId && item.ownerId === currentUser?.id);
 
@@ -78,7 +145,7 @@ export default function HotelBookingDetailPage() {
   const cancellation = cancellationFor(PAY_KIND.hotel, booking.id, cancellations);
   const activeStep = booking.status === HOTEL_STATUS.cancelled
     ? -1
-    : STAY_STEPS.findIndex((step) => step.id === booking.status);
+    : STAY_STEPS.findIndex((step) => step.id === stayProgressStatus(booking.status));
   const canCancel = booking.status === HOTEL_STATUS.waiting
     && booking.checkIn >= todayString()
     && !hasOpenCancellation(PAY_KIND.hotel, booking.id, cancellations);
@@ -143,7 +210,12 @@ export default function HotelBookingDetailPage() {
           <div>
             <p className="stay-kicker">โรงแรมสัตว์เลี้ยง · {booking.id.slice(-6).toUpperCase()}</p>
             <h1>รายละเอียดการจอง</h1>
-            <p>{booking.petName} · สร้างรายการเมื่อ {new Date(booking.createdAt).toLocaleString('th-TH')}</p>
+            <p>
+              {[
+                booking.petName,
+                formatCreatedAt(booking.createdAt) ? `สร้างรายการเมื่อ ${formatCreatedAt(booking.createdAt)}` : null,
+              ].filter(Boolean).join(' · ') || 'รายการจองโรงแรม'}
+            </p>
           </div>
           <span className={`stay-status ${booking.status}`}>
             {HOTEL_STATUS_LABEL[booking.status] || booking.status}
@@ -169,10 +241,33 @@ export default function HotelBookingDetailPage() {
         <div className="stay-detail-grid">
           <section className="stay-detail-card">
             <h2>ข้อมูลการเข้าพัก</h2>
+            {Array.isArray(booking.lines) && booking.lines.length > 0 ? (
+              <ul className="stay-detail-rooms">
+                {booking.lines.map((line) => {
+                  const linePets = (line.petIds || [])
+                    .map((id) => pets.find((p) => p.id === id)?.name)
+                    .filter(Boolean)
+                    .join(', ');
+                  return (
+                    <li key={line.id || `${line.roomTypeId}-${line.units}`}>
+                      <div className="stay-detail-rooms__main">
+                        <strong>{roomTypeTitleTh(line.roomTypeId)}</strong>
+                        <span>{line.units} ห้อง</span>
+                      </div>
+                      {linePets ? <span className="stay-detail-rooms__pets">สัตว์: {linePets}</span> : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
             <dl className="stay-folio-line">
-              <div><dt>ห้องพัก</dt><dd>{ROOM_LABELS[booking.roomName] || booking.roomName}</dd></div>
-              <div><dt>สัตว์เลี้ยง</dt><dd>{booking.petName}</dd></div>
-              <div><dt>จำนวนกรง</dt><dd>{booking.cages || '—'} กรง</dd></div>
+              {!booking.lines?.length ? (
+                <div><dt>ห้องพัก</dt><dd>{roomLabelThai(booking.roomName)}</dd></div>
+              ) : null}
+              <div><dt>สัตว์เลี้ยง</dt><dd>{booking.petName || '—'}</dd></div>
+              {!booking.lines ? (
+                <div><dt>จำนวนกรง</dt><dd>{booking.cages || '—'} กรง</dd></div>
+              ) : null}
               <div><dt>วันเข้าพัก</dt><dd>{formatDay(booking.checkIn)}</dd></div>
               <div><dt>วันรับกลับ</dt><dd>{formatDay(booking.checkOut)}</dd></div>
               <div><dt>จำนวนคืน</dt><dd>{booking.nights || '—'} คืน</dd></div>
@@ -186,7 +281,6 @@ export default function HotelBookingDetailPage() {
               <div><dt>ยอดค่าห้อง</dt><dd>{baht(booking.subtotal)}</dd></div>
               <div><dt>ส่วนลด</dt><dd>{booking.discount ? `-${baht(booking.discount)}` : '—'}</dd></div>
               <div><dt>ยอดรวม</dt><dd>{baht(booking.total)}</dd></div>
-              <div><dt>มัดจำ 30%</dt><dd>{baht(payment?.deposit ?? Math.round(booking.total * 0.3))}</dd></div>
             </dl>
             <span className={paymentToneClass}>{pay.label}</span>
             {payment?.slip && (

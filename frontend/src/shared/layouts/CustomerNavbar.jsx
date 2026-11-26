@@ -8,7 +8,7 @@ const GUEST_MENU = [
   { to: '/', label: 'หน้าแรก', icon: 'bi-house-heart', end: true },
   { to: '/#services', label: 'บริการ', icon: 'bi-grid' },
   { to: '/#hotel', label: 'โรงแรมสัตว์', icon: 'bi-building' },
-  { to: '/find-home', label: 'หาบ้าน', icon: 'bi-house-add' },
+  { to: '/#adopt', label: 'หาบ้าน', icon: 'bi-house-add' },
   { to: '/#vets', label: 'สัตวแพทย์ของเรา', icon: 'bi-person-hearts' },
   { to: '/#promo', label: 'โปรโมชั่น', icon: 'bi-tag' },
   { to: '/#contact', label: 'ติดต่อเรา', icon: 'bi-telephone' },
@@ -19,16 +19,13 @@ const MEMBER_MENU = [
   // แก้โดย มะแอ๋ว (Pet Owner): เมนู "บริการ" ของสมาชิกเปลี่ยนจาก '/#services' (เลื่อนไปส่วนบริการในหน้าแรก)
   // เป็น '/pet-owner/services' (หน้ารวมบริการ) เมนูของแขก (GUEST_MENU) ยังเหมือนเดิม
   { to: '/pet-owner/services', label: 'บริการ', icon: 'bi-grid' },
-  { to: '/pet-owner/booking', label: 'จองนัดหมาย', icon: 'bi-calendar2-plus' },
+  { to: '/pet-owner/booking', label: 'จองบริการ', icon: 'bi-calendar2-plus' },
   { to: '/pet-owner', label: 'นัดหมายของฉัน', icon: 'bi-calendar2-check', end: true },
   { to: '/pet-owner/my-pets', label: 'สัตว์เลี้ยงของฉัน', icon: 'bi-heart' },
   { to: '/pet-owner/medical', label: 'ประวัติ', icon: 'bi-journal-medical' },
   { to: '/pet-owner/history', label: 'ประวัติการจอง', icon: 'bi-receipt' },
-  { to: '/pet-owner/cat-hotel', label: 'โรงแรมสัตว์', icon: 'bi-building' },
-  { to: '/pet-owner/transport', label: 'รับ–ส่งสัตว์', icon: 'bi-truck' },
-  { to: '/pet-owner/adoption', label: 'หาบ้าน', icon: 'bi-house-add' },
-  { to: '/find-home', label: 'หาบ้าน', icon: 'bi-house-add' },
-  { to: '/#promo', label: 'โปรโมชั่น', icon: 'bi-tag' },
+  { to: '/pet-owner/cctv', label: 'ดูกล้องฝากน้อง', icon: 'bi-camera-video' },
+  { to: '/pet-owner/adoption', label: 'หาบ้านให้น้อง', icon: 'bi-house-add' },
 ];
 
 function MenuLink({ item, onNavigate }) {

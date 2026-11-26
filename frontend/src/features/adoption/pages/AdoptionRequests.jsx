@@ -4,10 +4,28 @@ import { adoptionStaffFetch, readAdoptionResponse } from '../api.js';
 
 const STATUS_LABELS = {
   pending: 'รอพิจารณา',
+  submitted: 'ส่งคำขอแล้ว',
+  reviewing: 'กำลังตรวจสอบ',
+  interview: 'นัดพูดคุย',
   approved: 'อนุมัติแล้ว',
   rejected: 'ไม่อนุมัติ',
+  completed: 'รับน้องแล้ว',
   closed: 'ปิดคำร้อง',
+  cancelled: 'ยกเลิกแล้ว',
 };
+
+const FILTER_BUCKETS = {
+  pending: new Set(['pending', 'submitted', 'reviewing', 'interview']),
+  approved: new Set(['approved', 'completed']),
+  rejected: new Set(['rejected']),
+  closed: new Set(['closed', 'cancelled']),
+};
+
+function matchesFilter(status, filter) {
+  if (filter === 'all') return true;
+  const bucket = FILTER_BUCKETS[filter];
+  return bucket ? bucket.has(status) : status === filter;
+}
 
 export default function AdoptionRequestsPage() {
   const [requests, setRequests] = useState([]);
@@ -19,9 +37,10 @@ export default function AdoptionRequestsPage() {
     const controller = new AbortController();
     async function loadRequests() {
       try {
-        const response = await adoptionStaffFetch('/requests', { signal: controller.signal });
-        const result = await readAdoptionResponse(response, 'โหลดคำร้องไม่สำเร็จ');
-        setRequests(result.requests);
+        const response = await adoptionStaffFetch('/applications', { signal: controller.signal });
+        const result = await readAdoptionResponse(response, 'โหลดคำขอไม่สำเร็จ');
+        const list = Array.isArray(result.applications) ? result.applications : [];
+        setRequests(list);
       } catch (requestError) {
         if (requestError.name !== 'AbortError') setError(requestError.message);
       } finally {
@@ -34,7 +53,7 @@ export default function AdoptionRequestsPage() {
   }, []);
 
   const filteredRequests = useMemo(
-    () => filter === 'all' ? requests : requests.filter((request) => request.status === filter),
+    () => requests.filter((request) => matchesFilter(request.status, filter)),
     [filter, requests],
   );
 
@@ -48,10 +67,10 @@ export default function AdoptionRequestsPage() {
         <label className="d-flex align-items-center gap-2">
           <span>แสดง</span>
           <select className="form-select" value={filter} onChange={(event) => setFilter(event.target.value)}>
-            <option value="pending">รอพิจารณา</option>
+            <option value="pending">รอดำเนินการ</option>
             <option value="approved">อนุมัติแล้ว</option>
             <option value="rejected">ไม่อนุมัติ</option>
-            <option value="closed">ปิดคำร้อง</option>
+            <option value="closed">ปิด/ยกเลิก</option>
             <option value="all">ทั้งหมด</option>
           </select>
         </label>

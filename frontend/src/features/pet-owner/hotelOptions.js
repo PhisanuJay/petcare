@@ -1,16 +1,17 @@
-import { HOTEL_ROOMS as HOME_HOTEL_ROOMS } from '../../shared/data/homeContent.js';
+import { HOTEL_ROOM_MATRIX, pricingRoomFromMatrix } from '../../shared/data/hotelRoomMatrix.js';
 
-const ROOM_VALUES = ['standard', 'deluxe', 'suite'];
-
-export const HOTEL_ROOMS = HOME_HOTEL_ROOMS.map((room, index) => ({
-  value: ROOM_VALUES[index] || `room-${index + 1}`,
-  label: room.name,
-  price: room.price,
-  icon: room.icon,
-  bg: room.bg,
-  fg: room.fg,
-  features: room.features || [],
-}));
+export const HOTEL_ROOMS = HOTEL_ROOM_MATRIX.map((row) => {
+  const room = pricingRoomFromMatrix(row);
+  return {
+    value: room.value,
+    label: room.label,
+    price: room.price,
+    icon: room.icon,
+    bg: room.bg,
+    fg: room.fg,
+    features: room.features,
+  };
+});
 
 export const HOTEL_SPECIES = 'cat';
 export const MAX_HOTEL_NIGHTS = 30;

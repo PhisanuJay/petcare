@@ -6,7 +6,9 @@ import {
   isFacilityKind,
   normalizePlaceKind,
 } from '../constants.js';
-import { districtLabel, subdistrictById, zoneIdFromSubdistrict } from '../pricing.js';
+import { zoneIdFromSubdistrict } from '../pricing.js';
+import ClinicPlaceSummary from './ClinicPlaceSummary.jsx';
+import { ServiceZonesMap } from './PriceQuote.jsx';
 
 export function emptyZonePlace(address = '', kind = 'custom') {
   return {
@@ -42,6 +44,8 @@ export default function PlaceFields({
   clinics = [],
   allowedKinds = null,
   locked = false,
+  hideZoneBadge = false,
+  hubZonesMap = false,
 }) {
   const kinds = allowedKinds?.length
     ? LOCATION_KINDS.filter((k) => allowedKinds.includes(k.id))
@@ -52,7 +56,6 @@ export default function PlaceFields({
   const kind = normalizePlaceKind(value.kind || 'custom');
   const catalogLocked = isFacilityKind(kind);
   const facilities = clinics;
-  const subMeta = value.subdistrictId ? subdistrictById(value.subdistrictId) : null;
   const forceFacilityUi = locked && allowedKinds?.length === 1 && allowedKinds[0] === 'facility';
   const showClinicReadonly = forceFacilityUi || (locked && catalogLocked);
 
@@ -109,68 +112,17 @@ export default function PlaceFields({
   }
 
   if (showClinicReadonly) {
-    return (
-      <div className="tp-card tp-card--muted">
-        <h3>{prefix}</h3>
-        <div className="tp-form">
-          <div className="field">
-            <label>ประเภทสถานที่</label>
-            <div className="tp-readonly-value">คลินิก</div>
-          </div>
-          <div className="field">
-            <label>ชื่อคลินิก</label>
-            <div className="tp-readonly-value">{value.name || facilities[0]?.name || '—'}</div>
-          </div>
-          <div className="field">
-            <label>รายละเอียดที่อยู่</label>
-            <div className="tp-readonly-value tp-readonly-value--block">
-              {value.address || facilities[0]?.address || '—'}
-            </div>
-          </div>
-          {(value.mapUrl || facilities[0]?.mapUrl) ? (
-            <div className="field">
-              <label>ลิงก์แผนที่</label>
-              <div className="tp-readonly-value tp-readonly-value--block">
-                <a href={value.mapUrl || facilities[0]?.mapUrl} target="_blank" rel="noreferrer">
-                  {value.mapUrl || facilities[0]?.mapUrl}
-                </a>
-              </div>
-            </div>
-          ) : null}
-          <div className="field">
-            <label>เขต / แขวง</label>
-            <div className="tp-readonly-value">
-              {[districtLabel(value.districtId || facilities[0]?.districtId), subMeta?.label || subdistrictById(facilities[0]?.subdistrictId)?.label]
-                .filter(Boolean)
-                .join(' · ') || '—'}
-            </div>
-          </div>
-          <div className="field">
-            <label>Zone</label>
-            <div className="tp-zone-badge" aria-live="polite">
-              {zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))) ? (
-                <>
-                  <strong>
-                    {(zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))))?.label}
-                  </strong>
-                  <span className="tp-muted">
-                    {' '}
-                    · ฿{(zoneMeta || ZONES.find((z) => z.id === (facilities[0]?.zoneId || zoneIdFromSubdistrict(facilities[0]?.subdistrictId))))?.price} ฐาน
-                  </span>
-                </>
-              ) : (
-                <span className="tp-muted">—</span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <ClinicPlaceSummary title={prefix} value={value} clinics={facilities} />;
   }
 
+  const showHubZonesAside = hubZonesMap && !catalogLocked;
+
   return (
-    <div className={`tp-card ${locked ? 'tp-card--muted' : ''}`}>
+    <div
+      className={`tp-card ${locked ? 'tp-card--muted' : ''}${showHubZonesAside ? ' tp-card--hub-zones' : ''}`}
+    >
       <h3>{prefix}</h3>
+      <div className={showHubZonesAside ? 'tp-card__hub-body' : undefined}>
       <div className="tp-form">
         <div className="field">
           <span className="tp-field-label" id={`${prefix}-kind-label`}>ประเภทสถานที่</span>
@@ -243,6 +195,93 @@ export default function PlaceFields({
             </div>
           </>
         )}
+
+        {!hideZoneBadge ? (
+          <div className="field">
+            <label>Zone</label>
+            <div className="tp-zone-badge" aria-live="polite">
+              {zoneMeta ? (
+                <>
+                  <strong>{zoneMeta.label}</strong>
+                  <span className="tp-muted"> · ฿{zoneMeta.price} ฐาน</span>
+                </>
+              ) : (
+                <span className="tp-muted">
+                  {catalogLocked ? 'เลือกรายการเพื่อดู Zone' : 'เลือกแขวงเพื่อดู Zone'}
+                </span>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {hideZoneBadge && zoneMeta ? (
+          <p className="tp-hub-zone-pick tp-muted small" aria-live="polite">
+            แขวงนี้อยู่ <strong>{zoneMeta.label}</strong> · ค่าบริการฐาน ฿{zoneMeta.price}
+          </p>
+        ) : null}
+
+        <div className="field">
+          <label htmlFor={`${prefix}-address`}>รายละเอียดที่อยู่</label>
+          <textarea
+            id={`${prefix}-address`}
+            rows={2}
+            value={value.address || ''}
+            readOnly={catalogLocked || locked}
+            onChange={(e) => onChange({ ...value, address: e.target.value })}
+            placeholder="บ้านเลขที่ ซอย ถนน จุดสังเกต"
+          />
+          {catalogLocked && !locked && (
+            <p className="tp-muted">ที่อยู่จากคลินิกในระบบ — แก้ไขไม่ได้</p>
+          )}
+        </div>
+
+        <div className="field">
+          <label htmlFor={`${prefix}-map`}>ลิงก์แผนที่ (Google Maps)</label>
+          <input
+            id={`${prefix}-map`}
+            type="url"
+            inputMode="url"
+            value={value.mapUrl || ''}
+            readOnly={catalogLocked || locked}
+            onChange={(e) => onChange({ ...value, mapUrl: e.target.value })}
+            placeholder="วางลิงก์จาก Google Maps เช่น https://maps.google.com/..."
+          />
+          {!catalogLocked && !locked ? (
+            <p className="tp-muted">ช่วยให้คนขับเปิดเส้นทางไปยังจุดรับ–ส่งได้ทันที</p>
+          ) : null}
+          {value.mapUrl && !catalogLocked && !locked ? (
+            <p className="tp-muted" style={{ marginTop: '0.35rem' }}>
+              <a href={value.mapUrl} target="_blank" rel="noreferrer">เปิดดูลิงก์นี้</a>
+            </p>
+          ) : null}
+        </div>
+      </div>
+      {showHubZonesAside ? (
+        <aside className="tp-hub-zones-map tp-hub-zones-map--inline" aria-label="แผนเขต Zone ค่ารถ">
+          <p className="tp-hub-zones-map__lead">แผนโซนค่ารถ · เขตจตุจักร</p>
+          <ServiceZonesMap compact />
+          <div className="tp-hub-zones-map__rates">
+            <p className="tp-hub-zones-map__rates-title">อัตราฐานต่อเที่ยว</p>
+            <ul className="tp-hub-zones-map__rate-list">
+              {ZONES.map((z) => {
+                const wards = SERVICE_SUBDISTRICTS.filter((s) => s.zoneId === z.id).map((s) => s.label);
+                return (
+                  <li key={z.id} className="tp-hub-zones-map__rate-item">
+                    <span className="tp-hub-zones-map__rate-head">
+                      <strong>{z.label}</strong>
+                      <span className="tp-hub-zones-map__rate-price">฿{z.price}</span>
+                    </span>
+                    <span className="tp-hub-zones-map__rate-wards">{wards.join(' · ')}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="tp-hub-zones-map__rates-note tp-muted small mb-0">
+              เลือกแขวงในฟอร์มเพื่อดูโซนของคุณ · ไป–กลับคิดตามจำนวนเที่ยว
+            </p>
+          </div>
+        </aside>
+      ) : null}
 
         <div className="field">
           <label>Zone</label>

@@ -1,10 +1,6 @@
 import { HOTEL_STATUS, HOTEL_STATUS_LABEL, useAllHotelBookings } from './useHotelBookings.js';
 
-const ROOM_THAI = {
-  Standard: 'ห้องมาตรฐาน',
-  Deluxe: 'ห้องพิเศษ',
-  Suite: 'ห้องสวีท',
-};
+import { roomLabelThai } from './hotelRooms.js';
 
 function formatDay(value) {
   if (!value) return '—';

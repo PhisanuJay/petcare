@@ -23,7 +23,7 @@ export const TRIP_STATUSES = [
 export const DEMO_CLINICS = [
   {
     id: 'clinic-1',
-    name: 'คลินิกมะแอ่ว',
+    name: 'Pet Care',
     address: '99/9 ถนนพหลโยธิน แขวงจตุจักร เขตจตุจักร กรุงเทพฯ 10900',
     districtId: 'chatuchak',
     subdistrictId: 'chatuchak',

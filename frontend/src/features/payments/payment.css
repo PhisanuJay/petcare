@@ -45,6 +45,17 @@
   font-size: 0.8rem;
 }
 
+.hist-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hist-chip-hub {
+  background: var(--baby);
+  border-color: rgba(47, 127, 200, 0.2);
+}
+
 .pay-layout,
 .hist-layout {
   display: grid;
@@ -68,6 +79,13 @@
 .pay-done p {
   margin: 8px 0 0;
   color: var(--muted);
+}
+
+.pay-hub-lines {
+  margin: 0 0 0.5rem;
+  padding-left: 1.1rem;
+  font-size: 0.92rem;
+  color: var(--ink);
 }
 
 .pay-card dl {

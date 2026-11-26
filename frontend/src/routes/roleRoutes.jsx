@@ -17,7 +17,7 @@ import TransportPage from '../features/pet-owner/pages/Transport.jsx';
 import TransportRequestsPage from '../features/pet-owner/pages/TransportRequests.jsx';
 import TransportHistoryPage from '../features/pet-owner/pages/TransportHistory.jsx';
 import TransportDetailPage from '../features/pet-owner/pages/TransportDetail.jsx';
-import PetOwnerAdoptionPage from '../features/pet-owner/pages/Adoption.jsx';
+import AdoptionHub from '../features/adoption/pages/AdoptionHub.jsx';
 import PetOwnerCctvPage from '../features/pet-owner/pages/Cctv.jsx';
 
 import VeterinarianDashboardPage from '../features/veterinarian/pages/Dashboard.jsx';
@@ -72,6 +72,7 @@ import AnimalsPage from '../features/adoption/pages/Animals.jsx';
 import AddAnimalPage from '../features/adoption/pages/AddAnimal.jsx';
 import AdoptionRequestsPage from '../features/adoption/pages/AdoptionRequests.jsx';
 import RequestDetailPage from '../features/adoption/pages/RequestDetail.jsx';
+import AdoptionHistoryPage from '../features/adoption/pages/AdoptionHistory.jsx';
 import AdoptionStaffGate from '../features/adoption/AdoptionStaffGate.jsx';
 import AdoptionStaffLayout from '../features/adoption/AdoptionStaffLayout.jsx';
 import AdoptionStaffLoginPage from '../features/adoption/pages/StaffLogin.jsx';
@@ -95,16 +96,16 @@ export const petOwnerRoutes = (
     <Route path="history" element={<BookingHistoryPage />} />
     <Route path="pay/:paymentId" element={<PaymentPage />} />
     <Route path="cat-hotel" element={<CatHotelPage />} />
-    <Route path="cat-hotel/reservations" element={<CatHotelReservationPage />} />
+    <Route path="cat-hotel/reservations" element={<Navigate to="/pet-owner/cat-hotel/book" replace />} />
     <Route path="cat-hotel/book" element={<StayBookPage />} />
     <Route path="cat-hotel/bookings" element={<CatHotelBookingsPage />} />
     <Route path="cat-hotel/bookings/:bookingId" element={<HotelBookingDetailPage />} />
     <Route path="cat-hotel/watch/:cameraId" element={<StayWatchPage />} />
     <Route path="transport" element={<TransportPage />} />
-    <Route path="transport/requests" element={<TransportRequestsPage />} />
+    <Route path="transport/requests" element={<Navigate to="/pet-owner/transport/history" replace />} />
     <Route path="transport/history" element={<TransportHistoryPage />} />
     <Route path="transport/:bookingId" element={<TransportDetailPage />} />
-    <Route path="adoption" element={<PetOwnerAdoptionPage />} />
+    <Route path="adoption" element={<AdoptionHub />} />
     <Route path="cctv" element={<PetOwnerCctvPage />} />
   </Route>
 );
@@ -152,6 +153,7 @@ export const adoptionStaffRoutes = (
         <Route path="add-animal" element={<AddAnimalPage />} />
         <Route path="requests" element={<AdoptionRequestsPage />} />
         <Route path="requests/:requestId" element={<RequestDetailPage />} />
+        <Route path="history" element={<AdoptionHistoryPage />} />
       </Route>
     </Route>
   </>

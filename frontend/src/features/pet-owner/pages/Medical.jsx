@@ -1,23 +1,21 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { usePets } from '../usePets.js';
-import { PARASITE_TYPES, careReminders, formatDate, labelOf, reminderText } from '../petUtils.js';
-import PetPhoto from '../components/PetPhoto.jsx';
+import { PARASITE_TYPES, careReminders, formatDate, labelOf, reminderText, speciesOf } from '../petUtils.js';
 
 /**
  * Medical (health history) — Role: Pet Owner (มะแอ่ว)
- * Read-only timeline of vaccines, parasite prevention and treatments for all of the owner's pets.
- * Records are added / edited from the pet's own page.
+ * Read-only health log grouped by month; vaccines, parasites and treatments.
  */
 
 const KINDS = [
   { value: 'all', label: 'ทั้งหมด', icon: 'bi-collection' },
   { value: 'vaccine', label: 'วัคซีน', icon: 'bi-capsule' },
-  { value: 'parasite', label: 'ถ่ายพยาธิ / เห็บหมัด', icon: 'bi-bug' },
+  { value: 'parasite', label: 'ถ่ายพยาธิ', icon: 'bi-bug' },
   { value: 'treatment', label: 'การรักษา', icon: 'bi-journal-medical' },
 ];
 
-const kindMeta = (kind) => KINDS.find((k) => k.value === kind);
+const kindMeta = (kind) => KINDS.find((k) => k.value === kind) ?? KINDS[0];
 
 function buildEntries(pets) {
   const entries = [];
@@ -30,10 +28,7 @@ function buildEntries(pets) {
         date: v.date,
         title: v.name || 'วัคซีน',
         byClinic: v.source === 'vet',
-        lines: [
-          (v.place || v.vet) && `สถานที่: ${[v.place, v.vet].filter(Boolean).join(' · ')}`,
-          v.lot && `หมายเหตุ: ${v.lot}`,
-        ],
+        detail: [v.place, v.vet, v.lot].filter(Boolean).join(' · ') || null,
         nextDate: v.nextDate,
         nextLabel: 'นัดครั้งถัดไป',
       });
@@ -46,7 +41,7 @@ function buildEntries(pets) {
         byClinic: p.source === 'vet',
         date: p.date,
         title: labelOf(PARASITE_TYPES, p.type),
-        lines: [p.product && `ผลิตภัณฑ์: ${p.product}`, p.vet && `สัตวแพทย์: ${p.vet}`],
+        detail: [p.product, p.vet].filter(Boolean).join(' · ') || null,
         nextDate: p.nextDate,
         nextLabel: 'ครั้งถัดไป',
       });
@@ -59,27 +54,118 @@ function buildEntries(pets) {
         byClinic: t.source === 'vet',
         date: t.date,
         title: t.diagnosis || t.symptoms || 'การรักษา',
-        lines: [
-          t.symptoms && t.diagnosis && `อาการ: ${t.symptoms}`,
-          t.treatment && `การรักษา: ${t.treatment}`,
-          (t.vet || t.clinic) && [t.vet, t.clinic].filter(Boolean).join(' · '),
-        ],
+        detail: [t.treatment, t.vet, t.clinic].filter(Boolean).join(' · ') || null,
         nextDate: t.followUp,
-        nextLabel: 'นัดติดตามอาการ',
+        nextLabel: 'นัดติดตาม',
       });
     }
   }
   return entries.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 }
 
-function DueTag({ label, date }) {
+function monthLabel(ym) {
+  if (!ym || ym === 'unknown') return 'ไม่ระบุวันที่';
+  const d = new Date(`${ym}-01T12:00:00`);
+  if (Number.isNaN(d.getTime())) return ym;
+  return d.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
+}
+
+function dateParts(iso) {
+  if (!iso) return { day: '—', mon: '' };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { day: '—', mon: '' };
+  return {
+    day: d.getDate(),
+    mon: d.toLocaleDateString('th-TH', { month: 'short' }),
+  };
+}
+
+function dueStatus(date) {
   const [r] = careReminders([{ vaccines: [{ nextDate: date }] }]);
-  const cls = r.status === 'overdue' ? 'danger' : r.status === 'soon' ? 'warn' : 'sky';
+  return r;
+}
+
+function UpcomingStrip({ pets, petId }) {
+  const scoped = petId === 'all' ? pets : pets.filter((p) => p.id === petId);
+  const upcoming = careReminders(scoped)
+    .filter((r) => r.status === 'overdue' || r.status === 'soon')
+    .slice(0, 3);
+
+  if (upcoming.length === 0) return null;
+
   return (
-    <span className={`tag ${cls}`}>
-      {label} {formatDate(date)} · {reminderText(r)}
-    </span>
+    <div className="health-upcoming">
+      <div className="small fw-medium text-muted px-1">ใกล้ถึงกำหนด / เลยกำหนด</div>
+      {upcoming.map((r) => {
+        const tone = r.status === 'overdue' ? 'danger' : 'warn';
+        return (
+          <Link
+            key={`${r.pet.id}-${r.kind}-${r.date}`}
+            to={`/pet-owner/my-pets/${r.pet.id}`}
+            className="health-upcoming-item"
+          >
+            <span className={`tag ${tone}`}>{reminderText(r)}</span>
+            <div className="flex-grow-1 min-w-0">
+              <div className="fw-medium text-truncate">
+                {r.title} · {r.pet.name}
+              </div>
+              <div className="small text-muted">ครบ {formatDate(r.date)}</div>
+            </div>
+            <i className="bi bi-chevron-right text-muted" />
+          </Link>
+        );
+      })}
+    </div>
   );
+}
+
+function LogItem({ entry, showPet }) {
+  const { day, mon } = dateParts(entry.date);
+  const meta = kindMeta(entry.kind);
+  const due = entry.nextDate ? dueStatus(entry.nextDate) : null;
+
+  return (
+    <article className="health-log-item">
+      <div className="health-log-date">
+        <div className="day">{day}</div>
+        <div className="mon">{mon}</div>
+      </div>
+      <div className={`health-log-icon ${entry.kind}`} aria-hidden>
+        <i className={`bi ${meta.icon}`} />
+      </div>
+      <div className="health-log-body">
+        <div className="health-log-title">{entry.title}</div>
+        <div className="health-log-meta">
+          <span>{meta.label}</span>
+          {showPet && <span>น้อง{entry.pet.name}</span>}
+          {entry.byClinic && <span>คลินิกบันทึก</span>}
+          {entry.detail && <span>{entry.detail}</span>}
+        </div>
+        {due && (
+          <span className={`tag mt-2 d-inline-block ${due.status === 'overdue' ? 'danger' : due.status === 'soon' ? 'warn' : 'sky'}`}>
+            {entry.nextLabel} {formatDate(entry.nextDate)} · {reminderText(due)}
+          </span>
+        )}
+      </div>
+      <Link
+        to={`/pet-owner/my-pets/${entry.pet.id}`}
+        className="btn btn-soft btn-sm align-self-center flex-shrink-0"
+        title={`ดูโปรไฟล์${entry.pet.name}`}
+      >
+        <i className="bi bi-box-arrow-up-right" />
+      </Link>
+    </article>
+  );
+}
+
+function groupByMonth(entries) {
+  const map = new Map();
+  for (const e of entries) {
+    const ym = e.date?.slice(0, 7) || 'unknown';
+    if (!map.has(ym)) map.set(ym, []);
+    map.get(ym).push(e);
+  }
+  return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
 }
 
 export default function MedicalPage() {
@@ -88,12 +174,25 @@ export default function MedicalPage() {
   const [kind, setKind] = useState('all');
 
   const entries = useMemo(() => buildEntries(pets), [pets]);
-  const selectedPet = pets.find((p) => p.id === petId) ?? null;
-  const shown = entries.filter(
-    (e) => (!selectedPet || e.pet.id === selectedPet.id) && (kind === 'all' || e.kind === kind),
+  const shown = useMemo(
+    () =>
+      entries.filter(
+        (e) => (petId === 'all' || e.pet.id === petId) && (kind === 'all' || e.kind === kind),
+      ),
+    [entries, petId, kind],
   );
-  const count = (k) =>
-    entries.filter((e) => (!selectedPet || e.pet.id === selectedPet.id) && (k === 'all' || e.kind === k)).length;
+  const groups = useMemo(() => groupByMonth(shown), [shown]);
+  const showPet = petId === 'all' && pets.length > 1;
+
+  const counts = useMemo(() => {
+    const base = entries.filter((e) => petId === 'all' || e.pet.id === petId);
+    return {
+      all: base.length,
+      vaccine: base.filter((e) => e.kind === 'vaccine').length,
+      parasite: base.filter((e) => e.kind === 'parasite').length,
+      treatment: base.filter((e) => e.kind === 'treatment').length,
+    };
+  }, [entries, petId]);
 
   return (
     <div className="page-wrap">
@@ -101,7 +200,7 @@ export default function MedicalPage() {
         <div className="page-head">
           <div>
             <h1>ประวัติสุขภาพ</h1>
-            <p>วัคซีน การถ่ายพยาธิ และการรักษาของสัตว์เลี้ยงทุกตัวในที่เดียว</p>
+            <p>ดูวัคซีน ถ่ายพยาธิ และการรักษา — เรียงตามเดือน อ่านง่ายในที่เดียว</p>
           </div>
           <Link to="/pet-owner/booking" className="btn btn-sky">
             <i className="bi bi-calendar-check me-1" />
@@ -112,7 +211,9 @@ export default function MedicalPage() {
         {error && (
           <div className="alert alert-danger d-flex align-items-center justify-content-between" role="alert">
             <span>{error}</span>
-            <button type="button" className="btn btn-sm btn-outline-danger" onClick={reload}>ลองใหม่</button>
+            <button type="button" className="btn btn-sm btn-outline-danger" onClick={reload}>
+              ลองใหม่
+            </button>
           </div>
         )}
 
@@ -123,92 +224,82 @@ export default function MedicalPage() {
             <i className="bi bi-heart" />
             ยังไม่มีสัตว์เลี้ยง เพิ่มน้องตัวแรกเพื่อเริ่มบันทึกประวัติสุขภาพ
             <div className="mt-3">
-              <Link to="/pet-owner/my-pets/new" className="btn btn-sky">เพิ่มสัตว์เลี้ยง</Link>
+              <Link to="/pet-owner/my-pets/new" className="btn btn-sky">
+                เพิ่มสัตว์เลี้ยง
+              </Link>
             </div>
           </div>
         ) : (
           <>
-            <div className="d-flex flex-wrap gap-2 mb-3">
-              <button
-                type="button"
-                className={`btn ${petId === 'all' ? 'btn-sky' : 'btn-soft'}`}
-                onClick={() => setPetId('all')}
-              >
-                สัตว์เลี้ยงทั้งหมด
-              </button>
-              {pets.map((p) => (
+            <UpcomingStrip pets={pets} petId={petId} />
+
+            <div className="health-toolbar">
+              <div className="pet-pills">
                 <button
                   type="button"
-                  key={p.id}
-                  className={`btn ${petId === p.id ? 'btn-sky' : 'btn-soft'}`}
-                  onClick={() => setPetId(p.id)}
+                  className={`btn btn-sm ${petId === 'all' ? 'btn-sky' : 'btn-soft'}`}
+                  onClick={() => setPetId('all')}
                 >
-                  {p.name}
+                  ทุกตัว ({pets.length})
                 </button>
-              ))}
+                {pets.map((p) => (
+                  <button
+                    type="button"
+                    key={p.id}
+                    className={`btn btn-sm ${petId === p.id ? 'btn-sky' : 'btn-soft'}`}
+                    onClick={() => setPetId(p.id)}
+                  >
+                    {speciesOf(p.species).emoji} {p.name}
+                  </button>
+                ))}
+              </div>
+              <div className="kind-tabs" role="tablist" aria-label="ประเภทประวัติ">
+                {KINDS.map((k) => (
+                  <button
+                    type="button"
+                    key={k.value}
+                    role="tab"
+                    aria-selected={kind === k.value}
+                    className={`btn btn-sm ${kind === k.value ? 'btn-sky' : 'btn-soft'}`}
+                    onClick={() => setKind(k.value)}
+                  >
+                    <i className={`bi ${k.icon} me-1`} />
+                    {k.label}
+                    <span className="opacity-75 ms-1">({counts[k.value]})</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="d-flex flex-wrap gap-2 mb-4">
-              {KINDS.map((k) => (
-                <button
-                  type="button"
-                  key={k.value}
-                  className={`btn btn-sm ${kind === k.value ? 'btn-sky' : 'btn-soft'}`}
-                  onClick={() => setKind(k.value)}
-                >
-                  <i className={`bi ${k.icon} me-1`} />
-                  {k.label} ({count(k.value)})
-                </button>
-              ))}
-            </div>
-
-            <div className="card-soft">
+            <div className="card-soft" style={{ padding: '1.25rem 1.5rem' }}>
               {shown.length === 0 ? (
                 <div className="empty-box py-3">
                   <i className="bi bi-journal-medical" />
                   ยังไม่มีประวัติในหมวดนี้
-                  {selectedPet && (
+                  {petId !== 'all' && (
                     <div className="mt-3">
-                      <Link to={`/pet-owner/my-pets/${selectedPet.id}/edit`} className="btn btn-soft">
-                        เพิ่มประวัติให้ {selectedPet.name}
+                      <Link to={`/pet-owner/my-pets/${petId}/edit`} className="btn btn-soft">
+                        เพิ่มประวัติให้ {pets.find((p) => p.id === petId)?.name}
                       </Link>
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="timeline">
-                  {shown.map((e) => (
-                    <div className="tl-item" key={e.key}>
-                      <div className="d-flex align-items-center gap-2 mb-1">
-                        <PetPhoto pet={e.pet} style={{ width: 32, height: 32, fontSize: '1rem', borderWidth: 1 }} />
-                        <Link to={`/pet-owner/my-pets/${e.pet.id}`} className="mitr text-decoration-none">
-                          {e.pet.name}
-                        </Link>
-                        <span className="tag">
-                          <i className={`bi ${kindMeta(e.kind).icon} me-1`} />
-                          {kindMeta(e.kind).label}
-                        </span>
-                        {e.byClinic && <span className="tag ok">บันทึกโดยคลินิก</span>}
-                      </div>
-                      <div className="date">{formatDate(e.date)}</div>
-                      <div className="fw-medium">{e.title}</div>
-                      {e.lines.filter(Boolean).map((line) => (
-                        <div className="small text-muted" key={line}>{line}</div>
-                      ))}
-                      {e.nextDate && (
-                        <div className="mt-1">
-                          <DueTag label={e.nextLabel} date={e.nextDate} />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                groups.map(([ym, items]) => (
+                  <section key={ym}>
+                    <h2 className="health-log-month">{monthLabel(ym)}</h2>
+                    {items.map((e) => (
+                      <LogItem key={e.key} entry={e} showPet={showPet} />
+                    ))}
+                  </section>
+                ))
               )}
             </div>
 
-            <div className="small text-muted mt-3">
-              ต้องการเพิ่มหรือแก้ไขประวัติ? เปิดหน้าสัตว์เลี้ยงแล้วกด “แก้ไข / เพิ่มประวัติ”
-            </div>
+            <p className="small text-muted mt-3 mb-0">
+              แก้ไขประวัติได้ที่หน้า{' '}
+              <Link to="/pet-owner/my-pets">สัตว์เลี้ยงของฉัน</Link> → เลือกน้อง → แก้ไข
+            </p>
           </>
         )}
       </div>

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { fileToResizedDataUrl, STORAGE_KEYS, readJSON } from '../../../shared/utils/storage.js';
+import { fileToResizedDataUrl } from '../../../shared/utils/storage.js';
 import IssueFields from '../components/IssueFields.jsx';
 import { TRIP_STATUSES, nextTripStatus, tripStatusMeta } from '../constants.js';
 import { placeParts } from '../store.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { SEX_OPTIONS, speciesOf } from '../../pet-owner/petUtils.js';
+import { bookingPetPhotoSrc, speciesOf } from '../../pet-owner/petUtils.js';
 import { useTransport } from '../useTransport.js';
 import '../transport.css';
 
@@ -28,12 +28,6 @@ const STEP_HINT = {
   arrived_dropoff: 'ถึงจุดส่งแล้ว',
   completed: 'ส่งน้องถึงปลายทางเรียบร้อย',
 };
-
-function findPet(petId) {
-  if (!petId) return null;
-  const pets = readJSON(STORAGE_KEYS.pets, []);
-  return pets.find((p) => p.id === petId) || null;
-}
 
 function phoneHref(phone) {
   const digits = String(phone || '').replace(/[^\d+]/g, '');
@@ -186,16 +180,14 @@ export default function JobDetailPage() {
   const meta = tripStatusMeta(trip.status);
   const paid = booking?.paymentStatus === 'paid';
   const phone = phoneHref(booking?.ownerPhone);
-  const pet = findPet(booking?.petId);
   const when = dateParts(trip.pickupTime);
   const from = placeParts(trip.from, transport);
   const to = placeParts(trip.to, transport);
   const mapLink = mapsHref(to.mapUrl ? to : from.mapUrl ? from : (to.address ? to : from));
-  const speciesKey = pet?.species || booking?.petSpecies;
+  const speciesKey = booking?.petSpecies;
   const speciesLabel = SPECIES_SHORT[speciesKey] || speciesOf(speciesKey).label;
-  const photo = pet?.photo || booking?.petPhoto || '';
-  const sex = SEX_OPTIONS.find((item) => item.value === pet?.sex);
-  const sexMark = pet?.sex === 'female' ? '♀' : pet?.sex === 'male' ? '♂' : '';
+  const photo = bookingPetPhotoSrc(booking);
+  const sexMark = booking?.petSex === 'female' ? '♀' : booking?.petSex === 'male' ? '♂' : '';
   const done = meta.step >= 7;
 
   async function onEvidence(kind, file) {
@@ -269,23 +261,14 @@ export default function JobDetailPage() {
 
         <div className="dv-detail__hero">
           <div className="dv-detail__pet">
-            {photo ? (
-              <img className="dv-detail__avatar" src={photo} alt="" />
-            ) : (
-              <span className="dv-detail__avatar is-fallback" aria-hidden="true">
-                {speciesOf(speciesKey).emoji}
-              </span>
-            )}
+            <img className="dv-detail__avatar" src={photo} alt="" loading="lazy" decoding="async" />
             <div>
               <strong>
-                {booking?.petName || pet?.name || 'สัตว์เลี้ยง'}
-                {sexMark ? <i className={`dv-detail__sex is-${pet?.sex}`}>{sexMark}</i> : null}
+                {booking?.petName || 'สัตว์เลี้ยง'}
+                {sexMark ? <i className={`dv-detail__sex is-${booking?.petSex || ''}`}>{sexMark}</i> : null}
                 <b className="dv-detail__species">{speciesLabel}</b>
               </strong>
-              <span>
-                โทร {booking?.ownerName || 'เจ้าของ'}
-                {sex?.label ? ` · ${sex.label}` : ''}
-              </span>
+              <span>โทร {booking?.ownerName || 'เจ้าของ'}</span>
             </div>
           </div>
 

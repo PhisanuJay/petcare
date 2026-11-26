@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { queryAll, queryOne, run, transaction } from '../../db/mssql.js';
 import { requireStaff } from '../auth/middleware.js';
+import { getCustomerSession } from '../auth/store.js';
 import { ensurePetTransportReady } from '../pet-transport/routes.js';
+import { approveTransportPayment, ownerConfirmPayment } from '../pet-transport/service.js';
 
 const router = Router();
-const KINDS = new Set(['hotel', 'transport', 'clinic']);
+const KINDS = new Set(['hotel', 'transport', 'clinic', 'hub']);
 const OPEN_CANCELLATION_STATUSES = ['pending_admin', 'awaiting_refund'];
 
 function httpError(status, message) {
@@ -32,6 +34,29 @@ async function loadCancellations(ownerId) {
     [ownerId],
   );
   return rows.map(parseRecord);
+}
+
+async function transportIdsFromPayment(payment) {
+  const ids = new Set();
+  if (payment.kind === 'transport' && payment.refId) ids.add(payment.refId);
+  if (payment.kind === 'hub' && Array.isArray(payment.lines)) {
+    for (const line of payment.lines) {
+      if (line.kind === 'transport' && line.refId) ids.add(line.refId);
+    }
+  }
+  return [...ids];
+}
+
+/** Instant pay: mark transport legs paid after slip (no accountant queue). */
+async function applyPaymentApprovalEffects(payment, slip = '') {
+  for (const bookingId of await transportIdsFromPayment(payment)) {
+    try {
+      if (slip) await ownerConfirmPayment(bookingId, slip);
+      await approveTransportPayment(bookingId);
+    } catch {
+      /* booking may already be paid or not in payable state */
+    }
+  }
 }
 
 async function savePayment(payment) {
@@ -118,11 +143,22 @@ function validateCancellation(input, ownerId) {
   return { reason, bankName, bankAccount, contactPhone };
 }
 
-function httpOwner(req, _res, next) {
-  const ownerId = req.get('x-owner-id');
-  if (!ownerId || !ownerId.trim()) return next(httpError(401, 'กรุณาเข้าสู่ระบบ'));
-  req.ownerId = ownerId.trim();
-  next();
+async function httpOwner(req, _res, next) {
+  try {
+    const session = await getCustomerSession(req);
+    if (session?.user?.id) {
+      req.ownerId = session.user.id;
+      return next();
+    }
+    const headerId = req.get('x-owner-id')?.trim();
+    if (headerId) {
+      req.ownerId = headerId;
+      return next();
+    }
+    return next(httpError(401, 'กรุณาเข้าสู่ระบบ'));
+  } catch (error) {
+    return next(error);
+  }
 }
 
 const wrap = (fn) => (req, res, next) => {
@@ -235,14 +271,17 @@ router.post('/:id/slip', httpOwner, wrap(async (req, res) => {
   if (payment.status === 'cancelled') throw httpError(409, 'รายการชำระเงินนี้ถูกยกเลิกแล้ว');
   if (payment.status === 'approved') throw httpError(409, 'รายการนี้อนุมัติแล้ว');
   if (typeof req.body?.slip !== 'string' || !req.body.slip) throw httpError(400, 'กรุณาแนบสลิป');
+  const now = new Date().toISOString();
   const updated = {
     ...payment,
     slip: req.body.slip,
-    status: 'pending_review',
+    status: 'approved',
     note: '',
-    submittedAt: new Date().toISOString(),
+    submittedAt: now,
+    reviewedAt: now,
   };
   await savePayment(updated);
+  await applyPaymentApprovalEffects(updated, req.body.slip);
   res.json(updated);
 }));
 
@@ -312,6 +351,9 @@ router.post('/staff/payments/:id/review', requireStaff('accountant'), wrap(async
     reviewedAt: new Date().toISOString(),
   };
   await savePayment(updated);
+  if (decision === 'approved') {
+    await applyPaymentApprovalEffects(payment, payment.slip);
+  }
   res.json(updated);
 }));
 

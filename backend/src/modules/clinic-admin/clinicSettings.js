@@ -5,15 +5,18 @@ import { createSyncJsonStore } from './syncJsonStore.js';
 
 // Note: Must NEVER import from `pet-owner/clinicSchedule.js` to avoid circular dependency.
 export const DEFAULT_SERVICES = {
+  triage: 'ประเมินอาการเบื้องต้น',
   checkup: 'ตรวจสุขภาพทั่วไป',
-  vaccine: 'ฉีดวัคซีน',
-  parasite: 'ถ่ายพยาธิ / เห็บหมัด',
-  followup: 'ติดตามอาการ',
-  other: 'อื่นๆ',
+  vaccine_combo: 'ฉีดวัคซีนรวม',
+  vaccine_rabies: 'วัคซีนพิษสุนัขบ้า',
+  deworming: 'ถ่ายพยาธิ',
+  flea_prevention: 'ป้องกันเห็บหมัด',
 };
 
-export const DEFAULT_WEEKDAY_HOURS = { open: '08:00', close: '22:00' };
-export const DEFAULT_WEEKEND_HOURS = { open: '09:00', close: '21:00' };
+export const DEFAULT_WEEKDAY_HOURS = { open: '09:00', close: '18:00' };
+export const DEFAULT_WEEKEND_HOURS = { open: '09:00', close: '17:00' };
+export const DEFAULT_LUNCH_BREAK = { start: '12:00', end: '13:00' };
+export const DEFAULT_SLOT_MINUTES = 60;
 
 const settingsFile = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -62,9 +65,20 @@ function createDefaultSettings() {
     hours,
     services,
     closures: [],
+    slotMinutes: DEFAULT_SLOT_MINUTES,
+    lunchBreak: { ...DEFAULT_LUNCH_BREAK },
     updatedAt: new Date().toISOString(),
   };
 }
+
+function slotOverlapsBreak(slotStartMin, durationMin, breakStart, breakEnd) {
+  const bStart = toMinutes(breakStart);
+  const bEnd = toMinutes(breakEnd);
+  const slotEnd = slotStartMin + durationMin;
+  return slotStartMin < bEnd && slotEnd > bStart;
+}
+
+const padTime = (n) => String(n).padStart(2, '0');
 
 function normalizeSettings(raw) {
   const base = createDefaultSettings();
@@ -104,10 +118,18 @@ function normalizeSettings(raw) {
   }
   closures.sort((a, b) => a.date.localeCompare(b.date));
 
+  const slotMinutes = Number(raw.slotMinutes);
+  const lunchRaw = raw.lunchBreak;
+  const lunchBreak = lunchRaw?.start && lunchRaw?.end
+    ? { start: lunchRaw.start, end: lunchRaw.end }
+    : base.lunchBreak;
+
   return {
     hours,
     services,
     closures,
+    slotMinutes: Number.isFinite(slotMinutes) && slotMinutes >= 30 ? slotMinutes : base.slotMinutes,
+    lunchBreak,
     updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : base.updatedAt,
   };
 }
@@ -144,6 +166,25 @@ export function isServiceOnline(code) {
 
 export function getSettings() {
   return settingsStore.get();
+}
+
+/** Bookable start times for a date (respects hours, lunch break, slot length). */
+export function slotTimesForDate(dateString) {
+  if (!isValidDateString(dateString)) return [];
+  if (getClosure(dateString)) return [];
+  const [y, m, d] = dateString.split('-').map(Number);
+  const day = new Date(y, m - 1, d).getDay();
+  const hours = getHoursForDay(day);
+  if (!hours) return [];
+  const { slotMinutes, lunchBreak } = settingsStore.get();
+  const step = Number(slotMinutes) > 0 ? Number(slotMinutes) : DEFAULT_SLOT_MINUTES;
+  const lunch = lunchBreak?.start && lunchBreak?.end ? lunchBreak : DEFAULT_LUNCH_BREAK;
+  const slots = [];
+  for (let t = toMinutes(hours.open); t + step <= toMinutes(hours.close); t += step) {
+    if (slotOverlapsBreak(t, step, lunch.start, lunch.end)) continue;
+    slots.push(`${padTime(Math.floor(t / 60))}:${padTime(t % 60)}`);
+  }
+  return slots;
 }
 
 export async function updateHours(nextHours) {

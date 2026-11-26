@@ -537,7 +537,7 @@ export default function AccountingPage() {
                   </div>
                 </header>
                 <div className="acct-sum3">
-                  <div><span>รายรับมัดจำ</span><strong className="is-in">{money(income)}</strong></div>
+                  <div><span>รายรับจากสลิป</span><strong className="is-in">{money(income)}</strong></div>
                   <div><span>รายจ่าย</span><strong className="is-out">{money(0)}</strong></div>
                   <div><span>คงเหลือสุทธิ</span><strong>{money(income)}</strong></div>
                 </div>

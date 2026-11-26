@@ -9,18 +9,24 @@ import { useAuth } from '../../auth/AuthContext.jsx';
 import { usePets } from '../usePets.js';
 import { ownerRequest } from '../api.js';
 import { speciesOf } from '../petUtils.js';
+import QuickAddPetModal from '../components/QuickAddPetModal.jsx';
 import { HOTEL_STATUS, HOTEL_STATUS_LABEL, cagePlan, quoteStay, stayNights, useHotelBookings } from '../useHotelBookings.js';
 import { useHotelPricing } from '../useHotelPricing.js';
+import { useHotelStays } from '../useHotelStays.js';
 import { createPayment, PAY_KIND, submitSlip } from '../../payments/store.js';
-import { PAY_ACCOUNT, depositOf, promptPayPayload } from '../../payments/promptpay.js';
 import { fileToResizedDataUrl } from '../../../shared/utils/storage.js';
 import QRCode from 'qrcode';
+import { api, formatWhen } from '../../super-admin/hotel-cctv/src/api.js';
+import Player from '../../super-admin/hotel-cctv/src/components/Player.jsx';
+import { roomLabelThai } from '../hotelRooms.js';
+import '../hotel.css';
 
 const PET_GROUPS = [
   { id: 'dog', label: 'สุนัข' },
   { id: 'cat', label: 'แมว' },
-  { id: 'other', label: 'อื่น ๆ' },
 ];
+
+export { StayBookPage } from './StayBookPage.jsx';
 
 function petGroup(species) {
   if (species === 'dog' || species === 'cat') return species;
@@ -39,15 +45,14 @@ function stayChoice(id) {
 }
 
 registerLocale('th', th);
-import { api, formatWhen } from '../../super-admin/hotel-cctv/src/api.js';
-import Player from '../../super-admin/hotel-cctv/src/components/Player.jsx';
-import '../hotel.css';
 
-const ROOM_THAI = {
-  Standard: 'ห้องมาตรฐาน',
-  Deluxe: 'ห้องพิเศษ',
-  Suite: 'ห้องสวีท',
-};
+const LEGACY_ROOM_MAP = { Standard: 'SizeS', Deluxe: 'SizeM', Suite: 'SizeL' };
+
+function normalizeRoomQuery(requested) {
+  const raw = LEGACY_ROOM_MAP[requested] || requested || '';
+  const valid = ['SizeS', 'SizeM', 'SizeL', 'SizeXL'];
+  return valid.includes(raw) ? raw : 'SizeM';
+}
 
 const GUIDE = [
   { n: '1', title: 'เลือกแพ็กเกจ', text: 'เลือกห้องในหน้านี้ แล้วไปกรอกวันเข้าพักในหน้าจอง' },
@@ -117,7 +122,7 @@ export default function CatHotelPage() {
           <div>
             <p className="stay-kicker">โรงแรมสัตว์เลี้ยง</p>
             <h1>จองห้องพักให้น้อง</h1>
-            <p>เลือกแพ็กเกจแล้วไปหน้าจอง สแกนมัดจำและแนบสลิป ฝ่ายบัญชีเป็นคนอนุมัติ</p>
+            <p>เลือกแพ็กเกจแล้วไปหน้าจอง ชำระค่าบริการเมื่อใช้บริการที่สาขา</p>
           </div>
           <ul className="stay-facts">
             <li><span>ที่ตั้ง</span><strong>99/9 ถนนพหลโยธิน จตุจักร</strong></li>
@@ -146,15 +151,15 @@ export default function CatHotelPage() {
               <div className="col-md-4" key={item.name}>
                 <article className={`hotel-card ${item.featured ? 'featured' : ''}`}>
                   {item.featured ? <span className="ribbon">ยอดนิยม</span> : null}
-                  <img className="room-photo" src={item.image} alt={ROOM_THAI[item.name]} />
-                  <div className="mitr fs-5">{ROOM_THAI[item.name]}</div>
-                  <div className="small text-muted">{item.name}</div>
+                  <img className="room-photo" src={item.image} alt={roomLabelThai(item.name)} />
+                  <div className="mitr fs-5">{roomLabelThai(item.name)}</div>
+                  <div className="small text-muted">{item.sizeHint}</div>
                   <div className="price">
                     {baht(item.price)}
                     <span className="fs-6 text-muted"> / คืน</span>
                   </div>
                   <ul>
-                    {item.features.map((feature) => (
+                    {(item.features ?? []).map((feature) => (
                       <li key={feature}>
                         <i className="bi bi-check-circle-fill" />
                         {feature}
@@ -162,7 +167,7 @@ export default function CatHotelPage() {
                     ))}
                   </ul>
                   <button className="btn btn-sky w-100" type="button" onClick={() => navigate(`/pet-owner/cat-hotel/book?room=${item.name}`)}>
-                    {`จอง${ROOM_THAI[item.name]}`}
+                    {`จอง${roomLabelThai(item.name)}`}
                   </button>
                 </article>
               </div>
@@ -204,9 +209,9 @@ export default function CatHotelPage() {
               <div><dt>จำนวนคืน</dt><dd>4 คืน</dd></div>
             </dl>
             <div className="stay-slip-tear">
-              <p>มัดจำที่ต้องสแกน</p>
-              <strong>฿765</strong>
-              <span>30% ของยอด ฿2,550 · ส่วนที่เหลือจ่ายตอนใช้บริการ</span>
+              <p>ยอดรวมโดยประมาณ</p>
+              <strong>฿2,550</strong>
+              <span>ชำระเมื่อใช้บริการที่สาขา</span>
             </div>
           </aside>
         </section>
@@ -228,288 +233,6 @@ export default function CatHotelPage() {
   );
 }
 
-export function StayBookPage() {
-  const { currentUser } = useAuth();
-  const { pets } = usePets();
-  const { createBooking } = useHotelBookings();
-  const { rooms: hotelRooms, loading: pricingLoading, error: pricingError } = useHotelPricing();
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const requested = params.get('room');
-  const transportBookingId = params.get('transportBookingId');
-  const requestedPetId = params.get('petId');
-  const [roomName, setRoomName] = useState(HOTEL_ROOMS.some((item) => item.name === requested) ? requested : 'Deluxe');
-  const [petIds, setPetIds] = useState([]);
-  const [checkIn, setCheckIn] = useState('');
-  const [checkOut, setCheckOut] = useState('');
-  const [note, setNote] = useState('');
-  const [slip, setSlip] = useState('');
-  const [qr, setQr] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    setPetIds((current) => current.filter((id) => pets.some((pet) => pet.id === id) || stayChoice(id)));
-  }, [pets]);
-
-  useEffect(() => {
-    if (requestedPetId && pets.some((pet) => pet.id === requestedPetId)) {
-      setPetIds((current) => (current.length ? current : [requestedPetId]));
-    }
-  }, [pets, requestedPetId]);
-
-  const selectedPets = petIds.flatMap((id) => {
-    const pet = pets.find((item) => item.id === id);
-    if (pet) return [pet];
-    const guest = stayChoice(id);
-    return guest ? [guest] : [];
-  });
-  const plan = cagePlan(selectedPets);
-  const nights = stayNights(checkIn, checkOut);
-  const room = hotelRooms.find((item) => item.name === roomName);
-  const quote = useMemo(
-    () => quoteStay({
-      roomName,
-      checkIn,
-      checkOut,
-      cages: plan.cages || 1,
-      pricePerNight: room?.price,
-    }),
-    [roomName, checkIn, checkOut, plan.cages, room?.price],
-  );
-  const priced = quote && selectedPets.length ? quote : null;
-  const deposit = priced ? depositOf(priced.total) : null;
-  const booker = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim();
-
-  useEffect(() => {
-    if (!deposit) {
-      setQr('');
-      return undefined;
-    }
-    let gone = false;
-    QRCode.toDataURL(promptPayPayload(PAY_ACCOUNT.promptpay, deposit), {
-      margin: 1,
-      width: 220,
-      color: { dark: '#17324d', light: '#ffffff' },
-    }).then((url) => {
-      if (!gone) setQr(url);
-    }).catch(() => {
-      if (!gone) setQr('');
-    });
-    return () => {
-      gone = true;
-    };
-  }, [deposit]);
-
-  async function onFile(event) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    setError('');
-    try {
-      setSlip(await fileToResizedDataUrl(file, 960, 0.82));
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function onSubmit(event) {
-    event.preventDefault();
-    setError('');
-    if (pricingLoading || pricingError) {
-      setError(pricingError || 'กำลังโหลดราคาห้องพัก กรุณาลองอีกครั้ง');
-      return;
-    }
-    if (!selectedPets.length) {
-      setError('เลือกสัตว์เลี้ยงอย่างน้อย 1 ตัว');
-      return;
-    }
-    if (!priced) {
-      setError('เลือกวันเข้าพักและวันรับกลับ');
-      return;
-    }
-    if (!slip) {
-      setError('แนบสลิปมัดจำก่อนยืนยัน');
-      return;
-    }
-    try {
-      const booking = createBooking({
-        pets: selectedPets.map((pet) => ({ id: pet.id, name: pet.name, species: pet.species || 'other' })),
-        checkIn,
-        checkOut,
-        roomName,
-        pricePerNight: room.price,
-        linkedBookings: transportBookingId
-          ? [{ kind: 'transport', id: transportBookingId, label: 'รับ–ส่งสัตว์เลี้ยง' }]
-          : [],
-      });
-      const payment = await createPayment({
-        kind: PAY_KIND.hotel,
-        refId: booking.id,
-        ownerId: currentUser.id,
-        ownerName: booker,
-        email: currentUser.email,
-        title: ROOM_THAI[roomName] || roomName,
-        detail: `${booking.petName} · ${priced.nights} คืน · ${plan.cages} กรง${note.trim() ? ` · ${note.trim()}` : ''}`,
-        total: priced.total,
-      });
-      await submitSlip(payment.id, currentUser.id, slip);
-      navigate(`/pet-owner/cat-hotel/bookings/${booking.id}`);
-    } catch (err) {
-      setError(err.message);
-    }
-  }
-
-  async function copyAccount() {
-    try {
-      await navigator.clipboard.writeText(PAY_ACCOUNT.promptpay);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  }
-
-  const start = checkIn ? parse(checkIn, 'yyyy-MM-dd', new Date()) : null;
-  const end = checkOut ? parse(checkOut, 'yyyy-MM-dd', new Date()) : null;
-
-  return (
-    <div className="stay-page page-wrap">
-      <div className="container">
-        <Link className="stay-back" to="/pet-owner/cat-hotel">กลับไปหน้าโรงแรม</Link>
-        <header className="book-head">
-          <h1>จองห้องพัก</h1>
-          <p>เลือกห้อง วัน และน้อง แล้วโอนมัดจำผ่าน QR หลังยืนยันสามารถเพิ่มรับ–ส่งหรือจองคลินิกได้</p>
-        </header>
-        <form className="book-sheet" onSubmit={onSubmit}>
-          <div className="book-main">
-            <section className="book-card">
-              <h2><b>1</b>เลือกห้อง</h2>
-              <label className="form-label" htmlFor="stay-room">แพ็กเกจ</label>
-              <select id="stay-room" className="form-control" value={roomName} onChange={(event) => setRoomName(event.target.value)}>
-                {hotelRooms.map((item) => (
-                  <option key={item.name} value={item.name}>
-                    {ROOM_THAI[item.name]} · {baht(item.price)} ต่อกรงต่อคืน
-                  </option>
-                ))}
-              </select>
-              {pricingLoading ? <p className="hotel-pricing-note" role="status">กำลังโหลดราคาห้องพัก</p> : null}
-              {pricingError ? <p className="hotel-pricing-error" role="alert">{pricingError}</p> : null}
-              {room ? (
-                <div className="book-room">
-                  <img src={room.image} alt={ROOM_THAI[room.name]} />
-                  <div>
-                    <strong>{ROOM_THAI[room.name]}</strong>
-                    <span>{room.features[0]}</span>
-                    <b>{baht(room.price)} ต่อกรงต่อคืน</b>
-                  </div>
-                </div>
-              ) : null}
-            </section>
-
-            <section className="book-card">
-              <h2><b>2</b>เลือกวันเข้าพัก</h2>
-              <div className="book-dates">
-                <DatePicker
-                  inline
-                  selectsRange
-                  startDate={start && isValid(start) ? start : null}
-                  endDate={end && isValid(end) ? end : null}
-                  onChange={(value) => {
-                    const [from, to] = value || [];
-                    setCheckIn(from && isValid(from) ? format(from, 'yyyy-MM-dd') : '');
-                    setCheckOut(to && isValid(to) ? format(to, 'yyyy-MM-dd') : '');
-                  }}
-                  locale="th"
-                  minDate={new Date()}
-                  monthsShown={1}
-                  calendarClassName="stay-range-cal"
-                />
-                <div className="book-span">
-                  <div>
-                    <p>เข้าพัก</p>
-                    <strong>{checkIn ? formatDay(checkIn) : 'ยังไม่เลือก'}</strong>
-                  </div>
-                  <div>
-                    <p>รับกลับ</p>
-                    <strong>{checkOut ? formatDay(checkOut) : 'ยังไม่เลือก'}</strong>
-                  </div>
-                  <div>
-                    <p>จำนวนคืน</p>
-                    <strong>{nights ? `${nights} คืน` : '—'}</strong>
-                  </div>
-                </div>
-              </div>
-            </section>
-
-            <section className="book-card">
-              <h2><b>3</b>ข้อมูลผู้จอง</h2>
-              <div className="book-who">
-                <label>
-                  ชื่อผู้จอง
-                  <input className="form-control" value={booker || '—'} readOnly />
-                </label>
-                <label>
-                  เบอร์โทร
-                  <input className="form-control" value={currentUser?.phone || '—'} readOnly />
-                </label>
-              </div>
-              <PetPicker pets={pets} petIds={petIds} onChange={setPetIds} />
-              <label className="form-label" htmlFor="stay-note">รายละเอียดเพิ่มเติม</label>
-              <textarea id="stay-note" className="form-control" rows={3} value={note} onChange={(event) => setNote(event.target.value)} placeholder="เช่น อาหารที่น้องกิน หรือเวลาที่จะนำมาฝาก" />
-            </section>
-          </div>
-
-          <aside className="book-card book-pay">
-            <h2><b>4</b>ชำระเงิน</h2>
-            <dl>
-              <div><dt>ห้อง</dt><dd>{room ? ROOM_THAI[room.name] : '—'}</dd></div>
-              <div><dt>เข้าพัก</dt><dd>{checkIn ? formatDay(checkIn) : '—'}</dd></div>
-              <div><dt>รับกลับ</dt><dd>{checkOut ? formatDay(checkOut) : '—'}</dd></div>
-              <div><dt>น้อง</dt><dd>{selectedPets.length ? selectedPets.map((pet) => pet.name).join(', ') : '—'}</dd></div>
-              <div><dt>กรง</dt><dd>{selectedPets.length ? `${plan.cages} กรง` : '—'}</dd></div>
-              <div><dt>ค่าห้อง</dt><dd>{priced ? baht(priced.subtotal) : '—'}</dd></div>
-              <div><dt>ส่วนลด</dt><dd>{priced?.discount ? `-${baht(priced.discount)}` : '—'}</dd></div>
-              <div><dt>ยอดเต็ม</dt><dd>{priced ? baht(priced.total) : '—'}</dd></div>
-            </dl>
-            <p className="book-promo">{priced?.promoApplied ? `พัก ${HOTEL_STAY_PROMO.minNights} คืนขึ้นไป หัก ${HOTEL_STAY_PROMO.percent}% แล้ว` : `พักครบ ${HOTEL_STAY_PROMO.minNights} คืน ลด ${HOTEL_STAY_PROMO.percent}%`}</p>
-            <div className="book-deposit">
-              <span>ยอดมัดจำที่ต้องโอน (30%)</span>
-              <strong>{deposit ? baht(deposit) : '—'}</strong>
-            </div>
-            <div className="book-qr">
-              {qr ? <img src={qr} alt={deposit ? `QR มัดจำ ${baht(deposit)}` : 'QR มัดจำ'} /> : <p>เลือกวันเข้าพักเพื่อสร้าง QR</p>}
-            </div>
-            <div className="book-account">
-              <span>ช่องทาง</span>
-              <b>{PAY_ACCOUNT.bank}</b>
-              <span className="book-account-gap" />
-              <span>ชื่อบัญชี</span>
-              <b>{PAY_ACCOUNT.name}</b>
-              <span className="book-account-gap" />
-              <span>พร้อมเพย์</span>
-              <b>{PAY_ACCOUNT.promptpay}</b>
-              <button type="button" onClick={copyAccount}>{copied ? 'คัดลอกแล้ว' : 'คัดลอก'}</button>
-            </div>
-            <label className="book-slip">
-              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onFile} />
-              <span>{slip ? 'เปลี่ยนสลิป' : 'แนบสลิปการโอนเงิน'}</span>
-            </label>
-            {slip ? <img className="book-slip-preview" src={slip} alt="สลิปที่แนบ" /> : null}
-            {plan.note && selectedPets.length ? <p className="book-note">{plan.note}</p> : null}
-            {error ? <p className="book-error">{error}</p> : null}
-            <button
-              className="btn btn-sky book-confirm"
-              type="submit"
-              disabled={!priced || !selectedPets.length || !slip || pricingLoading || Boolean(pricingError)}
-            >
-              ยืนยันการจอง
-            </button>
-          </aside>
-        </form>
-      </div>
-    </div>
-  );
-}
 
 const STAY_HEADERS = { 'X-Stay-View': '1' };
 
@@ -604,7 +327,19 @@ function screensByBooking(bookings, cameras) {
 
 export function CatHotelBookingsPage() {
   const { currentUser } = useAuth();
-  const { bookings } = useHotelBookings();
+  const { stays } = useHotelStays();
+  const bookings = useMemo(() => stays.map((stay) => ({
+    id: stay.id,
+    checkIn: stay.checkIn,
+    checkOut: stay.checkOut,
+    status: stay.status === 'waiting' ? HOTEL_STATUS.waiting : stay.status,
+    total: stay.total,
+    petName: (stay.lines || []).flatMap((line) => line.petIds || []).length
+      ? `${(stay.lines || []).length} ห้อง`
+      : '—',
+    stays: stay,
+    fromApi: true,
+  })), [stays]);
   const cameras = useStayCameras(currentUser?.id || '', currentUser?.email || '');
   const grouped = useMemo(
     () => screensByBooking(bookings, cameras || []),
@@ -669,12 +404,47 @@ const StayRangeInput = forwardRef(function StayRangeInput({ title, className, on
   );
 });
 
-function PetPicker({ pets, petIds, onChange }) {
+function StayRoomPicker({ rooms, value, onChange, formatBaht }) {
+  return (
+    <div className="stay-room-pick" role="radiogroup" aria-label="เลือกไซส์กรง">
+      {rooms.map((item) => {
+        const active = value === item.name;
+        const label = roomLabelThai(item.name);
+        return (
+          <button
+            key={item.name}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            className={`stay-room-pick__card${active ? ' stay-room-pick__card--active' : ''}`}
+            onClick={() => onChange(item.name)}
+          >
+            {item.featured ? <span className="stay-room-pick__ribbon">ยอดนิยม</span> : null}
+            <img className="stay-room-pick__photo" src={item.image} alt="" />
+            <span className="stay-room-pick__title">{label}</span>
+            {item.sizeHint ? <span className="stay-room-pick__hint">{item.sizeHint}</span> : null}
+            <span className="stay-room-pick__price">{formatBaht(item.price)} <small>/ กรง / คืน</small></span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PetPicker({ pets, petIds, onChange, activeTab, onActiveTab, onAddPet }) {
   const groups = PET_GROUPS.map((group) => ({
     ...group,
-    pets: pets.filter((pet) => petGroup(pet.species) === group.id),
+    pets:
+      group.id === 'cat'
+        ? pets.filter((pet) => petGroup(pet.species) === 'cat' || petGroup(pet.species) === 'other')
+        : pets.filter((pet) => petGroup(pet.species) === group.id),
   }));
-  const [active, setActive] = useState('dog');
+  const [innerActive, setInnerActive] = useState('dog');
+  const active = activeTab ?? innerActive;
+  const setActiveTab = (id) => {
+    if (onActiveTab) onActiveTab(id);
+    else setInnerActive(id);
+  };
   const [query, setQuery] = useState('');
   const current = groups.find((group) => group.id === active) || groups[0];
   const choices = current.pets.length ? current.pets : [stayChoice(`guest:${current.id}`)];
@@ -709,7 +479,7 @@ function PetPicker({ pets, petIds, onChange }) {
             role="tab"
             aria-selected={group.id === current.id}
             className={group.id === current.id ? 'is-on' : ''}
-            onClick={() => { setActive(group.id); setQuery(''); }}
+            onClick={() => { setActiveTab(group.id); setQuery(''); }}
           >
             {group.label}
             <b>{group.pets.length}</b>
@@ -742,7 +512,10 @@ function PetPicker({ pets, petIds, onChange }) {
             {allOn ? `ยกเลิก${current.label}ทั้งหมด` : `เลือก${current.label}ทั้งหมด`}
           </button>
         ) : <span>ยังไม่มี{current.label}ในบัญชี</span>}
-        <Link to="/pet-owner/my-pets/new">เพิ่มสัตว์เลี้ยง</Link>
+        <button type="button" className="stay-pets-add" onClick={onAddPet}>
+          <i className="bi bi-plus-lg" aria-hidden />
+          เพิ่มสัตว์เลี้ยง
+        </button>
       </div>
     </div>
   );
@@ -782,7 +555,7 @@ function StayRange({ id, checkIn, checkOut, onChange }) {
 
 function BookingCard({ booking, cameras }) {
   const nights = booking.nights || stayNights(booking.checkIn, booking.checkOut);
-  const roomLabel = ROOM_THAI[booking.roomName] || 'ไม่ระบุแพ็กเกจ';
+  const roomLabel = roomLabelThai(booking.roomName);
   return (
     <article className="stay-folio">
       <div className="stay-folio-main">

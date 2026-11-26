@@ -38,6 +38,55 @@ CREATE TABLE dbo.hotel_room_prices (
   sort_order INT NOT NULL
 );
 
+IF OBJECT_ID(N'dbo.hotel_room_types', N'U') IS NULL
+CREATE TABLE dbo.hotel_room_types (
+  id NVARCHAR(64) NOT NULL PRIMARY KEY,
+  species NVARCHAR(16) NOT NULL,
+  size_code NVARCHAR(8) NOT NULL,
+  title_th NVARCHAR(200) NOT NULL,
+  description_th NVARCHAR(1000) NOT NULL CONSTRAINT DF_hotel_room_types_desc DEFAULT (N''),
+  image_url NVARCHAR(500) NOT NULL CONSTRAINT DF_hotel_room_types_img DEFAULT (N''),
+  max_pets_per_unit INT NOT NULL,
+  total_units INT NOT NULL,
+  sort_order INT NOT NULL
+);
+
+IF OBJECT_ID(N'dbo.hotel_stays', N'U') IS NULL
+CREATE TABLE dbo.hotel_stays (
+  id NVARCHAR(64) NOT NULL PRIMARY KEY,
+  owner_id NVARCHAR(64) NOT NULL,
+  owner_email NVARCHAR(200) NOT NULL CONSTRAINT DF_hotel_stays_email DEFAULT (N''),
+  check_in NVARCHAR(10) NOT NULL,
+  check_out NVARCHAR(10) NOT NULL,
+  nights INT NOT NULL,
+  status NVARCHAR(50) NOT NULL,
+  note NVARCHAR(1000) NOT NULL CONSTRAINT DF_hotel_stays_note DEFAULT (N''),
+  subtotal DECIMAL(18,2) NOT NULL,
+  discount DECIMAL(18,2) NOT NULL CONSTRAINT DF_hotel_stays_discount DEFAULT (0),
+  total_price DECIMAL(18,2) NOT NULL,
+  promo_applied BIT NOT NULL CONSTRAINT DF_hotel_stays_promo DEFAULT (0),
+  created_at NVARCHAR(40) NOT NULL,
+  updated_at NVARCHAR(40) NOT NULL
+);
+
+IF OBJECT_ID(N'dbo.hotel_stay_units', N'U') IS NULL
+CREATE TABLE dbo.hotel_stay_units (
+  id NVARCHAR(64) NOT NULL PRIMARY KEY,
+  stay_id NVARCHAR(64) NOT NULL,
+  room_type_id NVARCHAR(64) NOT NULL,
+  units INT NOT NULL,
+  price_per_night DECIMAL(18,2) NOT NULL,
+  line_subtotal DECIMAL(18,2) NOT NULL,
+  pet_ids_json NVARCHAR(MAX) NOT NULL
+);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'hotel_stays_owner_idx' AND object_id = OBJECT_ID(N'dbo.hotel_stays'))
+  CREATE INDEX hotel_stays_owner_idx ON dbo.hotel_stays(owner_id, created_at DESC);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'hotel_stays_dates_idx' AND object_id = OBJECT_ID(N'dbo.hotel_stays'))
+  CREATE INDEX hotel_stays_dates_idx ON dbo.hotel_stays(check_in, check_out, status);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'hotel_stay_units_stay_idx' AND object_id = OBJECT_ID(N'dbo.hotel_stay_units'))
+  CREATE INDEX hotel_stay_units_stay_idx ON dbo.hotel_stay_units(stay_id);
+
 IF OBJECT_ID(N'dbo.bookings', N'U') IS NULL
 CREATE TABLE dbo.bookings (
   id NVARCHAR(64) NOT NULL PRIMARY KEY,
@@ -422,7 +471,7 @@ export const SEED_ZONES = [
 export const SEED_CLINICS = [
   {
     id: 'clinic-1',
-    name: 'คลินิกมะแอ่ว',
+    name: 'Pet Care',
     address: '99/9 ถนนพหลโยธิน แขวงจตุจักร เขตจตุจักร กรุงเทพฯ 10900',
     district_id: 'chatuchak',
     subdistrict_id: 'chatuchak',
@@ -431,10 +480,26 @@ export const SEED_CLINICS = [
   },
 ];
 
+export const SEED_HOTEL_ROOM_TYPES = [
+  { id: 'dog_s', species: 'dog', sizeCode: 'S', titleTh: 'ห้องสุนัข ไซส์ S', descriptionTh: 'เหมาะสุนัขเล็กและจิ๋ว', imageUrl: '/rooms/dog-s.jpg', maxPetsPerUnit: 1, totalUnits: 6, sortOrder: 1 },
+  { id: 'dog_m', species: 'dog', sizeCode: 'M', titleTh: 'ห้องสุนัข ไซส์ M', descriptionTh: 'สุนัขขนาดกลาง สบายตัว', imageUrl: '/rooms/dog-m.jpg', maxPetsPerUnit: 1, totalUnits: 8, sortOrder: 2 },
+  { id: 'dog_l', species: 'dog', sizeCode: 'L', titleTh: 'ห้องสุนัข ไซส์ L', descriptionTh: 'สุนัขกลาง–ใหญ่', imageUrl: '/rooms/dog-l.jpg', maxPetsPerUnit: 1, totalUnits: 5, sortOrder: 3 },
+  { id: 'dog_xl', species: 'dog', sizeCode: 'XL', titleTh: 'ห้องสุนัข ไซส์ XL', descriptionTh: 'สุนัขใหญ่พิเศษ', imageUrl: '/rooms/dog-xl.jpg', maxPetsPerUnit: 2, totalUnits: 3, sortOrder: 4 },
+  { id: 'cat_s', species: 'cat', sizeCode: 'S', titleTh: 'ห้องแมว ไซส์ S', descriptionTh: 'แมวตัวเดียว เงียบสงบ', imageUrl: '/rooms/cat-s.jpg', maxPetsPerUnit: 3, totalUnits: 8, sortOrder: 5 },
+  { id: 'cat_m', species: 'cat', sizeCode: 'M', titleTh: 'ห้องแมว ไซส์ M', descriptionTh: 'แมวขนาดกลาง มีที่ปีน', imageUrl: '/rooms/cat-m.jpg', maxPetsPerUnit: 3, totalUnits: 10, sortOrder: 6 },
+  { id: 'cat_l', species: 'cat', sizeCode: 'L', titleTh: 'ห้องแมว ไซส์ L', descriptionTh: 'แมวหลายตัว / พื้นที่กว้าง', imageUrl: '/rooms/cat-l.jpg', maxPetsPerUnit: 3, totalUnits: 6, sortOrder: 7 },
+  { id: 'cat_xl', species: 'cat', sizeCode: 'XL', titleTh: 'ห้องแมว ไซส์ XL', descriptionTh: 'ห้องใหญ่สำหรับแมวหลายตัว', imageUrl: '/rooms/cat-xl.jpg', maxPetsPerUnit: 2, totalUnits: 4, sortOrder: 8 },
+];
+
 export const SEED_HOTEL_ROOM_PRICES = [
-  { id: 'standard', label: 'Standard', price: 450, sortOrder: 1 },
-  { id: 'deluxe', label: 'Deluxe', price: 750, sortOrder: 2 },
-  { id: 'suite', label: 'Suite', price: 1200, sortOrder: 3 },
+  { id: 'dog_s', label: 'สุนัข S', price: 450, sortOrder: 1 },
+  { id: 'dog_m', label: 'สุนัข M', price: 650, sortOrder: 2 },
+  { id: 'dog_l', label: 'สุนัข L', price: 950, sortOrder: 3 },
+  { id: 'dog_xl', label: 'สุนัข XL', price: 1350, sortOrder: 4 },
+  { id: 'cat_s', label: 'แมว S', price: 350, sortOrder: 5 },
+  { id: 'cat_m', label: 'แมว M', price: 550, sortOrder: 6 },
+  { id: 'cat_l', label: 'แมว L', price: 750, sortOrder: 7 },
+  { id: 'cat_xl', label: 'แมว XL', price: 1050, sortOrder: 8 },
 ];
 
 async function upsertZone(z) {
@@ -474,6 +539,36 @@ async function upsertHotelRoom(room) {
   );
 }
 
+async function upsertHotelRoomType(row) {
+  await run(
+    `MERGE dbo.hotel_room_types AS t
+     USING (SELECT ? AS id, ? AS species, ? AS size_code, ? AS title_th, ? AS description_th,
+            ? AS image_url, ? AS max_pets_per_unit, ? AS total_units, ? AS sort_order) AS s
+     ON t.id = s.id
+     WHEN MATCHED THEN UPDATE SET
+       species = s.species, size_code = s.size_code, title_th = s.title_th,
+       description_th = s.description_th, image_url = s.image_url,
+       max_pets_per_unit = s.max_pets_per_unit, total_units = s.total_units, sort_order = s.sort_order
+     WHEN NOT MATCHED THEN INSERT (id, species, size_code, title_th, description_th, image_url,
+       max_pets_per_unit, total_units, sort_order)
+       VALUES (s.id, s.species, s.size_code, s.title_th, s.description_th, s.image_url,
+         s.max_pets_per_unit, s.total_units, s.sort_order);`,
+    [
+      row.id, row.species, row.sizeCode, row.titleTh, row.descriptionTh,
+      row.imageUrl, row.maxPetsPerUnit, row.totalUnits, row.sortOrder,
+    ],
+  );
+}
+
+async function seedHotelRoomCatalog() {
+  for (const row of SEED_HOTEL_ROOM_TYPES) {
+    await upsertHotelRoomType(row);
+  }
+  for (const room of SEED_HOTEL_ROOM_PRICES) {
+    await upsertHotelRoom(room);
+  }
+}
+
 async function seedCatalogIfEmpty() {
   const zoneCount = Number((await queryOne('SELECT COUNT(*) AS c FROM dbo.zones'))?.c ?? 0);
   if (zoneCount === 0) {
@@ -493,23 +588,32 @@ async function seedCatalogIfEmpty() {
     }
   }
 
-  const hotelPriceCount = Number(
-    (await queryOne('SELECT COUNT(*) AS c FROM dbo.hotel_room_prices'))?.c ?? 0,
-  );
-  if (hotelPriceCount === 0) {
-    for (const room of SEED_HOTEL_ROOM_PRICES) {
-      await run(
-        'INSERT INTO dbo.hotel_room_prices (room_id, label, price, sort_order) VALUES (?, ?, ?, ?)',
-        [room.id, room.label, room.price, room.sortOrder],
-      );
+  const typeCount = Number((await queryOne('SELECT COUNT(*) AS c FROM dbo.hotel_room_types'))?.c ?? 0);
+  if (typeCount === 0) {
+    await seedHotelRoomCatalog();
+  } else {
+    const priceCount = Number((await queryOne('SELECT COUNT(*) AS c FROM dbo.hotel_room_prices'))?.c ?? 0);
+    if (priceCount === 0) {
+      for (const room of SEED_HOTEL_ROOM_PRICES) {
+        await run(
+          'INSERT INTO dbo.hotel_room_prices (room_id, label, price, sort_order) VALUES (?, ?, ?, ?)',
+          [room.id, room.label, room.price, room.sortOrder],
+        );
+      }
     }
   }
+}
+
+async function syncSeedTransportCatalog() {
+  for (const z of SEED_ZONES) await upsertZone(z);
+  for (const c of SEED_CLINICS) await upsertClinic(c);
 }
 
 export async function migrate() {
   await exec(SCHEMA);
   await exec(SCHEMA_APP);
   await seedCatalogIfEmpty();
+  await syncSeedTransportCatalog();
   const { seedRoleUsers } = await import('../auth/seedUsers.js');
   await seedRoleUsers();
   const { ensureStaffReady } = await import('../auth/staffAccounts.js');
@@ -519,9 +623,8 @@ export async function migrate() {
 }
 
 export async function reseedsCatalog() {
-  for (const z of SEED_ZONES) await upsertZone(z);
-  for (const c of SEED_CLINICS) await upsertClinic(c);
-  for (const room of SEED_HOTEL_ROOM_PRICES) await upsertHotelRoom(room);
+  await syncSeedTransportCatalog();
+  await seedHotelRoomCatalog();
 }
 
-export { upsertZone, upsertHotelRoom };
+export { upsertZone, upsertHotelRoom, upsertHotelRoomType, seedHotelRoomCatalog };

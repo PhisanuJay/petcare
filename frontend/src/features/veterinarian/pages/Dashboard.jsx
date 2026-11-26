@@ -72,8 +72,10 @@ const Empty = ({ icon, text }) => (
   </div>
 );
 
+import PetAvatarImg from '../../pet-owner/components/PetAvatarImg.jsx';
+
 function PetAvatar({ pet, fallback }) {
-  return <span className="vet-avatar">{speciesOf(pet?.species ?? fallback).emoji}</span>;
+  return <PetAvatarImg pet={pet} species={pet?.species ?? fallback} className="vet-avatar" size={40} />;
 }
 
 function SlotAction({ a, busy, onAction }) {

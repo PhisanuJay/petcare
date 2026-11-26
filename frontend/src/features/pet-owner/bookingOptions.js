@@ -1,23 +1,87 @@
 import { useEffect, useState } from 'react';
 import { API_BASE } from './api.js';
 
-// Fallback service list & icons. Live online availability comes from /api/clinic-admin/public/clinic-info.
+/** Legacy URL/booking codes → current catalog codes */
+export const LEGACY_SERVICE_CODES = {
+  vaccine: 'vaccine_combo',
+  parasite: 'deworming',
+  followup: 'checkup',
+  other: 'checkup',
+};
+
+export function normalizeServiceCode(code) {
+  if (!code) return 'checkup';
+  return LEGACY_SERVICE_CODES[code] || code;
+}
+
+export function petSpeciesPriceGroup(species) {
+  return String(species || '').toLowerCase() === 'cat' ? 'cat' : 'dog';
+}
+
 export const BOOKING_SERVICES = [
+  {
+    value: 'triage',
+    label: 'ประเมินอาการเบื้องต้น',
+    hint: 'เหมาะเมื่อน้องมีอาการผิดปกติ',
+    icon: 'bi-clipboard2-pulse',
+  },
   { value: 'checkup', label: 'ตรวจสุขภาพทั่วไป', icon: 'bi-heart-pulse' },
-  { value: 'vaccine', label: 'ฉีดวัคซีน', icon: 'bi-capsule' },
-  { value: 'parasite', label: 'ถ่ายพยาธิ / เห็บหมัด', icon: 'bi-bug' },
-  { value: 'followup', label: 'ติดตามอาการ', icon: 'bi-journal-medical' },
-  { value: 'other', label: 'อื่นๆ', icon: 'bi-three-dots' },
+  {
+    value: 'vaccine_combo',
+    labelDog: 'ฉีดวัคซีนรวม 5–6 โรค',
+    labelCat: 'ฉีดวัคซีนรวม 3–4 โรค',
+    icon: 'bi-capsule',
+  },
+  { value: 'vaccine_rabies', label: 'วัคซีนพิษสุนัขบ้า', icon: 'bi-shield-plus' },
+  { value: 'deworming', label: 'ถ่ายพยาธิ', icon: 'bi-bug' },
+  { value: 'flea_prevention', label: 'ป้องกันเห็บหมัด', icon: 'bi-droplet' },
 ];
+
+export const CLINIC_SERVICE_PRICES = {
+  dog: {
+    triage: 350,
+    checkup: 450,
+    vaccine_combo: 550,
+    vaccine_rabies: 250,
+    deworming: 150,
+    flea_prevention: 450,
+  },
+  cat: {
+    triage: 320,
+    checkup: 400,
+    vaccine_combo: 500,
+    vaccine_rabies: 200,
+    deworming: 150,
+    flea_prevention: 350,
+  },
+};
+
+export function clinicServiceLabel(serviceCode, species) {
+  const code = normalizeServiceCode(serviceCode);
+  const meta = BOOKING_SERVICES.find((s) => s.value === code);
+  if (!meta) return code;
+  const group = petSpeciesPriceGroup(species);
+  if (group === 'cat' && meta.labelCat) return meta.labelCat;
+  if (meta.labelDog) return meta.labelDog;
+  return meta.label;
+}
+
+export function clinicServicePrice(serviceCode, species) {
+  const code = normalizeServiceCode(serviceCode);
+  const group = petSpeciesPriceGroup(species);
+  const table = CLINIC_SERVICE_PRICES[group];
+  return table[code] ?? table.checkup;
+}
 
 /**
  * Fallback clinic opening hours. Live hours & closures come from /api/clinic-admin/public/clinic-info.
- * Emergency care (24h) is not booked online.
  */
 export const OPENING_HOURS = {
-  weekday: { label: 'จันทร์ - ศุกร์', open: '08:00', close: '22:00' },
-  weekend: { label: 'เสาร์ - อาทิตย์', open: '09:00', close: '21:00' },
+  weekday: { label: 'จันทร์ - ศุกร์', open: '09:00', close: '18:00' },
+  weekend: { label: 'เสาร์ - อาทิตย์', open: '09:00', close: '17:00' },
 };
+
+export const DEFAULT_LUNCH_BREAK = { start: '12:00', end: '13:00' };
 export const CLINIC_PHONE = '02-123-4567';
 
 export const FALLBACK_CLINIC_INFO = {
@@ -30,9 +94,14 @@ export const FALLBACK_CLINIC_INFO = {
     5: { open: OPENING_HOURS.weekday.open, close: OPENING_HOURS.weekday.close },
     6: { open: OPENING_HOURS.weekend.open, close: OPENING_HOURS.weekend.close },
   },
-  services: BOOKING_SERVICES.map(({ value, label }) => ({ code: value, label })),
+  services: BOOKING_SERVICES.map(({ value, label, labelDog }) => ({
+    code: value,
+    label: label || labelDog,
+  })),
+  vets: [],
   closures: [],
-  slotMinutes: 30,
+  slotMinutes: 60,
+  lunchBreak: { ...DEFAULT_LUNCH_BREAK },
   fallback: true,
 };
 
@@ -62,10 +131,45 @@ function isValidClinicInfo(body) {
   return true;
 }
 
-/**
- * Fetch public clinic schedule/services/closures without throwing.
- * Returns null on network error, timeout (5s), non-2xx HTTP status, or malformed payload.
- */
+function normalizeVets(vets) {
+  if (!Array.isArray(vets)) return [];
+  return vets
+    .filter((v) => v && typeof v.id === 'string' && v.id && typeof v.name === 'string')
+    .map((v) => ({ id: v.id, name: v.name }));
+}
+
+export async function fetchClinicAvailability(dateString) {
+  if (!dateString) return null;
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/clinic-admin/public/clinic-availability?date=${encodeURIComponent(dateString)}`,
+    );
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null);
+    if (!body || typeof body !== 'object') return null;
+    return body;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchClinicSlots(dateString, vetId = '') {
+  if (!dateString) return null;
+  try {
+    const params = new URLSearchParams({ date: dateString });
+    if (vetId) params.set('vetId', vetId);
+    const res = await fetch(
+      `${API_BASE}/api/clinic-admin/public/clinic-slots?${params.toString()}`,
+    );
+    if (!res.ok) return null;
+    const body = await res.json().catch(() => null);
+    if (!body || typeof body !== 'object') return null;
+    return body;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchClinicInfo() {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), 5000) : null;
@@ -79,8 +183,12 @@ export async function fetchClinicInfo() {
     return {
       hours: body.hours,
       services: body.services,
+      vets: normalizeVets(body.vets),
       closures: body.closures,
-      slotMinutes: body.slotMinutes ?? 30,
+      slotMinutes: body.slotMinutes ?? 60,
+      lunchBreak: body.lunchBreak?.start && body.lunchBreak?.end
+        ? { start: body.lunchBreak.start, end: body.lunchBreak.end }
+        : DEFAULT_LUNCH_BREAK,
       fallback: false,
     };
   } catch {
@@ -91,13 +199,11 @@ export async function fetchClinicInfo() {
 }
 
 function getFreshCachedInfo() {
-  if (cachedInfo && Date.now() - cachedAt < CACHE_TTL_MS) return cachedInfo;
-  return null;
+  if (!cachedInfo || Date.now() - cachedAt >= CACHE_TTL_MS) return null;
+  if (!cachedInfo.fallback && !Array.isArray(cachedInfo.vets)) return null;
+  return cachedInfo;
 }
 
-/**
- * Load public clinic info once per 5 minutes (shared module cache) with safe FALLBACK_CLINIC_INFO.
- */
 export function useClinicInfo() {
   const initialFresh = getFreshCachedInfo();
   const [info, setInfo] = useState(() => initialFresh ?? FALLBACK_CLINIC_INFO);
@@ -157,7 +263,6 @@ export function hoursFor(dateString, info) {
   return { open: fallback.open, close: fallback.close };
 }
 
-/** Format clinic weekly hours for display, merging adjacent days with equal hours. */
 export function hoursSummary(info) {
   const hoursMap = info?.hours ?? FALLBACK_CLINIC_INFO.hours;
   const groups = [];
@@ -180,7 +285,12 @@ export function hoursSummary(info) {
   });
 }
 
-/** 30-minute slots for a 'YYYY-MM-DD' date; the last slot starts 30 minutes before closing. */
+function slotOverlapsBreak(slotStartMin, durationMin, breakStart, breakEnd) {
+  const bStart = toMinutes(breakStart);
+  const bEnd = toMinutes(breakEnd);
+  return slotStartMin < bEnd && slotStartMin + durationMin > bStart;
+}
+
 export function slotsForDate(dateString, info) {
   if (!dateString) return [];
   if (info !== undefined && closureFor(dateString, info)) return [];
@@ -195,14 +305,19 @@ export function slotsForDate(dateString, info) {
     hours = day === 0 || day === 6 ? OPENING_HOURS.weekend : OPENING_HOURS.weekday;
   }
 
+  const step = info?.slotMinutes > 0 ? info.slotMinutes : 60;
+  const lunch = info?.lunchBreak?.start && info?.lunchBreak?.end
+    ? info.lunchBreak
+    : DEFAULT_LUNCH_BREAK;
+
   const slots = [];
-  for (let t = toMinutes(hours.open); t + 30 <= toMinutes(hours.close); t += 30) {
+  for (let t = toMinutes(hours.open); t + step <= toMinutes(hours.close); t += step) {
+    if (slotOverlapsBreak(t, step, lunch.start, lunch.end)) continue;
     slots.push(`${pad(Math.floor(t / 60))}:${pad(t % 60)}`);
   }
   return slots;
 }
 
-/** Slots on `dateString` that are still in the future (all of them unless it is today). */
 export function availableSlots(dateString, info) {
   const slots = slotsForDate(dateString, info);
   if (dateString !== todayString()) return slots;
@@ -221,7 +336,6 @@ export const BOOKING_STATUS = {
   cancelled: { label: 'ยกเลิกแล้ว', tone: '' },
 };
 
-/** Bookings the owner can still cancel (the backend enforces the same rule). */
 export const OWNER_CANCELLABLE = ['pending', 'confirmed'];
 
 export function todayString() {

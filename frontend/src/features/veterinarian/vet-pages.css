@@ -278,6 +278,13 @@
   background: linear-gradient(135deg, #5aa9e6, #2f7fc8);
   box-shadow: 0 6px 14px rgba(47, 127, 200, 0.3);
 }
+.vet-inner .vet-person img.person-avatar,
+.vet-inner img.person-avatar.pet {
+  object-fit: cover;
+  padding: 0;
+  font-size: 0;
+  background: #e8f2fc;
+}
 .vet-inner .vet-person .person-body {
   flex: 1 1 auto;
   min-width: 0;

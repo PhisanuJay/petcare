@@ -1,0 +1,1 @@
+export { ADOPTION_SEED_ANIMALS } from '../../../../backend/src/modules/adoption/seedAnimals.js';
