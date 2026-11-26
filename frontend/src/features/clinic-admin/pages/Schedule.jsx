@@ -280,7 +280,7 @@ export default function Schedule() {
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
             <div className="section-label mb-0">
               <i className="bi bi-calendar-week" aria-hidden="true" />
-              <span>ก. ตารางเวรหมอประจำสัปดาห์</span>
+              <span>ตารางเวรหมอประจำสัปดาห์</span>
             </div>
             <button
               type="button"
@@ -467,7 +467,7 @@ export default function Schedule() {
         <div className="card-soft">
           <div className="section-label">
             <i className="bi bi-calendar-x" aria-hidden="true" />
-            <span>ข. วันปิดคลินิก</span>
+            <span>วันปิดคลินิก</span>
           </div>
 
           {closureWarnMsg && (

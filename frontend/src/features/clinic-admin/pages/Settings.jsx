@@ -93,19 +93,6 @@ export default function Settings() {
     }));
   }
 
-  function copyMondayToWeekdays() {
-    if (!draftHours) return;
-    setHoursError('');
-    const mon = draftHours['1'] ? { ...draftHours['1'] } : null;
-    setDraftHours((prev) => ({
-      ...prev,
-      2: mon ? { ...mon } : null,
-      3: mon ? { ...mon } : null,
-      4: mon ? { ...mon } : null,
-      5: mon ? { ...mon } : null,
-    }));
-  }
-
   function fillDefaultHours() {
     setHoursError('');
     setDraftHours(structuredClone(DEFAULT_HOURS));
@@ -204,20 +191,12 @@ export default function Settings() {
                 <div className="d-flex align-items-center gap-2 flex-wrap">
                   <div className="section-label mb-0">
                     <i className="bi bi-clock" aria-hidden="true" />
-                    <span>ก. เวลาทำการ</span>
+                    <span>เวลาทำการ</span>
                   </div>
                   {hoursDirty && <span className="tag warn">ยังไม่ได้บันทึก</span>}
                 </div>
 
                 <div className="d-flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-soft btn-sm"
-                    disabled={hoursSaving}
-                    onClick={copyMondayToWeekdays}
-                  >
-                    คัดลอกเวลา จ. ไปทุกวันธรรมดา
-                  </button>
                   <button
                     type="button"
                     className="btn btn-soft btn-sm"
@@ -339,7 +318,7 @@ export default function Settings() {
               <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
                 <div className="section-label mb-0">
                   <i className="bi bi-toggle-on" aria-hidden="true" />
-                  <span>ข. บริการที่เปิดให้จองออนไลน์</span>
+                  <span>บริการที่เปิดให้จองออนไลน์</span>
                 </div>
                 <Link className="btn btn-soft btn-sm" to="/clinic-admin/services">
                   จัดการบริการและราคา

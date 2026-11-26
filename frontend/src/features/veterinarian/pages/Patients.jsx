@@ -79,6 +79,23 @@ const ownerName = (o) => o.name || 'ไม่ทราบชื่อลูก�
 /** First letter of the name without its title (คุณ, นาย, น.สพ. ...), for the round avatar. */
 const initialOf = (name) => Array.from(name.replace(/^(น\.สพ\.|สพ\.ญ\.|นางสาว|นาง|นาย|คุณ)\s*/, '') || name)[0];
 
+/** Pets whose name matches `q`, best match first (exact → starts with → includes). */
+function petsMatchingName(owners, q) {
+  if (!q) return [];
+  const hits = [];
+  for (const o of owners) {
+    for (const p of o.pets ?? []) {
+      const name = (p.name || '').toLowerCase();
+      if (!name.includes(q)) continue;
+      hits.push({ pet: p, owner: o, name });
+    }
+  }
+  return hits.sort((a, b) => {
+    const rank = (h) => (h.name === q ? 0 : h.name.startsWith(q) ? 1 : 2);
+    return rank(a) - rank(b) || a.name.localeCompare(b.name, 'th');
+  });
+}
+
 /** One customer in the list: name, phone and the pets they registered. */
 function OwnerList({ owners, onSelect }) {
   if (owners.length === 0) {
@@ -113,6 +130,44 @@ function OwnerList({ owners, onSelect }) {
           <i className="bi bi-chevron-right person-go" />
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Search hits that are pets: show the pet card row with owner name underneath. */
+function PetSearchList({ hits, onSelect }) {
+  if (hits.length === 0) {
+    return (
+      <div className="empty-box py-4">
+        <i className="bi bi-search" />
+        ไม่พบสัตว์เลี้ยง
+      </div>
+    );
+  }
+  return (
+    <div className="d-grid gap-2">
+      {hits.map(({ pet: p, owner: o }) => {
+        const species = speciesOf(p.species);
+        return (
+          <button type="button" key={p.id} className="vet-person" onClick={() => onSelect(o.id, p.id)}>
+            <span className="person-avatar pet" aria-hidden="true">{species.emoji}</span>
+            <span className="person-body">
+              <span className="fw-medium d-block">
+                {p.name}
+                {p.allergies && (
+                  <i className="bi bi-exclamation-triangle-fill ms-2 text-danger" title={`แพ้: ${p.allergies}`} />
+                )}
+              </span>
+              <span className="small text-muted d-block">
+                {species.label}
+                {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+              </span>
+              <span className="small text-muted d-block">เจ้าของ {ownerName(o)}</span>
+            </span>
+            <i className="bi bi-chevron-right person-go" />
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -349,6 +404,7 @@ export default function PatientsPage() {
   const [params, setParams] = useSearchParams();
   const petId = params.get('pet') ?? '';
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const { owners, loading, error, reload } = useOwners();
   const detail = usePatient(petId);
@@ -357,7 +413,9 @@ export default function PatientsPage() {
   const ownerId = params.get('owner') || detail.patient?.owner?.id || '';
   const owner = owners.find((o) => o.id === ownerId) ?? null;
 
-  const q = query.trim().toLowerCase();
+  const q = appliedQuery.trim().toLowerCase();
+  const petHits = petsMatchingName(owners, q);
+  const petNameSearch = petHits.length > 0;
   const shown = owners.filter(
     (o) =>
       matches(o, filter) &&
@@ -367,8 +425,19 @@ export default function PatientsPage() {
         )),
   );
 
+  function runSearch(event) {
+    event?.preventDefault?.();
+    setAppliedQuery(query.trim());
+  }
+
+  function clearSearch() {
+    setQuery('');
+    setAppliedQuery('');
+  }
+
   const selectOwner = (id) => setParams({ owner: id });
   const selectPet = (id) => setParams({ owner: ownerId, pet: id });
+  const selectPetHit = (ownerHitId, petHitId) => setParams({ owner: ownerHitId, pet: petHitId });
   const backToCustomers = () => setParams({});
 
   return (
@@ -379,10 +448,6 @@ export default function PatientsPage() {
             icon="bi-people"
             title="ลูกค้า"
             subtitle="เจ้าของที่ลงทะเบียนสัตว์เลี้ยงไว้ เลือกลูกค้าเพื่อดูสัตว์เลี้ยง ช่องทางติดต่อ และประวัติสุขภาพ"
-            stats={[
-              { icon: 'bi-people', value: owners.length, label: 'ลูกค้า' },
-              { icon: 'bi-heart', value: owners.reduce((sum, o) => sum + o.pets.length, 0), label: 'สัตว์เลี้ยง' },
-            ]}
           />
 
           {error && (
@@ -412,29 +477,52 @@ export default function PatientsPage() {
                   </>
                 ) : (
                   <>
-                    <div className="input-group mb-3">
-                      <span className="input-group-text"><i className="bi bi-search" /></span>
-                      <input
-                        className="form-control"
-                        placeholder="ค้นหาชื่อลูกค้า / เบอร์โทร / ชื่อสัตว์เลี้ยง"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                      />
-                    </div>
-                    <div className="vet-chips mb-3">
-                      {FILTERS.map((f) => (
-                        <button
-                          type="button"
-                          key={f.value}
-                          className={`btn btn-sm vet-chip ${filter === f.value ? 'btn-sky' : 'btn-soft'}`}
-                          onClick={() => setFilter(f.value)}
-                        >
-                          {f.label}
-                          <span className="chip-count">{owners.filter((o) => matches(o, f.value)).length}</span>
+                    <form className="mb-3" onSubmit={runSearch}>
+                      <div className="input-group">
+                        <span className="input-group-text"><i className="bi bi-search" /></span>
+                        <input
+                          className="form-control"
+                          placeholder="ค้นหาชื่อลูกค้า / เบอร์โทร / ชื่อสัตว์เลี้ยง"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          aria-label="ค้นหาลูกค้า"
+                        />
+                        {appliedQuery ? (
+                          <button type="button" className="btn btn-soft" onClick={clearSearch}>
+                            ล้าง
+                          </button>
+                        ) : null}
+                        <button type="submit" className="btn btn-sky">
+                          ค้นหา
                         </button>
-                      ))}
-                    </div>
-                    <OwnerList owners={shown} onSelect={selectOwner} />
+                      </div>
+                    </form>
+                    {petNameSearch ? (
+                      <>
+                        <div className="section-label mb-2">
+                          <i className="bi bi-heart" />
+                          สัตว์เลี้ยงที่ตรงกับ “{appliedQuery.trim()}” ({petHits.length})
+                        </div>
+                        <PetSearchList hits={petHits} onSelect={selectPetHit} />
+                      </>
+                    ) : (
+                      <>
+                        <div className="vet-chips mb-3">
+                          {FILTERS.map((f) => (
+                            <button
+                              type="button"
+                              key={f.value}
+                              className={`btn btn-sm vet-chip ${filter === f.value ? 'btn-sky' : 'btn-soft'}`}
+                              onClick={() => setFilter(f.value)}
+                            >
+                              {f.label}
+                              <span className="chip-count">{owners.filter((o) => matches(o, f.value)).length}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <OwnerList owners={shown} onSelect={selectOwner} />
+                      </>
+                    )}
                   </>
                 )}
               </div>

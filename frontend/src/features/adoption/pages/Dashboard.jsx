@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext.jsx';
 import {
+  ADOPTION_STAFF_TOKEN_KEY,
   adoptionStaffFetch,
   readAdoptionResponse,
   updateAdoptionAnimalStatus,
@@ -10,15 +12,29 @@ import { adoptionListingPhoto } from './findHomeDialogs.jsx';
 
 export default function AdoptionDashboardPage() {
   const base = useAdoptionBasePath();
+  const { authToken, currentUser } = useAuth();
   const [overview, setOverview] = useState(null);
   const [animals, setAnimals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingAnimal, setUpdatingAnimal] = useState('');
   const [error, setError] = useState('');
+  const hasOpsAuth = Boolean(
+    authToken
+    || currentUser?.id
+    || (typeof sessionStorage !== 'undefined' && sessionStorage.getItem(ADOPTION_STAFF_TOKEN_KEY)),
+  );
 
   useEffect(() => {
+    if (!hasOpsAuth) {
+      setLoading(false);
+      setError('กรุณาเข้าสู่ระบบใหม่');
+      return undefined;
+    }
+
     const controller = new AbortController();
     async function loadDashboard() {
+      setLoading(true);
+      setError('');
       try {
         const [overviewResponse, animalsResponse] = await Promise.all([
           adoptionStaffFetch('/overview', { signal: controller.signal }),
@@ -39,7 +55,7 @@ export default function AdoptionDashboardPage() {
 
     loadDashboard();
     return () => controller.abort();
-  }, []);
+  }, [hasOpsAuth, authToken, currentUser?.id]);
 
   async function markAsAdopted(animal) {
     if (!window.confirm(`ยืนยันเปลี่ยนสถานะ ${animal.name} เป็น “มีบ้านแล้ว” หรือไม่?`)) return;

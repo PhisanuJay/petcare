@@ -9,11 +9,16 @@ export function adoptionCustomerHeaders(ownerId, extra = {}) {
   return ownerAuthHeaders(ownerId, extra);
 }
 
-/** Bearer ของแอดมินโรงแรมตอนทำงานหาบ้านใน /admin/adoption */
+/** Auth ของแอดมินโรงแรมตอนทำงานหาบ้านใน /admin/adoption */
 let adoptionOpsBearer = '';
+let adoptionOpsActorId = '';
 
 export function setAdoptionOpsBearer(token) {
   adoptionOpsBearer = typeof token === 'string' ? token : '';
+}
+
+export function setAdoptionOpsActorId(actorId) {
+  adoptionOpsActorId = typeof actorId === 'string' ? actorId : '';
 }
 
 export function getAdoptionOpsBearer() {
@@ -22,11 +27,13 @@ export function getAdoptionOpsBearer() {
 
 export function adoptionStaffFetch(path, options = {}) {
   const token = getAdoptionOpsBearer();
+  const actorId = adoptionOpsActorId;
   return fetch(`${ADOPTION_API_URL}/staff${path}`, {
     ...options,
     headers: {
       ...options.headers,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(actorId ? { 'x-owner-id': actorId } : {}),
     },
   });
 }

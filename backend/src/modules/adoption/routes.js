@@ -48,25 +48,25 @@ async function verifyUserPassword(password, user) {
   return expected.length === candidate.length && timingSafeEqual(expected, candidate);
 }
 
-/** โต๊ะหาบ้าน: พนักงานหาบ้าน (legacy session) หรือแอดมินโรงแรม (Bearer customer) */
+/** โต๊ะหาบ้าน: พนักงานหาบ้าน (legacy session) หรือแอดมินโรงแรม (Bearer / x-owner-id) */
 async function requireAdoptionOps(req, res, next) {
   try {
     const token = req.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!token) {
-      return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบใหม่' });
+
+    if (token) {
+      const staffSession = staffSessions.get(token);
+      const expiresAt = typeof staffSession === 'number' ? staffSession : staffSession?.expiresAt;
+      if (expiresAt && expiresAt > Date.now()) {
+        req.adoptionStaff = typeof staffSession === 'object' && staffSession?.staff
+          ? staffSession.staff
+          : null;
+        req.adoptionActor = 'adoption_staff';
+        return next();
+      }
+      if (staffSession) staffSessions.delete(token);
     }
 
-    const staffSession = staffSessions.get(token);
-    const expiresAt = typeof staffSession === 'number' ? staffSession : staffSession?.expiresAt;
-    if (expiresAt && expiresAt > Date.now()) {
-      req.adoptionStaff = typeof staffSession === 'object' && staffSession?.staff
-        ? staffSession.staff
-        : null;
-      req.adoptionActor = 'adoption_staff';
-      return next();
-    }
-    if (staffSession) staffSessions.delete(token);
-
+    // Bearer อาจหมดอายุหลัง backend รีสตาร์ท — resolveCustomerIdentity รองรับ x-owner-id
     const customerSession = await resolveCustomerIdentity(req);
     if (customerSession?.user?.role === 'admin' && customerSession.user.active !== false) {
       req.customer = customerSession.user;
@@ -82,7 +82,11 @@ async function requireAdoptionOps(req, res, next) {
       return next();
     }
 
-    return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบแอดมินโรงแรมหรือพนักงานหาบ้านใหม่' });
+    return res.status(401).json({
+      error: token
+        ? 'กรุณาเข้าสู่ระบบแอดมินโรงแรมหรือพนักงานหาบ้านใหม่'
+        : 'กรุณาเข้าสู่ระบบใหม่',
+    });
   } catch (error) {
     return next(error);
   }

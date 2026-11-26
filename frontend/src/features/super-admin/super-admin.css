@@ -571,7 +571,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
 }
 
@@ -581,6 +581,103 @@
   border-radius: 10px;
   padding: 0.45rem 0.7rem;
   min-width: 180px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.sa-toolbar__search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.sa-toolbar__btn {
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  padding: 0.45rem 0.85rem;
+  background: #fff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.sa-toolbar__btn:hover {
+  background: #f8fafc;
+}
+
+.sa-toolbar__btn--primary {
+  background: #1b253b;
+  border-color: #1b253b;
+  color: #fff;
+}
+
+.sa-toolbar__btn--primary:hover {
+  background: #283655;
+  border-color: #283655;
+  color: #fff;
+}
+
+.sa-toolbar__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.75rem;
+}
+
+.sa-toolbar__link {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sa-toolbar__link:hover {
+  text-decoration: underline;
+}
+
+.sa-chip--btn {
+  border: 1px solid transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.sa-chip--btn:hover {
+  background: #e2e8f0;
+}
+
+.sa-chip--btn.is-active {
+  background: #1b253b;
+  color: #fff;
+}
+
+.sa-chip--btn.is-active strong {
+  color: #fff;
+}
+
+.sa-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.sa-status.is-on {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.sa-status.is-off {
+  background: #fee2e2;
+  color: #991b1b;
 }
 
 @media (max-width: 1100px) {

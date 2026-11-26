@@ -369,6 +369,45 @@
   top: 14px;
   box-shadow: 0 0 0 4px rgba(90, 169, 230, 0.18);
 }
+.vet-inner button.tl-item--button {
+  display: block;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.vet-inner button.tl-item--button:focus-visible {
+  outline: 2px solid var(--sky);
+  outline-offset: 2px;
+}
+.vet-inner .text-sky {
+  color: var(--sky-dark);
+}
+.vet-inner .vet-record-detail {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+.vet-inner .vet-record-detail__row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  background: var(--cloud);
+}
+.vet-inner .vet-record-detail__row dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.vet-inner .vet-record-detail__row dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 /* ---------- Contact card ---------- */
 .vet-inner .vet-contact {

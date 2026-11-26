@@ -37,7 +37,7 @@ export const ROLE_LABELS = {
   find_home: 'หาบ้าน',
   adoption_staff: 'พนักงานหาบ้านสัตว์',
   veterinarian: 'สัตวแพทย์ (คลินิก)',
-  medical_assistant: 'แอดมินคลินิก',
+  medical_assistant: 'ผู้ช่วยสัตวแพทย์',
   clinic_admin: 'แอดมินคลินิก',
 };
 

@@ -7,13 +7,8 @@ import { buildCautionSummary } from '../components/PatientNameLink.jsx';
 import { CAUTION_FLAGS } from '../data/constants.js';
 import { usePatients } from '../data/usePatients.js';
 
-function hasCaution(patient) {
-  return (patient.flags?.length ?? 0) > 0 || Boolean(patient.allergies);
-}
-
 /**
- * Patients — Role: Medical Assistant
- * Owner: เอิร์ท
+ * Patients — Role: Clinic Admin / Medical Assistant
  */
 export default function PatientsPage() {
   const { patients, loading, error, reload } = usePatients();
@@ -25,17 +20,12 @@ export default function PatientsPage() {
   const [query, setQuery] = useState('');
 
   const counts = useMemo(() => {
-    let caution = 0;
     let upcoming = 0;
-
     for (const p of patients) {
-      if (hasCaution(p)) caution += 1;
       if (p.nextAppointment) upcoming += 1;
     }
-
     return {
       all: patients.length,
-      caution,
       upcoming,
     };
   }, [patients]);
@@ -44,7 +34,6 @@ export default function PatientsPage() {
     const q = query.trim().toLowerCase();
 
     const list = patients.filter((p) => {
-      if (tab === 'caution' && !hasCaution(p)) return false;
       if (tab === 'upcoming' && !p.nextAppointment) return false;
       if (speciesFilter !== 'all' && p.species !== speciesFilter) return false;
 
@@ -87,16 +76,15 @@ export default function PatientsPage() {
 
   const tabs = [
     { id: 'all', label: 'ทั้งหมด', count: counts.all },
-    { id: 'caution', label: 'มีข้อควรระวัง', count: counts.caution },
     { id: 'upcoming', label: 'มีนัดถัดไป', count: counts.upcoming },
   ];
 
   return (
-    <section>
+    <section className="ca-patients">
       <div className="page-head">
         <div>
           <h1>สัตว์เลี้ยง</h1>
-          <p>ค้นหาสัตว์เลี้ยง ดูประวัติการรักษา ข้อควรระวัง และบันทึกภายในก่อนเข้าตรวจ</p>
+          <p>ค้นหาสัตว์เลี้ยง ดูประวัติการรักษา และบันทึกภายในก่อนเข้าตรวจ</p>
         </div>
         <button type="button" className="btn btn-soft" disabled={loading} onClick={reload}>
           <i className="bi bi-arrow-clockwise me-1" />
@@ -108,38 +96,25 @@ export default function PatientsPage() {
 
       {!blockedByState && (
         <>
-          <div className="row g-2 g-md-3 mb-4">
-            <div className="col-4">
-              <div className="stat">
-                <span className="tag sky ma-stat-icon" aria-hidden="true">
-                  <i className="bi bi-clipboard2-heart" />
-                </span>
-                <div className="num">{counts.all}</div>
-                <div className="small text-muted">สัตว์เลี้ยงทั้งหมด</div>
-              </div>
+          <div className="ca-stat-grid ca-stat-grid--two mb-4">
+            <div className="stat">
+              <span className="ca-stat-icon" aria-hidden="true">
+                <i className="bi bi-clipboard2-heart" />
+              </span>
+              <div className="num">{counts.all}</div>
+              <div className="small text-muted">สัตว์เลี้ยงทั้งหมด</div>
             </div>
-            <div className="col-4">
-              <div className="stat">
-                <span className="tag warn ma-stat-icon" aria-hidden="true">
-                  <i className="bi bi-exclamation-triangle" />
-                </span>
-                <div className="num">{counts.caution}</div>
-                <div className="small text-muted">มีข้อควรระวัง</div>
-              </div>
-            </div>
-            <div className="col-4">
-              <div className="stat">
-                <span className="tag ok ma-stat-icon" aria-hidden="true">
-                  <i className="bi bi-calendar2-check" />
-                </span>
-                <div className="num">{counts.upcoming}</div>
-                <div className="small text-muted">มีนัดถัดไป</div>
-              </div>
+            <div className="stat">
+              <span className="ca-stat-icon" aria-hidden="true">
+                <i className="bi bi-calendar2-check" />
+              </span>
+              <div className="num">{counts.upcoming}</div>
+              <div className="small text-muted">มีนัดถัดไป</div>
             </div>
           </div>
 
-          <div className="card-soft mb-4">
-            <div className="pill-tabs ma-status-tabs mb-3" role="tablist" aria-label="หมวดหมู่สัตว์เลี้ยง">
+          <div className="card-soft ca-patients-board">
+            <div className="pill-tabs ca-scroll-tabs mb-3" role="tablist" aria-label="หมวดหมู่สัตว์เลี้ยง">
               {tabs.map((t) => (
                 <button
                   key={t.id}
@@ -155,8 +130,8 @@ export default function PatientsPage() {
               ))}
             </div>
 
-            <div className="ma-filter-bar">
-              <div className="input-group ma-search-group">
+            <div className="ca-filter-bar">
+              <div className="input-group ca-search-group">
                 <span className="input-group-text">
                   <i className="bi bi-search" />
                 </span>
@@ -171,7 +146,7 @@ export default function PatientsPage() {
               </div>
 
               <select
-                className="form-select w-auto"
+                className="form-select ca-patients-select"
                 aria-label="กรองตามชนิดสัตว์"
                 value={speciesFilter}
                 onChange={(e) => setSpeciesFilter(e.target.value)}
@@ -185,7 +160,7 @@ export default function PatientsPage() {
               </select>
 
               <select
-                className="form-select w-auto"
+                className="form-select ca-patients-select"
                 aria-label="เรียงลำดับสัตว์เลี้ยง"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -201,10 +176,16 @@ export default function PatientsPage() {
                 </button>
               )}
             </div>
-          </div>
 
-          {filtered.length === 0 ? (
-            <div className="card-soft">
+            <div className="ca-patients-board__head">
+              <div className="section-label mb-0">
+                <i className="bi bi-clipboard2-heart" />
+                รายการสัตว์เลี้ยง
+                <span className="ca-patients-board__count">{filtered.length} รายการ</span>
+              </div>
+            </div>
+
+            {filtered.length === 0 ? (
               <div className="empty-box">
                 <i className="bi bi-search" />
                 <div>
@@ -218,18 +199,17 @@ export default function PatientsPage() {
                   </button>
                 )}
               </div>
-            </div>
-          ) : (
-            <div className="row g-3">
-              {filtered.map((p) => {
-                const sp = speciesOf(p.species);
-                const flags = p.flags ?? [];
-                const cautionText = buildCautionSummary(flags, p.allergies);
+            ) : (
+              <div className="ca-patients-list">
+                {filtered.map((p) => {
+                  const sp = speciesOf(p.species);
+                  const flags = p.flags ?? [];
+                  const cautionText = buildCautionSummary(flags, p.allergies);
 
-                return (
-                  <div className="col-12 col-lg-6" key={p.id}>
-                    <div
-                      className="card-soft ma-queue-card ma-clickable-row h-100 d-flex flex-column"
+                  return (
+                    <article
+                      className="ca-patient-row"
+                      key={p.id}
                       role="button"
                       tabIndex={0}
                       onClick={() => openDetail(p.id)}
@@ -240,82 +220,86 @@ export default function PatientsPage() {
                         }
                       }}
                     >
-                      <div className="d-flex justify-content-between align-items-start gap-2 mb-2">
-                        <div className="d-flex align-items-center gap-2" style={{ minWidth: 0 }}>
-                          <PetPhoto pet={{ name: p.name, species: p.species }} size="xs" />
-                          <div style={{ minWidth: 0 }}>
-                            <div className="mitr fs-5 lh-sm d-flex align-items-center gap-1">
-                              <span className="text-truncate">{p.name}</span>
-                              {cautionText && (
-                                <span
-                                  className="ma-caution-icon"
-                                  title={`ข้อควรระวัง: ${cautionText}`}
-                                >
-                                  <i className="bi bi-exclamation-triangle-fill" />
-                                </span>
-                              )}
-                            </div>
-                            <div className="small text-muted">
-                              {sp.emoji} {sp.label}
-                              {p.breed ? ` · ${p.breed}` : ''}
-                            </div>
+                      <div className="ca-patient-row__identity">
+                        <PetPhoto pet={{ name: p.name, species: p.species }} size="xs" />
+                        <div className="ca-patient-row__who">
+                          <div className="ca-patient-row__name">
+                            <span>{p.name}</span>
+                            {cautionText && (
+                              <span
+                                className="ca-patient-row__caution"
+                                title={`ข้อควรระวัง: ${cautionText}`}
+                              >
+                                <i className="bi bi-exclamation-triangle-fill" />
+                              </span>
+                            )}
+                          </div>
+                          <div className="ca-patient-row__meta">
+                            {sp.emoji} {sp.label}
+                            {p.breed ? ` · ${p.breed}` : ''}
                           </div>
                         </div>
-
-                        <span className="tag sky m-0 flex-shrink-0">
-                          มาตรวจ {p.visitCount ?? 0} ครั้ง
-                        </span>
                       </div>
 
-                      <div className="small d-grid gap-1 mb-2">
-                        <div className="text-muted">
-                          <i className="bi bi-person me-1 text-sky" />
-                          {p.ownerName || '—'} · {p.ownerPhone || '—'}
-                        </div>
-                        <div className="text-muted">
-                          <i className="bi bi-clock-history me-1 text-sky" />
-                          ครั้งล่าสุด: {p.lastVisit ? formatDate(p.lastVisit) : 'ยังไม่เคยมาตรวจ'}
+                      <div className="ca-patient-row__facts">
+                        <div>
+                          <i className="bi bi-person" aria-hidden="true" />
+                          <span>
+                            {p.ownerName || '—'}
+                            {p.ownerPhone ? ` · ${p.ownerPhone}` : ''}
+                          </span>
                         </div>
                         <div>
-                          <i className="bi bi-calendar2-check me-1 text-sky" />
-                          นัดถัดไป:{' '}
-                          {p.nextAppointment ? (
-                            <span className="fw-medium">
-                              {formatDate(p.nextAppointment.date)} · {p.nextAppointment.time} น.
-                              {p.nextAppointment.vet ? ` (${p.nextAppointment.vet})` : ''}
-                            </span>
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
+                          <i className="bi bi-clock-history" aria-hidden="true" />
+                          <span>
+                            ครั้งล่าสุด: {p.lastVisit ? formatDate(p.lastVisit) : 'ยังไม่เคยมาตรวจ'}
+                          </span>
+                        </div>
+                        <div>
+                          <i className="bi bi-calendar2-check" aria-hidden="true" />
+                          <span>
+                            นัดถัดไป:{' '}
+                            {p.nextAppointment ? (
+                              <strong>
+                                {formatDate(p.nextAppointment.date)} · {p.nextAppointment.time} น.
+                                {p.nextAppointment.vet ? ` (${p.nextAppointment.vet})` : ''}
+                              </strong>
+                            ) : (
+                              '—'
+                            )}
+                          </span>
                         </div>
                       </div>
 
-                      {(flags.length > 0 || p.allergies) && (
-                        <div className="d-flex flex-wrap gap-1 mt-auto pt-2">
-                          {flags.map((f) => {
-                            const flagMeta = CAUTION_FLAGS[f];
-                            if (!flagMeta) return null;
-                            return (
-                              <span key={f} className={`tag ${flagMeta.tag} m-0`}>
-                                <i className={`bi ${flagMeta.icon} me-1`} />
-                                {flagMeta.label}
+                      <div className="ca-patient-row__aside">
+                        <span className="tag sky m-0">มาตรวจ {p.visitCount ?? 0} ครั้ง</span>
+                        {(flags.length > 0 || p.allergies) && (
+                          <div className="ca-patient-row__flags">
+                            {flags.map((f) => {
+                              const flagMeta = CAUTION_FLAGS[f];
+                              if (!flagMeta) return null;
+                              return (
+                                <span key={f} className={`tag ${flagMeta.tag} m-0`}>
+                                  <i className={`bi ${flagMeta.icon} me-1`} />
+                                  {flagMeta.label}
+                                </span>
+                              );
+                            })}
+                            {p.allergies && !flags.includes('drug_allergy') && (
+                              <span className="tag danger m-0" title={p.allergies}>
+                                <i className="bi bi-capsule me-1" />
+                                แพ้: {p.allergies}
                               </span>
-                            );
-                          })}
-                          {p.allergies && !flags.includes('drug_allergy') && (
-                            <span className="tag danger m-0" title={p.allergies}>
-                              <i className="bi bi-capsule me-1" />
-                              แพ้: {p.allergies}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </>
       )}
     </section>

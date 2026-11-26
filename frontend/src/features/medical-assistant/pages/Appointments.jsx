@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 import { useToast } from '../../../shared/components/Toast.jsx';
 import AppointmentModal from '../components/AppointmentModal.jsx';
-import ConfirmModal from '../components/ConfirmModal.jsx';
+import ConfirmDialog from '../../clinic-admin/components/ConfirmDialog.jsx';
 import MaDataState from '../components/MaDataState.jsx';
 import PatientNameLink from '../components/PatientNameLink.jsx';
 import { apptVetName, isSameVet, vetList } from '../data/clinicMeta.js';
@@ -15,12 +15,20 @@ import {
 import { useAppointments } from '../data/useAppointments.js';
 import { usePatients } from '../data/usePatients.js';
 
+function serviceLines(label) {
+  if (!label) return [];
+  return String(label)
+    .split(/\s*·\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
   const stage = appt.stage;
 
   if (stage === 'pending') {
     return (
-      <div className="ma-actions">
+      <div className="ca-actions ca-appt-actions">
         <span className="small text-muted">รอระบบยืนยันอัตโนมัติจากการจอง/โอน</span>
       </div>
     );
@@ -30,14 +38,14 @@ function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
     const isToday = appt.date === todayKey;
     const isPast = appt.date < todayKey;
     return (
-      <div className="ma-actions">
+      <div className="ca-actions ca-appt-actions">
         {isToday && (
           <button
             type="button"
             className="btn btn-sky btn-sm"
             onClick={() => onRequestAction('check_in', appt)}
           >
-            เช็คอิน
+            เช็คอินและส่งเข้าตรวจ
           </button>
         )}
         {(isToday || isPast) && (
@@ -61,8 +69,10 @@ function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
   }
 
   if (stage === 'checked_in') {
+    // เคสเก่าที่เช็คอินแล้วยังไม่ถูกส่งเข้าตรวจ — กดเช็คอินรอบใหม่จะส่งทันที
+    // เหลือทางลัดคัดกรอง / ส่งเข้าตรวจสำรอง
     return (
-      <div className="ma-actions">
+      <div className="ca-actions ca-appt-actions">
         <button
           type="button"
           className="btn btn-sky btn-sm"
@@ -83,7 +93,7 @@ function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
 
   if (stage === 'in_treatment') {
     return (
-      <div className="ma-actions">
+      <div className="ca-actions ca-appt-actions">
         <span className="tag warn m-0">รอหมอปิดเคส</span>
         <Link
           to={`/clinic-admin/appointments?focus=${appt.id}`}
@@ -106,8 +116,10 @@ function buildConfirmConfig(confirmAction) {
     return {
       title: 'ยืนยันการเช็คอิน',
       icon: 'bi-geo-alt',
-      message: `ยืนยันเช็คอิน "${appt.petName}" (เวลานัด ${appt.time} น.) ใช่หรือไม่?`,
-      confirmLabel: 'เช็คอิน',
+      message: 'บันทึกว่าสัตว์เลี้ยงมาถึงแล้ว และส่งเข้าห้องตรวจทันที',
+      detailTitle: appt.petName || '—',
+      detailLines: [`เวลานัด ${appt.time} น.`, appt.ownerName ? `เจ้าของ ${appt.ownerName}` : ''].filter(Boolean),
+      confirmLabel: 'เช็คอินและส่งเข้าตรวจ',
       confirmVariant: 'sky',
     };
   }
@@ -115,7 +127,12 @@ function buildConfirmConfig(confirmAction) {
     return {
       title: 'บันทึกไม่มาตามนัด',
       icon: 'bi-person-x',
-      message: `ยืนยันบันทึกว่า "${appt.petName}" ไม่มาตามนัดวันที่ ${formatDate(appt.date)} เวลา ${appt.time} น. ใช่หรือไม่?`,
+      message: 'ยืนยันบันทึกว่าสัตว์เลี้ยงไม่มาตามเวลานัดนี้',
+      detailTitle: appt.petName || '—',
+      detailLines: [
+        `วันที่ ${formatDate(appt.date)} · ${appt.time} น.`,
+        appt.ownerName ? `เจ้าของ ${appt.ownerName}` : '',
+      ].filter(Boolean),
       confirmLabel: 'ไม่มาตามนัด',
       confirmVariant: 'danger',
     };
@@ -123,7 +140,12 @@ function buildConfirmConfig(confirmAction) {
   return {
     title: 'ส่งสัตว์เลี้ยงเข้าห้องตรวจ',
     icon: 'bi-heart-pulse',
-    message: `ยืนยันส่ง "${appt.petName}" เข้าห้องตรวจกับ ${apptVetName(appt) || 'สัตวแพทย์'} ใช่หรือไม่?`,
+    message: 'ส่งผู้ป่วยเข้าห้องตรวจให้สัตวแพทย์เริ่มดูแล',
+    detailTitle: appt.petName || '—',
+    detailLines: [
+      `สัตวแพทย์ ${apptVetName(appt) || 'ยังไม่ระบุ'}`,
+      `เวลานัด ${appt.time} น.`,
+    ],
     confirmLabel: 'ส่งเข้าห้องตรวจ',
     confirmVariant: 'sky',
   };
@@ -229,7 +251,12 @@ export default function AppointmentsPage() {
     try {
       if (type === 'check_in') {
         await checkIn(appt.id);
-        show(`เช็คอิน "${appt.petName}" แล้ว`);
+        try {
+          await startTreatment(appt.id);
+          show(`เช็คอินและส่ง "${appt.petName}" เข้าห้องตรวจแล้ว`);
+        } catch {
+          show(`เช็คอิน "${appt.petName}" แล้ว แต่ส่งเข้าห้องตรวจไม่สำเร็จ — กดส่งเข้าห้องตรวจอีกครั้ง`);
+        }
       } else if (type === 'no_show') {
         await markNoShow(appt.id);
         show(`บันทึก "${appt.petName}" เป็นไม่มาตามนัดแล้ว`);
@@ -268,7 +295,7 @@ export default function AppointmentsPage() {
   const confirmCfg = buildConfirmConfig(confirmAction);
 
   return (
-    <section>
+    <section className="ca-appointments">
       <div className="page-head">
         <div>
           <h1>นัดหมาย</h1>
@@ -291,49 +318,41 @@ export default function AppointmentsPage() {
 
       {!blockedByState && (
         <>
-          <div className="row g-2 g-md-3 mb-4">
-            <div className="col-6 col-md-3">
-              <div className="stat">
-                <span className="tag sky ma-stat-icon" aria-hidden="true">
-                  <i className="bi bi-calendar2-week" />
-                </span>
-                <div className="num">{stageCounts.all}</div>
-                <div className="small text-muted">ทั้งหมด</div>
-              </div>
+          <div className="ca-stat-grid mb-4">
+            <div className="stat">
+              <span className="ca-stat-icon" aria-hidden="true">
+                <i className="bi bi-calendar2-week" />
+              </span>
+              <div className="num">{stageCounts.all}</div>
+              <div className="small text-muted">ทั้งหมด</div>
             </div>
-            <div className="col-6 col-md-3">
-              <div className="stat">
-                <span className="tag warn ma-stat-icon" aria-hidden="true">
-                  <i className="bi bi-hourglass-split" />
-                </span>
-                <div className="num">{stageCounts.pending}</div>
-                <div className="small text-muted">รอยืนยัน</div>
-              </div>
+            <div className="stat">
+              <span className="ca-stat-icon" aria-hidden="true">
+                <i className="bi bi-hourglass-split" />
+              </span>
+              <div className="num">{stageCounts.pending}</div>
+              <div className="small text-muted">รอยืนยัน</div>
             </div>
-            <div className="col-6 col-md-3">
-              <div className="stat">
-                <span className="tag sky ma-stat-icon" aria-hidden="true">
-                  <i className="bi bi-hospital" />
-                </span>
-                <div className="num">
-                  {(stageCounts.checked_in ?? 0) + (stageCounts.in_treatment ?? 0)}
-                </div>
-                <div className="small text-muted">อยู่ในคลินิก</div>
+            <div className="stat">
+              <span className="ca-stat-icon" aria-hidden="true">
+                <i className="bi bi-hospital" />
+              </span>
+              <div className="num">
+                {(stageCounts.checked_in ?? 0) + (stageCounts.in_treatment ?? 0)}
               </div>
+              <div className="small text-muted">อยู่ในคลินิก</div>
             </div>
-            <div className="col-6 col-md-3">
-              <div className="stat">
-                <span className="tag ok ma-stat-icon" aria-hidden="true">
-                  <i className="bi bi-check2-circle" />
-                </span>
-                <div className="num">{stageCounts.completed}</div>
-                <div className="small text-muted">เสร็จสิ้น</div>
-              </div>
+            <div className="stat">
+              <span className="ca-stat-icon" aria-hidden="true">
+                <i className="bi bi-check2-circle" />
+              </span>
+              <div className="num">{stageCounts.completed}</div>
+              <div className="small text-muted">เสร็จสิ้น</div>
             </div>
           </div>
 
-          <div className="card-soft mb-4">
-            <div className="ma-filter-bar mb-3">
+          <div className="card-soft ca-appt-board">
+            <div className="ca-filter-bar mb-3">
               <div className="pill-tabs mb-0" role="group" aria-label="เลือกวัน">
                 {dateTabs.map((d) => (
                   <button
@@ -349,14 +368,14 @@ export default function AppointmentsPage() {
 
               <input
                 type="date"
-                className="form-control w-auto"
+                className="form-control ca-appt-date"
                 aria-label="เลือกวันที่"
                 value={selectedDate}
                 onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
               />
 
               <select
-                className="form-select w-auto"
+                className="form-select ca-appt-vet-filter"
                 aria-label="กรองตามสัตวแพทย์"
                 value={vetFilter}
                 onChange={(e) => setVetFilter(e.target.value)}
@@ -372,7 +391,7 @@ export default function AppointmentsPage() {
                 })}
               </select>
 
-              <div className="input-group ma-search-group">
+              <div className="input-group ca-search-group">
                 <span className="input-group-text">
                   <i className="bi bi-search" />
                 </span>
@@ -387,7 +406,7 @@ export default function AppointmentsPage() {
               </div>
             </div>
 
-            <div className="pill-tabs ma-status-tabs mb-0" role="group" aria-label="กรองตามสถานะ">
+            <div className="pill-tabs ca-scroll-tabs mb-0" role="group" aria-label="กรองตามสถานะ">
               <button
                 type="button"
                 className={stageFilter === 'all' ? 'active' : ''}
@@ -408,13 +427,12 @@ export default function AppointmentsPage() {
                 </button>
               ))}
             </div>
-          </div>
 
-          <div className="card-soft">
-            <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div className="ca-appt-board__head">
               <div className="section-label mb-0">
                 <i className="bi bi-calendar2-week" />
-                ตารางนัดวันที่ {formatDate(selectedDate)} ({filtered.length} รายการ)
+                ตารางนัดวันที่ {formatDate(selectedDate)}
+                <span className="ca-appt-board__count">{filtered.length} รายการ</span>
               </div>
               {hasActiveFilter && (
                 <button type="button" className="btn btn-soft btn-sm" onClick={clearFilters}>
@@ -441,8 +459,17 @@ export default function AppointmentsPage() {
               </div>
             ) : (
               <>
-                <div className="d-none d-md-block table-responsive">
-                  <table className="ma-table">
+                <div className="d-none d-lg-block ca-appt-table-wrap">
+                  <table className="ca-table ca-appt-table">
+                    <colgroup>
+                      <col className="ca-appt-col-time" />
+                      <col className="ca-appt-col-pet" />
+                      <col className="ca-appt-col-owner" />
+                      <col className="ca-appt-col-service" />
+                      <col className="ca-appt-col-vet" />
+                      <col className="ca-appt-col-status" />
+                      <col className="ca-appt-col-actions" />
+                    </colgroup>
                     <thead>
                       <tr>
                         <th>เวลา</th>
@@ -461,17 +488,22 @@ export default function AppointmentsPage() {
                         const pat = patientsById.get(appt.petId);
                         const vetName = apptVetName(appt);
                         const durationMin = appt.visit?.durationMin;
+                        const services = serviceLines(appt.serviceLabel || appt.service);
+                        const note = appt.note || appt.clinicNote;
 
                         return (
                           <tr key={appt.id}>
-                            <td className="text-nowrap">
-                              <div className="fw-medium">{appt.time} น.</div>
-                              <div className="small text-muted">
+                            <td>
+                              <div className="ca-appt-time">
+                                <strong>{appt.time}</strong>
+                                <span>น.</span>
+                              </div>
+                              <div className="ca-appt-duration">
                                 {durationMin ? `${durationMin} นาที` : '—'}
                               </div>
                             </td>
-                            <td className="text-nowrap">
-                              <div className="fw-medium text-nowrap">
+                            <td>
+                              <div className="ca-appt-pet">
                                 <PatientNameLink
                                   petId={appt.petId}
                                   petName={appt.petName}
@@ -479,45 +511,47 @@ export default function AppointmentsPage() {
                                   flags={pat?.flags}
                                   allergies={appt.pet?.allergies ?? pat?.allergies}
                                 />
+                                <span className="ca-appt-meta">{sp.label}</span>
                               </div>
-                              <div className="small text-muted text-nowrap">{sp.label}</div>
                             </td>
                             <td>
-                              <div>{appt.ownerName || '—'}</div>
-                              <div className="small text-muted text-nowrap">
+                              <div className="ca-appt-owner">
+                                <span className="ca-appt-owner__name">{appt.ownerName || '—'}</span>
                                 {appt.ownerPhone ? (
-                                  <a href={`tel:${appt.ownerPhone}`} className="text-decoration-none">
+                                  <a href={`tel:${appt.ownerPhone}`} className="ca-appt-owner__phone">
                                     {appt.ownerPhone}
                                   </a>
                                 ) : (
-                                  '—'
+                                  <span className="ca-appt-meta">—</span>
                                 )}
                               </div>
                             </td>
-                            <td className="ma-service-cell">
-                              <div>{appt.serviceLabel || appt.service}</div>
-                              {appt.closure && (
-                                <div className="mt-1">
-                                  <span className="tag warn m-0">
+                            <td>
+                              <div className="ca-appt-service">
+                                {services.length > 0 ? (
+                                  <ul className="ca-appt-service__list">
+                                    {services.map((line) => (
+                                      <li key={line}>{line}</li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <span className="ca-appt-meta">—</span>
+                                )}
+                                {appt.closure && (
+                                  <span className="tag warn m-0 ca-appt-service__flag">
                                     <i className="bi bi-calendar-x me-1" />
-                                    ตรงวันปิดคลินิก: {appt.closure.reason}
+                                    ปิดคลินิก: {appt.closure.reason}
                                   </span>
-                                </div>
-                              )}
-                              {(appt.note || appt.clinicNote) && (
-                                <div
-                                  className="small text-muted text-truncate d-none d-xl-block"
-                                  style={{ maxWidth: 220 }}
-                                  title={appt.note || appt.clinicNote}
-                                >
-                                  {appt.note || appt.clinicNote}
-                                </div>
-                              )}
+                                )}
+                                {note && (
+                                  <p className="ca-appt-service__note" title={note}>{note}</p>
+                                )}
+                              </div>
                             </td>
-                            <td className="text-nowrap">
-                              <div className="d-flex align-items-center gap-1">
+                            <td>
+                              <div className="ca-appt-vet">
                                 <span
-                                  className={`ma-vet-vis ${appt.visibleToVet ? 'text-sky' : 'text-muted'}`}
+                                  className={`ca-appt-vet__vis ${appt.visibleToVet ? 'is-visible' : ''}`}
                                   title={
                                     appt.visibleToVet
                                       ? 'แสดงในหน้าสัตวแพทย์แล้ว'
@@ -531,15 +565,15 @@ export default function AppointmentsPage() {
                                 >
                                   <i className={`bi ${appt.visibleToVet ? 'bi-eye' : 'bi-eye-slash'}`} />
                                 </span>
-                                <span className="small ma-vet-cell" title={vetName || 'ยังไม่ระบุ'}>
+                                <span title={vetName || 'ยังไม่ระบุ'}>
                                   {vetName || 'ยังไม่ระบุ'}
                                 </span>
                               </div>
                             </td>
-                            <td className="text-nowrap">
+                            <td>
                               <span className={`tag ${st.tag} m-0`}>{st.label}</span>
                             </td>
-                            <td className="text-nowrap">
+                            <td>
                               <StatusActions
                                 appt={appt}
                                 todayKey={todayKey}
@@ -554,63 +588,69 @@ export default function AppointmentsPage() {
                   </table>
                 </div>
 
-                <div className="d-md-none d-grid gap-3">
+                <div className="d-lg-none ca-appt-cards">
                   {filtered.map((appt) => {
                     const sp = speciesOf(appt.petSpecies);
                     const st = STAGE_META[appt.stage] ?? STAGE_META.pending;
                     const pat = patientsById.get(appt.petId);
                     const vetName = apptVetName(appt);
                     const durationMin = appt.visit?.durationMin;
+                    const services = serviceLines(appt.serviceLabel || appt.service);
 
                     return (
-                      <div className="record-row mb-0 pb-3" key={appt.id}>
-                        <div className="d-flex justify-content-between align-items-center gap-2 mb-2">
-                          <div className="mitr">
-                            {appt.time} น.{' '}
-                            {durationMin && (
-                              <span className="small text-muted fw-normal">({durationMin} นาที)</span>
-                            )}
+                      <article className="ca-appt-card" key={appt.id}>
+                        <header className="ca-appt-card__head">
+                          <div className="ca-appt-time">
+                            <strong>{appt.time}</strong>
+                            <span>น.</span>
+                            {durationMin ? (
+                              <span className="ca-appt-duration">· {durationMin} นาที</span>
+                            ) : null}
                           </div>
                           <span className={`tag ${st.tag} m-0`}>{st.label}</span>
-                        </div>
+                        </header>
+
                         {appt.closure && (
-                          <div className="mb-2">
-                            <span className="tag warn m-0">
-                              <i className="bi bi-calendar-x me-1" />
-                              ตรงวันปิดคลินิก: {appt.closure.reason}
-                            </span>
-                          </div>
+                          <span className="tag warn m-0 ca-appt-service__flag">
+                            <i className="bi bi-calendar-x me-1" />
+                            ปิดคลินิก: {appt.closure.reason}
+                          </span>
                         )}
 
-                        <div className="fw-medium mb-1">
+                        <div className="ca-appt-pet">
                           <PatientNameLink
                             petId={appt.petId}
                             petName={appt.petName}
                             petSpecies={appt.petSpecies}
                             flags={pat?.flags}
                             allergies={appt.pet?.allergies ?? pat?.allergies}
-                          />{' '}
-                          <span className="small text-muted fw-normal">· {sp.label}</span>
+                          />
+                          <span className="ca-appt-meta">{sp.label}</span>
                         </div>
 
-                        <div className="small text-muted mb-1">
-                          <i className="bi bi-person me-1" />
-                          {appt.ownerName || '—'} ·{' '}
+                        <div className="ca-appt-owner">
+                          <span className="ca-appt-owner__name">
+                            <i className="bi bi-person me-1" aria-hidden="true" />
+                            {appt.ownerName || '—'}
+                          </span>
                           {appt.ownerPhone ? (
-                            <a href={`tel:${appt.ownerPhone}`} className="text-decoration-none">
+                            <a href={`tel:${appt.ownerPhone}`} className="ca-appt-owner__phone">
                               {appt.ownerPhone}
                             </a>
-                          ) : (
-                            '—'
-                          )}
+                          ) : null}
                         </div>
-                        <div className="small mb-1 d-flex align-items-center flex-wrap gap-1">
-                          <i className="bi bi-clipboard2-pulse text-sky" />
-                          <span>
-                            {appt.serviceLabel || appt.service} · {vetName || 'ยังไม่ระบุหมอ'}
-                          </span>
+
+                        <div className="ca-appt-service">
+                          <ul className="ca-appt-service__list">
+                            {services.map((line) => (
+                              <li key={line}>{line}</li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="ca-appt-vet">
                           <span
-                            className={`ma-vet-vis ms-1 ${appt.visibleToVet ? 'text-sky' : 'text-muted'}`}
+                            className={`ca-appt-vet__vis ${appt.visibleToVet ? 'is-visible' : ''}`}
                             title={
                               appt.visibleToVet
                                 ? 'แสดงในหน้าสัตวแพทย์แล้ว'
@@ -619,20 +659,22 @@ export default function AppointmentsPage() {
                           >
                             <i className={`bi ${appt.visibleToVet ? 'bi-eye' : 'bi-eye-slash'}`} />
                           </span>
+                          <span>{vetName || 'ยังไม่ระบุหมอ'}</span>
                         </div>
+
                         {appt.note && (
-                          <div className="small text-muted mb-2">อาการ/หมายเหตุ: {appt.note}</div>
+                          <p className="ca-appt-service__note">อาการ/หมายเหตุ: {appt.note}</p>
                         )}
 
-                        <div className="mt-2 pt-2" style={{ borderTop: '1px solid var(--baby)' }}>
+                        <footer className="ca-appt-card__actions">
                           <StatusActions
                             appt={appt}
                             todayKey={todayKey}
                             onRequestAction={openConfirm}
                             onReschedule={setRescheduleTarget}
                           />
-                        </div>
-                      </div>
+                        </footer>
+                      </article>
                     );
                   })}
                 </div>
@@ -651,11 +693,13 @@ export default function AppointmentsPage() {
         onReschedule={handleRescheduleSave}
       />
 
-      <ConfirmModal
+      <ConfirmDialog
         open={Boolean(confirmAction)}
         title={confirmCfg?.title}
         icon={confirmCfg?.icon}
         message={confirmCfg?.message}
+        detailTitle={confirmCfg?.detailTitle}
+        detailLines={confirmCfg?.detailLines}
         confirmLabel={confirmCfg?.confirmLabel}
         cancelLabel="ยกเลิก"
         confirmVariant={confirmCfg?.confirmVariant}

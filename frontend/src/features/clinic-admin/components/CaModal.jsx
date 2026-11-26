@@ -9,6 +9,7 @@ export default function CaModal({
   onClose,
   children,
   footer = null,
+  size = '',
 }) {
   const titleId = useId();
 
@@ -23,6 +24,13 @@ export default function CaModal({
 
   if (!open) return null;
 
+  const dialogClass = [
+    'modal-dialog',
+    'modal-dialog-centered',
+    size === 'sm' ? 'modal-sm' : '',
+    size === 'lg' ? 'modal-lg' : '',
+  ].filter(Boolean).join(' ');
+
   return (
     <>
       <div
@@ -33,9 +41,9 @@ export default function CaModal({
         aria-labelledby={titleId}
         onClick={() => !submitting && onClose()}
       >
-        <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
+        <div className={dialogClass} onClick={(e) => e.stopPropagation()}>
           <div className="modal-content ca-modal-card">
-            <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <div className="ca-modal-card__head">
               <div id={titleId} className="section-label mb-0">
                 <i className={`bi ${icon}`} aria-hidden="true" />
                 <span>{title}</span>
@@ -56,9 +64,9 @@ export default function CaModal({
               </div>
             )}
 
-            <div>{children}</div>
+            <div className="ca-modal-card__body">{children}</div>
 
-            {footer && <div className="d-flex justify-content-end gap-2 mt-3">{footer}</div>}
+            {footer ? <div className="ca-modal-card__footer">{footer}</div> : null}
           </div>
         </div>
       </div>

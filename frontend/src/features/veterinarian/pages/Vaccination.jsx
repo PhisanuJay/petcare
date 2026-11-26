@@ -253,12 +253,28 @@ function VaccineHistory({ vaccines, onEdit, editingId }) {
   );
 }
 
+function petsMatchingName(owners, q) {
+  if (!q) return [];
+  const hits = [];
+  for (const o of owners) {
+    for (const p of o.pets ?? []) {
+      const name = (p.name || '').toLowerCase();
+      if (!name.includes(q)) continue;
+      hits.push({ pet: p, owner: o });
+    }
+  }
+  return hits.sort((a, b) => (a.pet.name || '').localeCompare(b.pet.name || '', 'th'));
+}
+
 /** Step 1: pick the customer. Step 2: pick one of that customer's pets. */
 function PatientPicker({ owners, loading, onSelect, startOwnerId = '' }) {
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [ownerId, setOwnerId] = useState(startOwnerId);
-  const q = query.trim().toLowerCase();
+  const q = appliedQuery.trim().toLowerCase();
   const owner = owners.find((o) => o.id === ownerId) ?? null;
+  const petHits = petsMatchingName(owners, q);
+  const petNameSearch = petHits.length > 0;
   const shown = owners.filter(
     (o) =>
       !q ||
@@ -266,6 +282,18 @@ function PatientPicker({ owners, loading, onSelect, startOwnerId = '' }) {
         v?.toLowerCase().includes(q),
       ),
   );
+
+  function runSearch(event) {
+    event?.preventDefault?.();
+    setAppliedQuery(query.trim());
+    setOwnerId('');
+  }
+
+  function clearSearch() {
+    setQuery('');
+    setAppliedQuery('');
+  }
+
   return (
     <div className="card-soft">
       {loading ? (
@@ -305,13 +333,52 @@ function PatientPicker({ owners, loading, onSelect, startOwnerId = '' }) {
             <i className="bi bi-search" />
             เลือกลูกค้า
           </div>
-          <input
-            className="form-control mb-3"
-            placeholder="ค้นหาชื่อลูกค้า / เบอร์โทร / ชื่อสัตว์เลี้ยง"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          {shown.length === 0 ? (
+          <form className="mb-3" onSubmit={runSearch}>
+            <div className="input-group">
+              <input
+                className="form-control"
+                placeholder="ค้นหาชื่อลูกค้า / เบอร์โทร / ชื่อสัตว์เลี้ยง"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="ค้นหาลูกค้า"
+              />
+              {appliedQuery ? (
+                <button type="button" className="btn btn-soft" onClick={clearSearch}>
+                  ล้าง
+                </button>
+              ) : null}
+              <button type="submit" className="btn btn-sky">
+                ค้นหา
+              </button>
+            </div>
+          </form>
+          {petNameSearch ? (
+            <>
+              <div className="section-label mb-2">
+                <i className="bi bi-heart" />
+                สัตว์เลี้ยงที่ตรงกับ “{appliedQuery.trim()}” ({petHits.length})
+              </div>
+              <div className="d-grid gap-2 mb-3">
+                {petHits.map(({ pet: p, owner: o }) => {
+                  const species = speciesOf(p.species);
+                  return (
+                    <button type="button" key={p.id} className="vet-person" onClick={() => onSelect(p.id)}>
+                      <span className="person-avatar pet" aria-hidden="true">{species.emoji}</span>
+                      <span className="person-body">
+                        <span className="fw-medium d-block">{p.name}</span>
+                        <span className="small text-muted d-block">
+                          {species.label}
+                          {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+                        </span>
+                        <span className="small text-muted d-block">เจ้าของ {o.name || 'ไม่ทราบชื่อลูกค้า'}</span>
+                      </span>
+                      <i className="bi bi-chevron-right person-go" />
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : shown.length === 0 ? (
             <div className="empty-box py-3">ไม่พบลูกค้า</div>
           ) : (
             <div className="d-grid gap-2">

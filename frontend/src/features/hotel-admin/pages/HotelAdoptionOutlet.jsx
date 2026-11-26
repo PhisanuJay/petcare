@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
-import { setAdoptionOpsBearer } from '../../adoption/api.js';
+import { ROLES } from '../../auth/roles.js';
+import { setAdoptionOpsActorId, setAdoptionOpsBearer } from '../../adoption/api.js';
 import '../../adoption/adoptionStaff.css';
 
 const TABS = [
@@ -12,15 +13,28 @@ const TABS = [
 ];
 
 /**
- * โต๊ะหาบ้านใน Hotel Admin — ใช้ Bearer ของแอดมินโรงแรมเรียก /api/adoption/staff/*
+ * โต๊ะหาบ้านใน Hotel Admin — ใช้ Bearer + x-owner-id ของแอดมินโรงแรม
+ * (x-owner-id สำคัญเมื่อ backend รีสตาร์ทแล้ว in-memory Bearer หาย)
  */
 export default function HotelAdoptionOutlet() {
-  const { authToken } = useAuth();
+  const { authToken, currentUser } = useAuth();
+  const token = typeof authToken === 'string' ? authToken : '';
+  const actorId = currentUser?.role === ROLES.admin && currentUser?.id
+    ? String(currentUser.id)
+    : '';
+
+  // เซ็ตก่อน child useEffect เพื่อไม่ให้ fetch แรกไม่มี credentials
+  setAdoptionOpsBearer(token);
+  setAdoptionOpsActorId(actorId);
 
   useEffect(() => {
-    setAdoptionOpsBearer(authToken);
-    return () => setAdoptionOpsBearer('');
-  }, [authToken]);
+    setAdoptionOpsBearer(token);
+    setAdoptionOpsActorId(actorId);
+    return () => {
+      setAdoptionOpsBearer('');
+      setAdoptionOpsActorId('');
+    };
+  }, [token, actorId]);
 
   return (
     <div className="hotel-adoption-ops">

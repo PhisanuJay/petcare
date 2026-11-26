@@ -8,7 +8,6 @@ import {
   WEEKDAYS_TH,
   addDays,
   daysBetweenInclusive,
-  formatDurationMinutes,
   formatThaiDate,
   formatThaiDateTime,
   monthStartKey,
@@ -217,7 +216,7 @@ export default function Reports() {
           {data && (
             <div className="d-grid gap-4">
               {/* Summary Stat Cards */}
-              <div className="ca-stat-grid">
+              <div className="ca-stat-grid ca-stat-grid--two">
                 <div className="stat">
                   <div className="ca-stat-icon">
                     <i className="bi bi-calendar2-week" aria-hidden="true" />
@@ -232,32 +231,8 @@ export default function Reports() {
                   </div>
                   <div className="num">{((data.noShowRate ?? 0) * 100).toFixed(1)}%</div>
                   <div className="small text-muted">อัตราไม่มาตามนัด</div>
-                  <div className="small text-muted">คิดจาก เสร็จสิ้น + ไม่มา</div>
+                  
                 </div>
-
-                <div className="stat">
-                  <div className="ca-stat-icon">
-                    <i className="bi bi-stopwatch" aria-hidden="true" />
-                  </div>
-                  {data.maResponse?.count > 0 ? (
-                    <>
-                      <div className="num fs-4">
-                        {formatDurationMinutes(data.maResponse.avgMinutes)}
-                      </div>
-                      <div className="small text-muted">เวลาตอบคำขอของผู้ช่วยฯ</div>
-                      <div className="small text-muted">
-                        มัธยฐาน {formatDurationMinutes(data.maResponse.medianMinutes)} (
-                        {data.maResponse.count} รายการ)
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="num fs-5">ยังไม่มีข้อมูล</div>
-                      <div className="small text-muted">เวลาตอบคำขอของผู้ช่วยฯ</div>
-                    </>
-                  )}
-                </div>
-
               </div>
 
               {/* Bar Charts */}

@@ -34,14 +34,6 @@ export default function TransportDashboard() {
     (booking) => booking.paymentStatus === 'paid' && booking.status !== 'cancelled',
   );
   const received = paidBookings.reduce((sum, booking) => sum + bookingTotal(booking), 0);
-  const unpaidAmount = bookings
-    .filter((booking) =>
-      booking.paymentStatus !== 'paid'
-      && booking.status !== 'cancelled'
-      && booking.status !== 'completed'
-      && booking.quote,
-    )
-    .reduce((sum, booking) => sum + bookingTotal(booking), 0);
 
   const now = new Date();
   const months = Array.from({ length: 6 }, (_, index) => {
@@ -119,16 +111,6 @@ export default function TransportDashboard() {
             <span>ยอดรับชำระแล้ว</span>
             <strong>{loading ? '—' : baht(received)}</strong>
             <small>{loading ? 'กำลังโหลดข้อมูล' : `${paidBookings.length} รายการ`}</small>
-          </div>
-        </article>
-        <article className="admin-dashboard__stat">
-          <div className="admin-dashboard__stat-icon" aria-hidden="true">
-            <i className="bi bi-hourglass-split" />
-          </div>
-          <div className="admin-dashboard__stat-copy">
-            <span>มูลค่างานที่ยังไม่รับชำระ</span>
-            <strong>{loading ? '—' : baht(unpaidAmount)}</strong>
-            <small>คำนวณจากยอดประเมินล่าสุด</small>
           </div>
         </article>
         <article className="admin-dashboard__stat">

@@ -1,6 +1,9 @@
 /* PetCare Driver — match Super Admin theme-admin */
 
-.driver-shell.app-shell {
+/* Vars live on page root too: driver now renders inside StaffWorkspace, not only .driver-shell */
+.driver-shell.app-shell,
+.driver-page,
+.dv-light {
   --dv-sky: #76b5ff;
   --dv-sky-dark: #4a8ff0;
   --dv-cream: #f0f7ff;
@@ -12,7 +15,9 @@
   --dv-gap: 10px;
   --dv-radius: 24px;
   --dv-shadow: 0 10px 30px rgba(58, 74, 92, 0.08);
+}
 
+.driver-shell.app-shell {
   color: var(--dv-ink);
   font-family: Prompt, Inter, sans-serif;
   line-height: 1.5;
@@ -20,6 +25,10 @@
     radial-gradient(700px 420px at 0% 0%, rgba(214, 232, 255, 0.85) 0%, transparent 55%),
     radial-gradient(560px 360px at 100% 100%, rgba(118, 181, 255, 0.18) 0%, transparent 50%),
     var(--dv-cream);
+}
+
+.driver-page {
+  color: var(--dv-ink);
 }
 
 .driver-shell--side.app-shell {
@@ -488,7 +497,7 @@ button.dv-date--picker:hover {
   border-radius: 999px;
   padding: 7px 14px;
   background: transparent;
-  color: var(--dv-muted);
+  color: var(--dv-muted, #7a8a9a);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 500;
@@ -499,26 +508,26 @@ button.dv-date--picker:hover {
   margin-left: 4px;
   padding: 1px 7px;
   border-radius: 999px;
-  background: var(--dv-mist);
-  color: var(--dv-sky-dark);
+  background: var(--dv-mist, #d6e8ff);
+  color: var(--dv-sky-dark, #4a8ff0);
   font-weight: 600;
   font-size: 0.75rem;
 }
 
 .dv-tabs button:hover:not(.is-active) {
-  color: var(--dv-ink);
-  background: var(--dv-cream);
+  color: var(--dv-ink, #3a4a5c);
+  background: var(--dv-cream, #f0f7ff);
 }
 
 .dv-tabs button.is-active {
-  background: var(--dv-sky);
-  color: #fff;
+  background: #4a8ff0;
+  color: #ffffff;
   box-shadow: 0 6px 16px rgba(74, 143, 240, 0.35);
 }
 
 .dv-tabs button.is-active b {
-  background: rgba(255, 255, 255, 0.28);
-  color: #fff;
+  background: #ffffff;
+  color: #4a8ff0;
 }
 
 .dv-jobs {

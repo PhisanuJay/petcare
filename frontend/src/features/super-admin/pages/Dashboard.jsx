@@ -92,11 +92,7 @@ export default function SuperAdminDashboardPage() {
         <div>
           <p className="sa-dash__eyebrow">แผงควบคุมระบบ</p>
           <h1>ต้องจัดการอะไรวันนี้</h1>
-          <p className="sa-dash__lede">
-            สรุปจากข้อมูลจริงทั้ง PetCare
-            {data?.today ? ` · ${formatThaiDate(data.today)}` : ''}
-            {needsAction ? ` · มี ${needsAction} จุดที่ควรดู` : ' · ทุกอย่างสงบ'}
-          </p>
+         
         </div>
         <div className="sa-dash__intro-actions">
           <Link className="sa-btn sa-btn--ghost" to="/super-admin/reports">รายงานเต็ม</Link>

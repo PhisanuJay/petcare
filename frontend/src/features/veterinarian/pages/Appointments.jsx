@@ -3,8 +3,29 @@ import { Link } from 'react-router-dom';
 import { useAppointments } from '../useAppointments.js';
 import VetLayout from '../components/VetLayout.jsx';
 import VetPageHeader from '../components/VetPageHeader.jsx';
+import RecordVisitModal from '../components/RecordVisitModal.jsx';
 import { BOOKING_STATUS, todayString } from '../../pet-owner/bookingOptions.js';
 import { ageText, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
+
+const RECORDED_APPT_KEY = 'petcare.vet.recorded-appointments';
+
+function readRecordedAppointmentIds() {
+  try {
+    const raw = sessionStorage.getItem(RECORDED_APPT_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(list) ? list.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeRecordedAppointmentIds(ids) {
+  try {
+    sessionStorage.setItem(RECORDED_APPT_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 /**
  * Appointments — Role: Veterinarian (มะแอ่ว)
@@ -22,11 +43,11 @@ const vetStatus = (status) => BOOKING_STATUS[status] ?? { label: status, tone: '
 const FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'confirmed', label: 'รอตรวจ' },
-  { value: 'completed', label: 'เสร็จสิ้น' },
   { value: 'other', label: 'ไม่มาตามนัด' },
 ];
 
 const inFilter = (a, filter) => {
+  if (a.status === 'completed') return false;
   if (filter === 'all') return true;
   if (filter === 'other') return a.status === 'no_show';
   return a.status === filter;
@@ -39,15 +60,12 @@ function addDays(dateString, days) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** Where the vet records what was done, depending on the service the owner booked. */
-function recordLink(a) {
-  if (['vaccine', 'vaccine_combo', 'vaccine_rabies'].includes(a.service)) {
-    return `/veterinarian/vaccination?pet=${a.pet.id}`;
-  }
-  if (['parasite', 'deworming', 'flea_prevention'].includes(a.service)) {
-    return `/veterinarian/medical-records?pet=${a.pet.id}&kind=parasite`;
-  }
-  return `/veterinarian/medical-records?pet=${a.pet.id}`;
+function isVaccineService(service) {
+  return ['vaccine', 'vaccine_combo', 'vaccine_rabies'].includes(service);
+}
+
+function isParasiteService(service) {
+  return ['parasite', 'deworming', 'flea_prevention'].includes(service);
 }
 
 const STAGE_LABEL = {
@@ -121,10 +139,20 @@ function PetInfo({ pet, fallbackName }) {
   );
 }
 
-function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
+function AppointmentCard({ appointment: a, showDate, busy, onAction, onRecord, recorded }) {
   const status = vetStatus(a.status);
   const stage = a.status === 'confirmed' ? STAGE_LABEL[a.visit?.stage] : null;
-  const inRoom = a.visit?.stage === 'in_treatment';
+  const visitStage = a.visit?.stage;
+  const inRoom = visitStage === 'in_treatment';
+  const arrived = visitStage === 'checked_in' || visitStage === 'in_treatment';
+  const canRecord = Boolean(a.pet && a.status === 'confirmed' && arrived && !recorded);
+  const vaccine = isVaccineService(a.service);
+  const recordLabel = vaccine
+    ? 'บันทึกการฉีดวัคซีน'
+    : isParasiteService(a.service)
+      ? 'บันทึกการให้ยา'
+      : 'ตรวจและบันทึกการรักษา';
+
   return (
     <div className={`card-soft vet-appt st-${a.status} mb-3`}>
       <div className="d-flex flex-wrap align-items-start gap-3">
@@ -138,6 +166,9 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
             <span className="tag">{a.serviceLabel}</span>
             <span className={`tag ${status.tone}`}>{status.label}</span>
             {stage && <span className={`tag ${stage.tone}`}>{stage.label}</span>}
+            {recorded && a.status === 'confirmed' && (
+              <span className="tag ok">บันทึกแล้ว</span>
+            )}
           </div>
           <PetInfo pet={a.pet} fallbackName={a.petName} />
           {a.note && (
@@ -151,13 +182,19 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
         </div>
 
         <div className="d-flex flex-column gap-2">
-          {['confirmed', 'completed'].includes(a.status) && a.pet && (
-            <Link to={recordLink(a)} className="btn btn-soft btn-sm">
+          {canRecord && vaccine && (
+            <Link to={`/veterinarian/vaccination?pet=${a.pet.id}`} className="btn btn-soft btn-sm">
               <i className="bi bi-journal-plus me-1" />
-              {a.service === 'vaccine' ? 'บันทึกการฉีดวัคซีน' : a.service === 'parasite' ? 'บันทึกการให้ยา' : 'บันทึกการรักษา'}
+              {recordLabel}
             </Link>
           )}
-          {a.status === 'confirmed' && (
+          {canRecord && !vaccine && (
+            <button type="button" className="btn btn-soft btn-sm" onClick={() => onRecord(a)}>
+              <i className="bi bi-journal-plus me-1" />
+              {recordLabel}
+            </button>
+          )}
+          {a.status === 'confirmed' && recorded && (
             <button
               type="button"
               className="btn btn-sky btn-sm"
@@ -176,14 +213,27 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
 
 export default function AppointmentsPage() {
   const [date, setDate] = useState(todayString());
-  const [allDays, setAllDays] = useState(false);
   const [filter, setFilter] = useState('all');
   const [actionError, setActionError] = useState('');
   const [busyId, setBusyId] = useState('');
-  const { appointments, loading, error, reload, setStatus } = useAppointments(allDays ? '' : date);
+  const [recordTarget, setRecordTarget] = useState(null);
+  const [recordNotice, setRecordNotice] = useState('');
+  const [recordedIds, setRecordedIds] = useState(readRecordedAppointmentIds);
+  const { appointments, loading, error, reload, setStatus } = useAppointments(date);
 
-  const shown = appointments.filter((a) => inFilter(a, filter));
-  const count = (f) => appointments.filter((a) => inFilter(a, f)).length;
+  const openAppointments = appointments.filter((a) => a.status !== 'completed');
+  const shown = openAppointments.filter((a) => inFilter(a, filter));
+  const count = (f) => openAppointments.filter((a) => inFilter(a, f)).length;
+
+  function markAppointmentRecorded(appointmentId) {
+    if (!appointmentId) return;
+    setRecordedIds((prev) => {
+      const next = new Set(prev);
+      next.add(String(appointmentId));
+      writeRecordedAppointmentIds(next);
+      return next;
+    });
+  }
 
   async function handleAction(a, status) {
     setBusyId(a.id);
@@ -197,6 +247,13 @@ export default function AppointmentsPage() {
     }
   }
 
+  async function handleRecordSaved() {
+    const appointmentId = recordTarget?.id;
+    setRecordTarget(null);
+    markAppointmentRecorded(appointmentId);
+    setRecordNotice('บันทึกเรียบร้อยแล้ว');
+  }
+
   return (
     <VetLayout>
     <div className="page-wrap">
@@ -204,10 +261,10 @@ export default function AppointmentsPage() {
         <VetPageHeader
           icon="bi-calendar2-check"
           title="นัดหมาย"
-          subtitle="นัดที่แอดมินคลินิกมอบหมายให้คุณ บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ"
+          subtitle="นัดที่แอดมินคลินิกมอบหมายให้คุณ บันทึกการรักษาที่นี่ และปิดเคสเมื่อตรวจเสร็จ"
           stats={[
             { icon: 'bi-hourglass-split', value: count('confirmed'), label: 'รอตรวจ' },
-            { icon: 'bi-check2-all', value: count('completed'), label: 'เสร็จสิ้น' },
+            { icon: 'bi-list-ul', value: count('all'), label: 'นัดที่ยังเปิดอยู่' },
           ]}
         />
 
@@ -216,7 +273,6 @@ export default function AppointmentsPage() {
             <button
               type="button"
               className="btn btn-soft btn-sm"
-              disabled={allDays}
               onClick={() => setDate((d) => addDays(d, -1))}
               aria-label="วันก่อนหน้า"
             >
@@ -227,32 +283,20 @@ export default function AppointmentsPage() {
               className="form-control"
               style={{ maxWidth: 190 }}
               value={date}
-              disabled={allDays}
               onChange={(e) => e.target.value && setDate(e.target.value)}
               aria-label="วันที่"
             />
             <button
               type="button"
               className="btn btn-soft btn-sm"
-              disabled={allDays}
               onClick={() => setDate((d) => addDays(d, 1))}
               aria-label="วันถัดไป"
             >
               <i className="bi bi-chevron-right" />
             </button>
-            <button type="button" className="btn btn-soft btn-sm" disabled={allDays} onClick={() => setDate(todayString())}>
+            <button type="button" className="btn btn-soft btn-sm" onClick={() => setDate(todayString())}>
               วันนี้
             </button>
-            <div className="form-check ms-md-3">
-              <input
-                id="all-days"
-                type="checkbox"
-                className="form-check-input"
-                checked={allDays}
-                onChange={(e) => setAllDays(e.target.checked)}
-              />
-              <label className="form-check-label" htmlFor="all-days">ดูทุกวัน</label>
-            </div>
           </div>
 
           <div className="vet-chips mt-3">
@@ -276,21 +320,42 @@ export default function AppointmentsPage() {
             <button type="button" className="btn btn-sm btn-outline-danger" onClick={reload}>ลองใหม่</button>
           </div>
         )}
+        {recordNotice && (
+          <div className="alert alert-success d-flex align-items-center justify-content-between" role="status">
+            <span>{recordNotice}</span>
+            <button type="button" className="btn btn-sm btn-outline-success" onClick={() => setRecordNotice('')}>
+              ปิด
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="card-soft empty-box">กำลังโหลดข้อมูล...</div>
         ) : shown.length === 0 ? (
           <div className="card-soft empty-box">
             <i className="bi bi-calendar-x" />
-            ไม่มีนัดหมาย{allDays ? '' : `ในวันที่ ${formatDate(date)}`}
+            ไม่มีนัดหมายในวันที่ {formatDate(date)}
           </div>
         ) : (
           shown.map((a) => (
-            <AppointmentCard key={a.id} appointment={a} showDate={allDays} busy={busyId === a.id} onAction={handleAction} />
+            <AppointmentCard
+              key={a.id}
+              appointment={a}
+              busy={busyId === a.id}
+              onAction={handleAction}
+              onRecord={setRecordTarget}
+              recorded={recordedIds.has(String(a.id))}
+            />
           ))
         )}
       </div>
     </div>
+
+    <RecordVisitModal
+      appointment={recordTarget}
+      onClose={() => setRecordTarget(null)}
+      onSaved={handleRecordSaved}
+    />
     </VetLayout>
   );
 }
