@@ -1,5 +1,6 @@
 import { Navigate, Route } from 'react-router-dom';
 import RequireStaff from '../features/auth/RequireStaff.jsx';
+import VeterinarianLayout from '../features/veterinarian/components/VeterinarianLayout.jsx';
 
 import PetOwnerDashboardPage from '../features/pet-owner/pages/Dashboard.jsx';
 import MyPetsPage from '../features/pet-owner/pages/MyPets.jsx';
@@ -27,30 +28,19 @@ import MedicalRecordsPage from '../features/veterinarian/pages/MedicalRecords.js
 import VaccinationPage from '../features/veterinarian/pages/Vaccination.jsx';
 import VetReportsPage from '../features/veterinarian/pages/Reports.jsx';
 
-import MedicalAssistantLayout from '../features/medical-assistant/layout/MedicalAssistantLayout.jsx';
-import MedicalAssistantDashboardPage from '../features/medical-assistant/pages/Dashboard.jsx';
 import MaAppointmentsPage from '../features/medical-assistant/pages/Appointments.jsx';
 import MaPatientsPage from '../features/medical-assistant/pages/Patients.jsx';
 import MaPatientDetailPage from '../features/medical-assistant/pages/PatientDetail.jsx';
-import BookingManagementPage from '../features/medical-assistant/pages/BookingManagement.jsx';
-import MedicalSupportPage from '../features/medical-assistant/pages/MedicalSupport.jsx';
-import SupportCasePage from '../features/medical-assistant/pages/SupportCase.jsx';
 
 import ClinicAdminLayout from '../features/clinic-admin/layout/ClinicAdminLayout.jsx';
 import ClinicAdminOverviewPage from '../features/clinic-admin/pages/Overview.jsx';
 import ClinicAdminStaffPage from '../features/clinic-admin/pages/Staff.jsx';
 import ClinicAdminSchedulePage from '../features/clinic-admin/pages/Schedule.jsx';
 import ClinicAdminSettingsPage from '../features/clinic-admin/pages/Settings.jsx';
+import ClinicAdminServicesPage from '../features/clinic-admin/pages/Services.jsx';
 import ClinicAdminReportsPage from '../features/clinic-admin/pages/Reports.jsx';
 
 import PetProfile from '../features/pet-profile/PetProfile.jsx';
-import PetHotelDashboardPage from '../features/pet-hotel/pages/Dashboard.jsx';
-import RoomsPage from '../features/pet-hotel/pages/Rooms.jsx';
-import ReservationsPage from '../features/pet-hotel/pages/Reservations.jsx';
-import CheckInOutPage from '../features/pet-hotel/pages/CheckInOut.jsx';
-import HotelPetsPage from '../features/pet-hotel/pages/Pets.jsx';
-import CareRecordsPage from '../features/pet-hotel/pages/CareRecords.jsx';
-import HotelCctvPage from '../features/pet-hotel/pages/Cctv.jsx';
 
 import PetTransportDashboardPage from '../features/pet-transport/pages/Dashboard.jsx';
 import AssignedJobsPage from '../features/pet-transport/pages/AssignedJobs.jsx';
@@ -75,7 +65,6 @@ import RequestDetailPage from '../features/adoption/pages/RequestDetail.jsx';
 import AdoptionHistoryPage from '../features/adoption/pages/AdoptionHistory.jsx';
 import AdoptionStaffGate from '../features/adoption/AdoptionStaffGate.jsx';
 import AdoptionStaffLayout from '../features/adoption/AdoptionStaffLayout.jsx';
-import AdoptionStaffLoginPage from '../features/adoption/pages/StaffLogin.jsx';
 
 import AdminDashboardPage from '../features/admin/pages/Dashboard.jsx';
 import AdminUsersPage from '../features/admin/pages/Users.jsx';
@@ -112,7 +101,6 @@ export const petOwnerRoutes = (
 
 export const adminTransportRoutes = (
   <>
-    <Route index element={<Navigate to="transport" replace />} />
     <Route path="transport" element={<AdminTransportLayout />}>
       <Route index element={<TransportDashboard />} />
       <Route path="bookings" element={<BookingManagement />} />
@@ -145,7 +133,7 @@ export const driverTransportRoutes = (
 
 export const adoptionStaffRoutes = (
   <>
-    <Route path="adoption/login" element={<AdoptionStaffLoginPage />} />
+    <Route path="adoption/login" element={<Navigate to="/login?next=/adoption" replace />} />
     <Route element={<AdoptionStaffGate />}>
       <Route path="adoption" element={<AdoptionStaffLayout />}>
         <Route index element={<AdoptionDashboardPage />} />
@@ -162,42 +150,38 @@ export const adoptionStaffRoutes = (
 export const roleRoutes = (
   <>
     <Route path="veterinarian" element={<RequireStaff role="veterinarian" />}>
-      <Route index element={<VeterinarianDashboardPage />} />
-      <Route path="appointments" element={<VetAppointmentsPage />} />
-      <Route path="patients" element={<VetPatientsPage />} />
-      <Route path="medical-records" element={<MedicalRecordsPage />} />
-      <Route path="vaccination" element={<VaccinationPage />} />
-      <Route path="reports" element={<VetReportsPage />} />
-    </Route>
-    <Route path="medical-assistant" element={<RequireStaff role="medical_assistant" />}>
-      <Route element={<MedicalAssistantLayout />}>
-        <Route index element={<MedicalAssistantDashboardPage />} />
-        <Route path="appointments" element={<MaAppointmentsPage />} />
-        <Route path="patients" element={<MaPatientsPage />} />
-        <Route path="patients/:patientId" element={<MaPatientDetailPage />} />
-        <Route path="booking-management" element={<BookingManagementPage />} />
-        <Route path="medical-support" element={<MedicalSupportPage />} />
-        <Route path="medical-support/:appointmentId" element={<SupportCasePage />} />
+      <Route element={<VeterinarianLayout />}>
+        <Route index element={<VeterinarianDashboardPage />} />
+        <Route path="appointments" element={<VetAppointmentsPage />} />
+        <Route path="patients" element={<VetPatientsPage />} />
+        <Route path="medical-records" element={<MedicalRecordsPage />} />
+        <Route path="vaccination" element={<VaccinationPage />} />
+        <Route path="reports" element={<VetReportsPage />} />
       </Route>
     </Route>
-    <Route path="clinic-admin" element={<RequireStaff role="clinic_admin" />}>
+    {/* งานหน้าร้านคลินิกอยู่ใต้แอดมินคลินิก — เลิกมีบทบาทผู้ช่วยฯ แยก */}
+    <Route path="clinic-admin" element={<RequireStaff roles={['clinic_admin', 'medical_assistant']} />}>
       <Route element={<ClinicAdminLayout />}>
         <Route index element={<ClinicAdminOverviewPage />} />
+        <Route path="appointments" element={<MaAppointmentsPage />} />
+        <Route path="booking-management" element={<Navigate to="/clinic-admin/appointments" replace />} />
+        <Route path="patients" element={<MaPatientsPage />} />
+        <Route path="patients/:patientId" element={<MaPatientDetailPage />} />
+        <Route path="medical-support" element={<Navigate to="/clinic-admin/appointments" replace />} />
+        <Route path="medical-support/:appointmentId" element={<Navigate to="/clinic-admin/appointments" replace />} />
+        <Route path="desk" element={<Navigate to="/clinic-admin" replace />} />
         <Route path="staff" element={<ClinicAdminStaffPage />} />
         <Route path="schedule" element={<ClinicAdminSchedulePage />} />
+        <Route path="services" element={<ClinicAdminServicesPage />} />
         <Route path="settings" element={<ClinicAdminSettingsPage />} />
         <Route path="reports" element={<ClinicAdminReportsPage />} />
       </Route>
     </Route>
+    <Route path="medical-assistant" element={<Navigate to="/clinic-admin" replace />} />
+    <Route path="medical-assistant/*" element={<Navigate to="/clinic-admin" replace />} />
     <Route path="pet-profile" element={<PetProfile />} />
-    <Route path="pet-hotel">
-      <Route index element={<PetHotelDashboardPage />} />
-      <Route path="rooms" element={<RoomsPage />} />
-      <Route path="reservations" element={<ReservationsPage />} />
-      <Route path="check-in-out" element={<CheckInOutPage />} />
-      <Route path="pets" element={<HotelPetsPage />} />
-      <Route path="care-records" element={<CareRecordsPage />} />
-      <Route path="cctv" element={<HotelCctvPage />} />
-    </Route>
+    {/* Legacy pet-hotel staff paths → Hotel Admin shell */}
+    <Route path="pet-hotel" element={<Navigate to="/admin/stays" replace />} />
+    <Route path="pet-hotel/*" element={<Navigate to="/admin/stays" replace />} />
   </>
 );

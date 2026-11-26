@@ -177,8 +177,10 @@ export default function Player({ cameraId, mode, tile = false, minimal = false, 
 
   useEffect(() => {
     if (phase !== 'error') return undefined;
-    const wait = tile ? 30000 : attempt === 0 ? 2000 : 0;
-    if (!wait) return undefined;
+    // Auto-retry once slowly — avoid rapid remount flicker when stream is down.
+    if (attempt > 0) return undefined;
+    if (typeof document !== 'undefined' && document.hidden) return undefined;
+    const wait = tile ? 45000 : 8000;
     const timer = window.setTimeout(() => setAttempt((value) => value + 1), wait);
     return () => window.clearTimeout(timer);
   }, [tile, phase, attempt]);

@@ -45,7 +45,8 @@ const router = Router();
 
 backfillVetIds();
 
-const requireMA = requireStaff('medical_assistant');
+/** งานหน้าร้านคลินิก — แอดมินคลินิกทำได้ (เลิกพึ่งบทบาทผู้ช่วยฯ แยก) */
+const requireMA = requireStaff(['clinic_admin', 'medical_assistant']);
 const vetNames = () => listStaff('veterinarian').map((s) => s.name);
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);

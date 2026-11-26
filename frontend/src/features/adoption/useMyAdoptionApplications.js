@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ADOPTION_API_URL } from './api.js';
+import { ADOPTION_API_URL, adoptionCustomerHeaders } from './api.js';
 
-export function useMyAdoptionApplications(authToken) {
+export function useMyAdoptionApplications(authToken, ownerId) {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const reload = useCallback(async () => {
-    if (!authToken) {
+    if (!ownerId && !authToken) {
       setApplications([]);
       return;
     }
@@ -15,7 +15,7 @@ export function useMyAdoptionApplications(authToken) {
     setError('');
     try {
       const response = await fetch(`${ADOPTION_API_URL}/applications/mine`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: adoptionCustomerHeaders(ownerId),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'โหลดคำขอไม่สำเร็จ');
@@ -26,19 +26,19 @@ export function useMyAdoptionApplications(authToken) {
     } finally {
       setLoading(false);
     }
-  }, [authToken]);
+  }, [authToken, ownerId]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
   const cancelApplication = useCallback(async (applicationId) => {
-    if (!authToken) throw new Error('กรุณาเข้าสู่ระบบ');
+    if (!ownerId && !authToken) throw new Error('กรุณาเข้าสู่ระบบ');
     const response = await fetch(
       `${ADOPTION_API_URL}/applications/${encodeURIComponent(applicationId)}/cancel`,
       {
         method: 'POST',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: adoptionCustomerHeaders(ownerId),
       },
     );
     const result = await response.json();
@@ -49,7 +49,7 @@ export function useMyAdoptionApplications(authToken) {
         : item)),
     );
     return result.application;
-  }, [authToken]);
+  }, [authToken, ownerId]);
 
   return { applications, loading, error, reload, cancelApplication };
 }

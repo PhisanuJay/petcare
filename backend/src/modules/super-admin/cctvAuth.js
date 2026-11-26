@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { queryOne } from '../../db/mssql.js';
+import { getCustomerSession } from '../auth/store.js';
 import { migrateCctv } from './cctvMigrate.js';
 
 const COOKIE_NAME = 'cathotel';
@@ -84,20 +85,45 @@ export async function getCctvRequestUser(req) {
   return user ? publicUser(user) : null;
 }
 
+/** Hotel Admin (PetCare role admin) or Super Admin Bearer may use CCTV admin APIs. */
+async function hotelAdminFromBearer(req) {
+  const session = await getCustomerSession(req);
+  const role = session?.user?.role;
+  if (role !== 'admin' && role !== 'super_admin') return null;
+  return {
+    id: 0,
+    email: session.user.email,
+    role: 'admin',
+    displayName: [session.user.firstName, session.user.lastName].filter(Boolean).join(' ').trim()
+      || session.user.email,
+    isActive: true,
+    isSuper: true,
+    permissions: Object.fromEntries(PERMISSION_KEYS.map((key) => [key, true])),
+    petcareUserId: session.user.id,
+  };
+}
+
 export function requireCctvPermission(permission) {
   return async (req, res, next) => {
     try {
       const user = await getCctvRequestUser(req);
+      if (user && (user.isSuper || user.permissions[permission])) {
+        req.cctvUser = user;
+        next();
+        return;
+      }
+      const hotelAdmin = await hotelAdminFromBearer(req);
+      if (hotelAdmin) {
+        req.cctvUser = hotelAdmin;
+        req.petcareAdmin = hotelAdmin;
+        next();
+        return;
+      }
       if (!user) {
         res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'กรุณาเข้าสู่ระบบ' } });
         return;
       }
-      if (!user.isSuper && !user.permissions[permission]) {
-        res.status(403).json({ error: { code: 'FORBIDDEN', message: 'ไม่มีสิทธิ์ดำเนินการนี้' } });
-        return;
-      }
-      req.cctvUser = user;
-      next();
+      res.status(403).json({ error: { code: 'FORBIDDEN', message: 'ไม่มีสิทธิ์ดำเนินการนี้' } });
     } catch (error) {
       next(error);
     }

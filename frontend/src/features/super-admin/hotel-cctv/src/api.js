@@ -1,3 +1,14 @@
+function petcareBearer() {
+  try {
+    const remembered = JSON.parse(localStorage.getItem('petcare_session') || 'null');
+    const temporary = JSON.parse(sessionStorage.getItem('petcare_session') || 'null');
+    const session = remembered?.authToken ? remembered : temporary;
+    return session?.authToken || '';
+  } catch {
+    return '';
+  }
+}
+
 export async function api(path, options = {}) {
   let requestPath = path;
   const pathname = path.split('?')[0];
@@ -8,15 +19,24 @@ export async function api(path, options = {}) {
     || pathname === '/api/admin/rooms/rename'
     || pathname === '/api/admin/customers'
     || pathname === '/api/admin/grants'
+    || pathname === '/api/admin/stays'
+    || pathname === '/api/admin/admins'
+    || pathname === '/api/admin/drivers'
     || /^\/api\/admin\/grants\/\d+$/.test(pathname)
+    || /^\/api\/admin\/stays\/[^/]+\/(?:status|grants)$/.test(pathname)
+    || /^\/api\/admin\/admins\/[^/]+$/.test(pathname)
+    || /^\/api\/admin\/drivers\/[^/]+$/.test(pathname)
+    || /^\/api\/admin\/customers\/[^/]+$/.test(pathname)
     || /^\/api\/admin\/cameras(?:\/\d+(?:\/(?:toggle|recheck|grants))?)?$/.test(pathname)
   ) {
     requestPath = path.replace('/api/admin/', '/api/cctv-admin/');
   }
+  const token = petcareBearer();
   const response = await fetch(requestPath, {
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     method: options.method || 'GET',

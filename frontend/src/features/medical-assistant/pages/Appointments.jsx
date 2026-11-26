@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+﻿import { useCallback, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 import { useToast } from '../../../shared/components/Toast.jsx';
@@ -21,10 +21,7 @@ function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
   if (stage === 'pending') {
     return (
       <div className="ma-actions">
-        <Link to="/medical-assistant/booking-management" className="btn btn-soft btn-sm">
-          <i className="bi bi-journal-bookmark me-1" />
-          ไปหน้าจัดการการจอง
-        </Link>
+        <span className="small text-muted">รอระบบยืนยันอัตโนมัติจากการจอง/โอน</span>
       </div>
     );
   }
@@ -74,7 +71,7 @@ function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
           ส่งเข้าห้องตรวจ
         </button>
         <Link
-          to={`/medical-assistant/medical-support/${appt.id}`}
+          to={`/clinic-admin/appointments?focus=${appt.id}`}
           className="btn btn-soft btn-sm"
         >
           <i className="bi bi-thermometer-half me-1" />
@@ -89,7 +86,7 @@ function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
       <div className="ma-actions">
         <span className="tag warn m-0">รอหมอปิดเคส</span>
         <Link
-          to={`/medical-assistant/medical-support/${appt.id}`}
+          to={`/clinic-admin/appointments?focus=${appt.id}`}
           className="btn btn-soft btn-sm"
           title="เปิดหน้าสนับสนุนการรักษา"
         >
@@ -287,10 +284,6 @@ export default function AppointmentsPage() {
             <i className="bi bi-arrow-clockwise me-1" />
             รีเฟรช
           </button>
-          <Link to="/medical-assistant/booking-management" className="btn btn-sky">
-            <i className="bi bi-journal-bookmark me-1" />
-            จัดการการจอง
-          </Link>
         </div>
       </div>
 

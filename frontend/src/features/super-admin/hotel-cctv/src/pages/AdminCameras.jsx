@@ -5,6 +5,7 @@ import CameraCard from '../components/CameraCard';
 import WatchBoard from '../components/WatchBoard';
 import { IconCamera, IconSearch } from '../components/Marks';
 import { api, formatWhen } from '../api';
+import { keepIfSame } from '../../../../../shared/utils/stableData.js';
 import { LogsPanel, RoomsHub, SettingsPanel, UsersPanel } from './AdminSections';
 import HotelStayDesk from '../../../../pet-owner/HotelStayDesk.jsx';
 
@@ -85,11 +86,24 @@ function CameraDesk({ focusLive = false, canCare = true }) {
     if (next.status) params.set('status', next.status);
     params.set('page', String(next.page));
     try {
-      setData(await api(`/api/admin/cameras?${params}`));
+      const payload = await api(`/api/admin/cameras?${params}`);
+      setData((prev) => keepIfSame(prev, payload));
       setError('');
     } catch (err) {
       setError(err.message);
     }
+  }
+
+  function markLive(cameraId) {
+    setData((prev) => {
+      if (!prev?.items) return prev;
+      const items = prev.items.map((item) => (
+        String(item.id) === String(cameraId)
+          ? { ...item, streamStatus: 'online', lastError: '' }
+          : item
+      ));
+      return keepIfSame(prev, { ...prev, items });
+    });
   }
 
   useEffect(() => {
@@ -218,7 +232,7 @@ function CameraDesk({ focusLive = false, canCare = true }) {
                   camera={{ ...camera, mode: 'admin' }}
                   showLive={!preview && camera.isEnabled && camera.streamStatus !== 'offline'}
                   onOpen={() => openPreview(camera)}
-                  onPicture={() => load()}
+                  onPicture={() => markLive(camera.id)}
                 />
               ))}
             </section>
@@ -315,7 +329,7 @@ function CameraDesk({ focusLive = false, canCare = true }) {
               camera={{ ...camera, mode: 'admin' }}
               showLive={!preview && camera.isEnabled && camera.streamStatus !== 'offline'}
               onOpen={() => openPreview(camera)}
-              onPicture={() => load()}
+              onPicture={() => markLive(camera.id)}
             />
           ))}
         </section>

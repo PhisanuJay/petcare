@@ -2222,6 +2222,13 @@
   max-width: 1280px;
 }
 
+.tp-page--workspace {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+
 .tp-tabs {
   display: flex;
   flex-wrap: wrap;

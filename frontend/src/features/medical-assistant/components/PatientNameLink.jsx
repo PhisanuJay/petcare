@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { speciesOf } from '../../pet-owner/petUtils.js';
 import { CAUTION_FLAGS } from '../data/constants.js';
 
@@ -28,7 +28,7 @@ export default function PatientNameLink({
     <span className={`d-inline-flex align-items-center gap-1 ${className}`.trim()}>
       {petId ? (
         <Link
-          to={`/medical-assistant/patients/${encodeURIComponent(petId)}`}
+          to={`/clinic-admin/patients/${encodeURIComponent(petId)}`}
           className="ma-patient-link"
         >
           {showEmoji && (

@@ -67,19 +67,21 @@ async function migrateLocalPets(ownerId) {
   }
 }
 
-async function load(ownerId) {
-  if (loadingFor === ownerId) return;
+async function load(ownerId, { force = false } = {}) {
+  if (!force && loadingFor === ownerId) return;
   loadingFor = ownerId;
   setState({ ownerId, pets: [], status: 'loading', error: '' });
   try {
     let pets = await request(ownerId);
+    if (!Array.isArray(pets)) pets = [];
     if (pets.length === 0 && readJSON(STORAGE_KEYS.pets, []).some((p) => p.ownerId === ownerId)) {
       await migrateLocalPets(ownerId);
       pets = await request(ownerId);
+      if (!Array.isArray(pets)) pets = [];
     }
-    if (state.ownerId === ownerId) setState({ pets, status: 'ready' });
+    if (state.ownerId === ownerId) setState({ pets, status: 'ready', error: '' });
   } catch (err) {
-    if (state.ownerId === ownerId) setState({ status: 'error', error: err.message });
+    if (state.ownerId === ownerId) setState({ status: 'error', error: err.message || 'โหลดข้อมูลไม่สำเร็จ' });
   } finally {
     if (loadingFor === ownerId) loadingFor = null;
   }
@@ -112,7 +114,7 @@ export function usePets() {
   const getPet = useCallback((id) => pets.find((p) => p.id === id) ?? null, [pets]);
 
   const reload = useCallback(() => {
-    if (ownerId) load(ownerId);
+    if (ownerId) load(ownerId, { force: true });
   }, [ownerId]);
 
   const addPet = useCallback(

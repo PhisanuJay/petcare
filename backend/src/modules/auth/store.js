@@ -65,18 +65,32 @@ export async function getCustomerSession(req) {
   return { token, user };
 }
 
+/**
+ * Bearer session ก่อน แล้วค่อย fallback x-owner-id (กรณี backend รีสตาร์ทแล้ว in-memory token หาย
+ * แต่ UI ยังล็อกอินอยู่)
+ */
+export async function resolveCustomerIdentity(req) {
+  const session = await getCustomerSession(req);
+  if (session?.user) return session;
+  const headerId = req.get('x-owner-id')?.trim();
+  if (!headerId) return null;
+  const user = await findUserById(headerId);
+  if (!user || user.active === false) return null;
+  return { token: null, user };
+}
+
 export function revokeCustomerSession(token) {
   sessions.delete(token);
 }
 
 export async function requireCustomer(req, res, next) {
   try {
-    const session = await getCustomerSession(req);
-    if (!session) {
+    const identity = await resolveCustomerIdentity(req);
+    if (!identity) {
       return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบสมาชิก' });
     }
-    req.customer = session.user;
-    req.customerSessionToken = session.token;
+    req.customer = identity.user;
+    req.customerSessionToken = identity.token;
     return next();
   } catch (error) {
     return next(error);

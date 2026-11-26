@@ -38,8 +38,33 @@ export function validateRoomSpeciesCoverage(lines, catalogById, speciesGroups) {
   return '';
 }
 
-export function validateRoomLines(lines, catalogById, availabilityMap) {
+export function totalRoomUnits(lines) {
+  return lines.reduce((sum, line) => sum + Math.max(1, Number(line.units) || 1), 0);
+}
+
+/** ห้องทั้งหมดต้องไม่เกินจำนวนสัตว์ (ตัวเดียว = ห้องเดียว) */
+export function trimRoomLinesToPetCount(lines, petCount) {
+  const max = Math.max(0, Number(petCount) || 0);
+  if (!max) return [];
+  let remaining = max;
+  const next = [];
+  for (const line of lines) {
+    if (remaining <= 0) break;
+    const units = Math.min(Math.max(1, Number(line.units) || 1), remaining);
+    next.push({ ...line, units });
+    remaining -= units;
+  }
+  return next;
+}
+
+export function validateRoomLines(lines, catalogById, availabilityMap, petCount = 0) {
   if (!lines.length) return 'เลือกห้องพักอย่างน้อย 1 รายการ';
+  const unitsTotal = totalRoomUnits(lines);
+  if (petCount > 0 && unitsTotal > petCount) {
+    return petCount === 1
+      ? 'สัตว์เลี้ยงตัวเดียวเลือกได้แค่ 1 ห้อง'
+      : `สัตว์เลี้ยง ${petCount} ตัว เลือกห้องได้ไม่เกิน ${petCount} ห้อง`;
+  }
   for (const line of lines) {
     const type = catalogById.get(line.roomTypeId);
     if (!type) return 'ประเภทห้องไม่ถูกต้อง';

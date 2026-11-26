@@ -1,7 +1,7 @@
 import { startTransition, useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { memberTier, useAuth } from '../../features/auth/AuthContext.jsx';
-import { ADOPTION_STAFF_TOKEN_KEY } from '../../features/adoption/api.js';
+import { ROLES, normalizeRole } from '../../features/auth/roles.js';
 import UserAvatar from '../components/UserAvatar.jsx';
 
 const GUEST_MENU = [
@@ -66,14 +66,13 @@ export default function CustomerNavbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const isAdoptionPage = location.pathname.startsWith('/adoption');
-  const isAdoptionStaff = isAdoptionPage && Boolean(sessionStorage.getItem(ADOPTION_STAFF_TOKEN_KEY));
 
   useEffect(() => {
     setOpen(false);
   }, [location.pathname, location.hash]);
 
-  const menu = currentUser ? MEMBER_MENU : GUEST_MENU;
+  const isOwner = Boolean(currentUser) && normalizeRole(currentUser.role) === ROLES.owner;
+  const menu = isOwner ? MEMBER_MENU : GUEST_MENU;
   const close = () => setOpen(false);
 
   function handleLogout() {
@@ -83,17 +82,14 @@ export default function CustomerNavbar() {
     startTransition(logout);
   }
 
-  function handleAdoptionStaffLogout() {
-    sessionStorage.removeItem(ADOPTION_STAFF_TOKEN_KEY);
-    navigate('/login', { replace: true });
-  }
-
   return (
-    <div className={`nav-shell${isAdoptionPage ? ' adoption-nav-shell' : ''}`}>
+    <div className="nav-shell">
       <div className="container-fluid">
         <nav className="navbar navbar-expand-xxl pc-navbar">
           <Link className="navbar-brand d-flex align-items-center gap-2 ms-1" to="/">
-            <span className="brand-logo"><i className="bi bi-balloon-heart-fill" /></span>
+            <span className="brand-logo" aria-hidden="true">
+              <img src="/brand-mark.jpg" alt="" draggable="false" />
+            </span>
             <span className="brand-text">Pet<span>Care</span></span>
           </Link>
           <button
@@ -107,7 +103,7 @@ export default function CustomerNavbar() {
           </button>
 
           <div className={`collapse navbar-collapse ${open ? 'show' : ''}`}>
-            <ul className={`navbar-nav mx-auto ${currentUser ? 'member-nav' : 'guest-nav'}`}>
+            <ul className={`navbar-nav mx-auto ${isOwner ? 'member-nav' : 'guest-nav'}`}>
               {menu.map((item) => (
                 <li className="nav-item" key={item.to}>
                   <MenuLink item={item} onNavigate={close} />
@@ -115,18 +111,8 @@ export default function CustomerNavbar() {
               ))}
             </ul>
 
-            {isAdoptionStaff ? (
-              <div className="d-flex gap-2 pb-2 pb-xl-0">
-                <button className="btn btn-soft" type="button" onClick={handleAdoptionStaffLogout}>
-                  <i className="bi bi-box-arrow-right me-1" />ออกจากระบบ
-                </button>
-              </div>
-            ) : currentUser ? (
+            {currentUser ? (
               <div className="d-flex align-items-center gap-2 pb-2 pb-xl-0">
-                <button className="bell" type="button" title="การแจ้งเตือน">
-                  <i className="bi bi-bell-fill" />
-                  <span className="dot" />
-                </button>
                 <div className="dropdown">
                   <button className="profile-btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                     <UserAvatar user={currentUser} />
@@ -138,20 +124,31 @@ export default function CustomerNavbar() {
                         {currentUser.firstName} {currentUser.lastName}
                       </div>
                       <div className="small text-muted">
-                        สมาชิก {memberTier(currentUser.points)} · {currentUser.points ?? 0} แต้ม
+                        {isOwner
+                          ? `สมาชิก ${memberTier(currentUser.points)} · ${currentUser.points ?? 0} แต้ม`
+                          : 'บัญชีพนักงาน / แอดมิน — จองบริการใช้บัญชีเจ้าของสัตว์'}
                       </div>
                     </li>
-                    <li>
-                      <Link className="dropdown-item" to="/profile">
-                        <i className="bi bi-person me-2" />โปรไฟล์
-                      </Link>
-                    </li>
-                    <li>
-                      <Link className="dropdown-item" to="/pet-owner/my-pets">
-                        <i className="bi bi-heart me-2" />สัตว์เลี้ยงของฉัน
-                      </Link>
-                    </li>
-                    <li><hr className="dropdown-divider" /></li>
+                    {isOwner ? (
+                      <>
+                        <li>
+                          <Link className="dropdown-item" to="/profile">
+                            <i className="bi bi-person me-2" />โปรไฟล์
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item" to="/pet-owner/my-pets">
+                            <i className="bi bi-heart me-2" />สัตว์เลี้ยงของฉัน
+                          </Link>
+                        </li>
+                        <li>
+                          <Link className="dropdown-item" to="/pet-owner/booking">
+                            <i className="bi bi-calendar2-plus me-2" />จองบริการ
+                          </Link>
+                        </li>
+                        <li><hr className="dropdown-divider" /></li>
+                      </>
+                    ) : null}
                     <li>
                       <button type="button" className="dropdown-item text-danger" onClick={handleLogout}>
                         <i className="bi bi-box-arrow-right me-2" />ออกจากระบบ

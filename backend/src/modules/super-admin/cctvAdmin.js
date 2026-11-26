@@ -5,7 +5,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Router } from 'express';
 import { queryAll, queryOne, run, transaction } from '../../db/mssql.js';
+import { findUserById } from '../auth/usersRepository.js';
+import { getPetById } from '../pet-owner/store.js';
+import { listHotelRoomCatalog } from '../pet-owner/hotelCatalog.js';
+import { listAllStays, updateStayStatus } from '../pet-owner/hotelStayStore.js';
 import { ensureCctvReady, requireCctvPermission } from './cctvAuth.js';
+import cctvAccountsRouter from './cctvAccounts.js';
+import { syncOwnerWatchGrant, syncOwnerWatchGrantsForOwner } from './syncOwnerWatchAccess.js';
 
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(moduleDir, '.env');
@@ -253,6 +259,7 @@ export async function listGrantedCamerasForOwner(ownerId, email) {
   const rows = await queryAll(
     `SELECT c.id, c.name, c.description, c.room_label, c.cat_name, c.is_enabled,
             c.stream_status, c.last_error, c.last_seen_at, c.created_at, c.updated_at,
+            c.rtsp_fingerprint,
             g.id AS grant_id, g.pet_name, g.room_label AS grant_room_label,
             g.starts_at, g.ends_at
      FROM dbo.cctv_petcare_camera_grants g
@@ -261,16 +268,33 @@ export async function listGrantedCamerasForOwner(ownerId, email) {
     [normalizedId, normalizedEmail],
   );
   const now = Date.now();
-  return rows
-    .filter((row) => Date.parse(row.starts_at) <= now && Date.parse(row.ends_at) >= now)
-    .map((row) => ({
-      ...cameraFromRow(row),
+  const active = rows.filter((row) => Date.parse(row.starts_at) <= now && Date.parse(row.ends_at) >= now);
+  // Bridge to CatHotel SQLite so Player mode=customer can open a stream session.
+  const syncResults = syncOwnerWatchGrantsForOwner(active.map((row) => ({
+    owner_email: normalizedEmail,
+    owner_name: '',
+    camera_id: row.id,
+    rtsp_fingerprint: row.rtsp_fingerprint || '',
+    pet_name: row.pet_name || row.cat_name || '',
+    room_label: row.grant_room_label || row.room_label || '',
+    starts_at: row.starts_at,
+    ends_at: row.ends_at,
+  })));
+  return active.map((row, index) => {
+    const streamCameraId = syncResults[index]?.streamCameraId || row.id;
+    const camera = cameraFromRow(row);
+    return {
+      ...camera,
+      // Player / MediaMTX use the SQLite camera id (may differ from MSSQL after migrate).
+      id: streamCameraId,
+      petcareCameraId: row.id,
       petName: row.pet_name || row.cat_name || '',
       roomLabel: row.grant_room_label || row.room_label || '',
       accessStartsAt: row.starts_at,
       accessEndsAt: row.ends_at,
       grantId: row.grant_id,
-    }));
+    };
+  });
 }
 
 const router = Router();
@@ -283,6 +307,8 @@ router.use(async (_req, _res, next) => {
     next(error);
   }
 });
+
+router.use(cctvAccountsRouter);
 
 router.get('/rooms', requireCctvPermission('view_cameras'), async (_req, res) => {
   const groups = new Map();
@@ -443,6 +469,16 @@ router.post('/cameras/:id/grants', requireCctvPermission('manage_grants'), async
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [camera.id, ownerId, email, displayName, petName, roomLabel, startsAt, endsAt, stamp],
   );
+  syncOwnerWatchGrant({
+    email,
+    displayName,
+    cameraId: camera.id,
+    rtspFingerprint: camera.rtsp_fingerprint || '',
+    petName,
+    roomLabel,
+    startsAt,
+    endsAt,
+  });
   const row = await queryOne(
     `SELECT g.id, g.camera_id, g.owner_id, g.pet_name, g.room_label, g.starts_at,
             g.ends_at, g.revoked_at, g.owner_name AS display_name, g.owner_email AS email,
@@ -599,6 +635,301 @@ router.patch('/rooms/rename', requireCctvPermission('manage_rooms'), async (req,
     [toLabel, nowIso(), fromLabel],
   );
   res.json({ updated: Number(result.changes) });
+});
+
+function stayBoundIso(dateStr, endOfDay = false) {
+  if (typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return null;
+  const stamp = endOfDay ? `${dateStr}T23:59:59+07:00` : `${dateStr}T00:00:00+07:00`;
+  const date = new Date(stamp);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+async function enrichStayForDesk(stay, catalogById, grantsByOwner) {
+  const owner = stay.ownerId ? await findUserById(stay.ownerId) : null;
+  const ownerName = owner
+    ? [owner.firstName, owner.lastName].filter(Boolean).join(' ').trim() || owner.email
+    : (stay.ownerEmail || 'ลูกค้า');
+  const pets = [];
+  const rooms = [];
+  for (const line of stay.lines || []) {
+    const type = catalogById.get(line.roomTypeId);
+    rooms.push({
+      roomTypeId: line.roomTypeId,
+      titleTh: type?.titleTh || line.roomTypeId,
+      species: type?.species || '',
+      units: line.units,
+    });
+    for (const petId of line.petIds || []) {
+      const pet = await getPetById(petId);
+      if (pet) {
+        pets.push({
+          id: pet.id,
+          name: pet.name || 'สัตว์เลี้ยง',
+          species: pet.species || '',
+          photo: typeof pet.photo === 'string' ? pet.photo : '',
+        });
+      } else {
+        pets.push({ id: petId, name: 'สัตว์เลี้ยง', species: '', photo: '' });
+      }
+    }
+  }
+  const uniquePets = [];
+  const seen = new Set();
+  pets.forEach((pet) => {
+    if (seen.has(pet.id)) return;
+    seen.add(pet.id);
+    uniquePets.push(pet);
+  });
+
+  const ownerKey = `${stay.ownerId}::${String(stay.ownerEmail || '').trim().toLowerCase()}`;
+  const grants = grantsByOwner.get(ownerKey) || [];
+  const startsMs = Date.parse(stayBoundIso(stay.checkIn, false) || '');
+  const endsMs = Date.parse(stayBoundIso(stay.checkOut, true) || '');
+  const linkedGrants = grants.filter((g) => {
+    if (g.revoked_at) return false;
+    const gStart = Date.parse(g.starts_at);
+    const gEnd = Date.parse(g.ends_at);
+    if (Number.isNaN(gStart) || Number.isNaN(gEnd) || Number.isNaN(startsMs) || Number.isNaN(endsMs)) {
+      return false;
+    }
+    return gStart < endsMs && gEnd > startsMs;
+  }).map((g) => ({
+    id: g.id,
+    cameraId: g.camera_id,
+    cameraName: g.camera_name,
+    roomLabel: g.room_label || g.camera_room || '',
+    startsAt: g.starts_at,
+    endsAt: g.ends_at,
+    isActive: !g.revoked_at && Date.parse(g.starts_at) <= Date.now() && Date.parse(g.ends_at) >= Date.now(),
+  }));
+
+  return {
+    id: stay.id,
+    ownerId: stay.ownerId,
+    ownerEmail: stay.ownerEmail,
+    ownerName,
+    checkIn: stay.checkIn,
+    checkOut: stay.checkOut,
+    nights: stay.nights,
+    status: stay.status,
+    note: stay.note || '',
+    total: stay.totalPrice ?? stay.total,
+    createdAt: stay.createdAt,
+    pets: uniquePets,
+    rooms,
+    petLabel: uniquePets.map((p) => p.name).join(', ') || 'สัตว์เลี้ยง',
+    roomLabel: rooms.map((r) => r.titleTh).join(', ') || 'ห้องพัก',
+    cameraGranted: linkedGrants.length > 0,
+    grants: linkedGrants,
+  };
+}
+
+async function upsertGrantForStay({
+  stay,
+  camera,
+  startsAt,
+  endsAt,
+  petName,
+  roomLabel,
+  ownerName,
+}) {
+  const email = String(stay.ownerEmail || '').trim().toLowerCase();
+  const ownerId = String(stay.ownerId || '').trim();
+  const existing = await queryOne(
+    `SELECT TOP 1 id, starts_at, ends_at FROM dbo.cctv_petcare_camera_grants
+     WHERE camera_id = ? AND owner_id = ? AND lower(owner_email) = ?
+       AND revoked_at IS NULL
+       AND starts_at < ? AND ends_at > ?
+     ORDER BY id DESC`,
+    [camera.id, ownerId, email, endsAt, startsAt],
+  );
+
+  if (existing) {
+    const nextStart = Date.parse(existing.starts_at) <= Date.parse(startsAt)
+      ? existing.starts_at
+      : startsAt;
+    const nextEnd = Date.parse(existing.ends_at) >= Date.parse(endsAt)
+      ? existing.ends_at
+      : endsAt;
+    await run(
+      `UPDATE dbo.cctv_petcare_camera_grants
+       SET starts_at = ?, ends_at = ?, pet_name = ?, room_label = ?, owner_name = ?
+       WHERE id = ?`,
+      [nextStart, nextEnd, petName, roomLabel, ownerName, existing.id],
+    );
+    return existing.id;
+  }
+
+  const stamp = nowIso();
+  const inserted = await queryOne(
+    `INSERT INTO dbo.cctv_petcare_camera_grants
+      (camera_id, owner_id, owner_email, owner_name, pet_name, room_label, starts_at, ends_at, created_at)
+     OUTPUT INSERTED.id
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [camera.id, ownerId, email, ownerName, petName, roomLabel, startsAt, endsAt, stamp],
+  );
+  return inserted.id;
+}
+
+router.get('/stays', requireCctvPermission('manage_customers'), async (_req, res) => {
+  await ensureCctvReady();
+  const catalog = await listHotelRoomCatalog();
+  const catalogById = new Map(catalog.map((item) => [item.id, item]));
+  const grantRows = await queryAll(
+    `SELECT g.id, g.camera_id, g.owner_id, g.owner_email, g.room_label, g.starts_at, g.ends_at, g.revoked_at,
+            c.name AS camera_name, c.room_label AS camera_room
+     FROM dbo.cctv_petcare_camera_grants g
+     JOIN dbo.cctv_cameras c ON c.id = g.camera_id`,
+  );
+  const grantsByOwner = new Map();
+  grantRows.forEach((row) => {
+    const key = `${row.owner_id}::${String(row.owner_email || '').trim().toLowerCase()}`;
+    if (!grantsByOwner.has(key)) grantsByOwner.set(key, []);
+    grantsByOwner.get(key).push(row);
+  });
+
+  const stays = await listAllStays();
+  const items = [];
+  for (const stay of stays) {
+    items.push(await enrichStayForDesk(stay, catalogById, grantsByOwner));
+  }
+  res.json({
+    items,
+    summary: {
+      total: items.length,
+      waiting: items.filter((s) => s.status === 'waiting' || s.status === 'pending').length,
+      checkedIn: items.filter((s) => s.status === 'checked_in').length,
+      confirmed: items.filter((s) => s.status === 'confirmed').length,
+      granted: items.filter((s) => s.cameraGranted).length,
+    },
+  });
+});
+
+router.patch('/stays/:id/status', requireCctvPermission('manage_customers'), async (req, res) => {
+  await ensureCctvReady();
+  const status = String(req.body?.status || '').trim();
+  try {
+    const stay = await updateStayStatus(req.params.id, status);
+    const catalog = await listHotelRoomCatalog();
+    const catalogById = new Map(catalog.map((item) => [item.id, item]));
+    const grantRows = await queryAll(
+      `SELECT g.id, g.camera_id, g.owner_id, g.owner_email, g.room_label, g.starts_at, g.ends_at, g.revoked_at,
+              c.name AS camera_name, c.room_label AS camera_room
+       FROM dbo.cctv_petcare_camera_grants g
+       JOIN dbo.cctv_cameras c ON c.id = g.camera_id
+       WHERE g.owner_id = ? AND lower(g.owner_email) = ?`,
+      [stay.ownerId, String(stay.ownerEmail || '').trim().toLowerCase()],
+    );
+    const grantsByOwner = new Map([
+      [`${stay.ownerId}::${String(stay.ownerEmail || '').trim().toLowerCase()}`, grantRows],
+    ]);
+    const enriched = await enrichStayForDesk(stay, catalogById, grantsByOwner);
+    res.json({ stay: enriched });
+  } catch (error) {
+    sendError(res, error.status || 400, 'STAY_STATUS', error.message || 'อัปเดตสถานะไม่สำเร็จ');
+  }
+});
+
+router.post('/stays/:id/grants', requireCctvPermission('manage_customers'), async (req, res) => {
+  await ensureCctvReady();
+  const stayId = String(req.params.id || '').trim();
+  const stays = await listAllStays();
+  const stay = stays.find((item) => item.id === stayId);
+  if (!stay) {
+    sendError(res, 404, 'STAY_NOT_FOUND', 'ไม่พบใบจองนี้');
+    return;
+  }
+  if (['cancelled', 'checked_out'].includes(stay.status)) {
+    sendError(res, 409, 'STAY_CLOSED', 'ใบจองนี้ปิดแล้ว ไม่สามารถมอบสิทธิ์กล้องได้');
+    return;
+  }
+
+  const cameraId = validId(req.body?.cameraId);
+  const camera = cameraId ? await cameraById(cameraId) : null;
+  if (!camera) {
+    sendError(res, 404, 'CAMERA_NOT_FOUND', 'ไม่พบกล้องนี้');
+    return;
+  }
+
+  const defaultStart = stayBoundIso(stay.checkIn, false);
+  const defaultEnd = stayBoundIso(stay.checkOut, true);
+  const startsAt = parseGrantDate(req.body?.startsAt) || defaultStart;
+  const endsAt = parseGrantDate(req.body?.endsAt) || defaultEnd;
+  if (!startsAt || !endsAt || Date.parse(startsAt) >= Date.parse(endsAt)) {
+    sendError(res, 400, 'INVALID_GRANT_PERIOD', 'กรุณาระบุช่วงเวลาให้ถูกต้อง');
+    return;
+  }
+
+  const owner = stay.ownerId ? await findUserById(stay.ownerId) : null;
+  const ownerName = owner
+    ? [owner.firstName, owner.lastName].filter(Boolean).join(' ').trim() || owner.email
+    : (stay.ownerEmail || 'ลูกค้า');
+
+  const catalog = await listHotelRoomCatalog();
+  const catalogById = new Map(catalog.map((item) => [item.id, item]));
+  const stayPetIds = (stay.lines || []).flatMap((line) => line.petIds || []);
+  const requestedPetIds = Array.isArray(req.body?.petIds)
+    ? req.body.petIds.map((id) => String(id || '').trim()).filter(Boolean)
+    : [];
+  const petIds = requestedPetIds.length
+    ? requestedPetIds.filter((id) => stayPetIds.includes(id) || stayPetIds.length === 0)
+    : (stayPetIds.length ? stayPetIds : []);
+
+  const pets = petIds.length
+    ? await Promise.all(petIds.map(async (petId) => {
+      const pet = await getPetById(petId);
+      return pet
+        ? { id: pet.id, name: pet.name || 'สัตว์เลี้ยง', species: pet.species || '' }
+        : { id: petId, name: 'สัตว์เลี้ยง', species: '' };
+    }))
+    : [{
+      id: '',
+      name: String(req.body?.petName || camera.cat_name || 'สัตว์เลี้ยง').trim().slice(0, 120),
+      species: '',
+    }];
+
+  const roomFromStay = stay.lines?.[0]
+    ? (catalogById.get(stay.lines[0].roomTypeId)?.titleTh || stay.lines[0].roomTypeId)
+    : '';
+  const roomLabel = String(
+    req.body?.roomLabel || camera.room_label || roomFromStay || '',
+  ).trim().slice(0, 120);
+
+  const grants = [];
+  for (const pet of pets) {
+    const petName = String(pet.name || 'สัตว์เลี้ยง').trim().slice(0, 120);
+    const grantId = await upsertGrantForStay({
+      stay,
+      camera,
+      startsAt,
+      endsAt,
+      petName,
+      roomLabel,
+      ownerName,
+    });
+    syncOwnerWatchGrant({
+      email: stay.ownerEmail,
+      displayName: ownerName,
+      cameraId: camera.id,
+      rtspFingerprint: camera.rtsp_fingerprint || '',
+      petName,
+      roomLabel,
+      startsAt,
+      endsAt,
+    });
+    const row = await queryOne(
+      `SELECT g.id, g.camera_id, g.owner_id, g.pet_name, g.room_label, g.starts_at,
+              g.ends_at, g.revoked_at, g.owner_name AS display_name, g.owner_email AS email,
+              c.name AS camera_name, c.cat_name AS camera_cat, c.room_label AS camera_room
+       FROM dbo.cctv_petcare_camera_grants g
+       JOIN dbo.cctv_cameras c ON c.id = g.camera_id
+       WHERE g.id = ?`,
+      [grantId],
+    );
+    grants.push(grantFromRow(row));
+  }
+
+  res.status(201).json({ grants, grant: grants[0] || null, count: grants.length });
 });
 
 export default router;

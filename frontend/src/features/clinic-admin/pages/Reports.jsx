@@ -258,14 +258,6 @@ export default function Reports() {
                   )}
                 </div>
 
-                <div className={`stat${(data.pendingOver24h ?? 0) > 0 ? ' ca-stat-warn' : ''}`}>
-                  <div className="ca-stat-icon">
-                    <i className="bi bi-exclamation-triangle" aria-hidden="true" />
-                  </div>
-                  <div className="num">{data.pendingOver24h ?? 0}</div>
-                  <div className="small text-muted">คำขอค้างเกิน 24 ชม.</div>
-                  <div className="small text-muted">ณ ตอนนี้</div>
-                </div>
               </div>
 
               {/* Bar Charts */}

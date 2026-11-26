@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import DataState, { useCaToast } from '../components/DataState.jsx';
 import { caRequest } from '../data/caApi.js';
 import {
@@ -335,9 +336,14 @@ export default function Settings() {
 
             {/* Online Services */}
             <div className="card-soft">
-              <div className="section-label">
-                <i className="bi bi-toggle-on" aria-hidden="true" />
-                <span>ข. บริการที่เปิดให้จองออนไลน์</span>
+              <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div className="section-label mb-0">
+                  <i className="bi bi-toggle-on" aria-hidden="true" />
+                  <span>ข. บริการที่เปิดให้จองออนไลน์</span>
+                </div>
+                <Link className="btn btn-soft btn-sm" to="/clinic-admin/services">
+                  จัดการบริการและราคา
+                </Link>
               </div>
 
               {servicesError && (

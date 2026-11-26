@@ -136,8 +136,9 @@ export function BookingForm({
         return {
           value: s.code,
           label: s.label,
-          hint: meta?.hint ?? '',
-          icon: meta?.icon ?? ICON_BY_SERVICE.get(s.code) ?? 'bi-calendar',
+          hint: s.hint || meta?.hint || '',
+          icon: s.icon || meta?.icon || ICON_BY_SERVICE.get(s.code) || 'bi-calendar',
+          prices: s.prices,
         };
       }),
     [info],
@@ -168,7 +169,13 @@ export function BookingForm({
   const [daySlots, setDaySlots] = useState(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
-  const dutyVets = dayAvailability?.vetsOnDuty ?? [];
+  // หมอทุกคนจากคลินิก — ไม่พึ่งผู้ช่วยตั้งเวรรายวัน
+  const dutyVets = useMemo(() => {
+    const all = Array.isArray(info?.vets) ? info.vets : [];
+    const onDuty = Array.isArray(dayAvailability?.vetsOnDuty) ? dayAvailability.vetsOnDuty : [];
+    if (all.length) return all;
+    return onDuty;
+  }, [info?.vets, dayAvailability?.vetsOnDuty]);
   const vetChosen = form.vetId !== VET_UNSET;
   const selectedPets = useMemo(
     () => pets.filter((p) => form.petIds.includes(p.id)),
@@ -751,8 +758,12 @@ export default function BookingPage() {
   const navigate = useNavigate();
   const [params, setSearchParams] = useSearchParams();
   const tabParam = params.get('tab');
-  const { pets, loading: petsLoading, error: petsError } = usePets();
-  const { error, reload, addBooking } = useBookings();
+  const { pets, loading: petsLoading, error: petsError, reload: reloadPets } = usePets();
+  const { error, reload: reloadBookings, addBooking } = useBookings();
+  const reload = () => {
+    reloadPets();
+    reloadBookings();
+  };
   const { bookings: hotelBookings, linkRelatedBooking } = useHotelBookings();
   const urlHotelBookingId = params.get('hotelBookingId') || '';
   const [hubHotelId, setHubHotelId] = useState(urlHotelBookingId);

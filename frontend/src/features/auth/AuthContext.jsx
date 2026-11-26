@@ -182,6 +182,41 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener(STAFF_SESSION_EXPIRED, onExpired);
   }, []);
 
+  // ตรวจ Bearer ตอนเปิดแอป — ถ้า backend รีสตาร์ทแล้ว token หาย ให้ลบ token แต่คง userId ไว้
+  // เพื่อให้หน้าเจ้าของสัตว์ยังเรียก API ได้ผ่าน x-owner-id
+  useEffect(() => {
+    const token = authState.authToken;
+    const userId = authState.currentUser?.id;
+    if (!token || !userId) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(`${AUTH_API_URL}/session`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (cancelled || response.ok || response.status !== 401) return;
+        const remembered = readJSON(STORAGE_KEYS.session, null, localStorage);
+        const temporary = readJSON(STORAGE_KEYS.session, null, sessionStorage);
+        if (remembered?.userId === userId) {
+          writeJSON(STORAGE_KEYS.session, { userId, authToken: '' }, localStorage);
+        }
+        if (temporary?.userId === userId) {
+          writeJSON(STORAGE_KEYS.session, { userId, authToken: '' }, sessionStorage);
+        }
+        setAuthState((state) => (
+          state.currentUser?.id === userId ? { ...state, authToken: '' } : state
+        ));
+      } catch {
+        /* offline — คง token เดิม */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  // ตรวจครั้งเดียวตอนบูต
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!currentUser || currentUser.role !== ROLES.admin || !authToken) {
       setRemoteDrivers([]);

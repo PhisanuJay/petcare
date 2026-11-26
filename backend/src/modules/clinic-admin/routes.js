@@ -14,12 +14,15 @@ import { isDateString, todayString } from '../pet-owner/clinicSchedule.js';
 import { httpError } from '../pet-owner/jsonCollection.js';
 import {
   addClosure,
+  createService,
   getClosure,
   getHoursForDay,
   getSettings,
+  listBookableServices,
   listServices,
   removeClosure,
   updateHours,
+  updateService,
   updateServices,
 } from './clinicSettings.js';
 import { buildReport } from './reports.js';
@@ -57,9 +60,7 @@ router.get('/public/clinic-info', (_req, res) => {
   const settings = getSettings();
   res.json({
     hours: settings.hours,
-    services: listServices()
-      .filter((s) => s.online)
-      .map(({ code, label }) => ({ code, label })),
+    services: listBookableServices(),
     vets: listStaff('veterinarian').map(({ id, name }) => ({ id, name })),
     closures: settings.closures.filter((c) => c.date >= t && c.date <= limit90),
     slotMinutes: settings.slotMinutes ?? 60,
@@ -104,7 +105,11 @@ router.get('/public/clinic-availability', (req, res) => {
       vetsOnDuty: [],
     });
   }
-  const vets = vetsOnDuty(date).map(({ id, name }) => ({ id, name }));
+  // ใช้รายชื่อหมอทั้งหมดที่เปิดใช้ — ตารางเวรถูก seed ครบแล้ว
+  const vets = (vetsOnDuty(date).length
+    ? vetsOnDuty(date)
+    : listStaff('veterinarian')
+  ).map(({ id, name }) => ({ id, name }));
   if (!vets.length) {
     return res.json({
       date,
@@ -197,6 +202,24 @@ router.put(
   wrap(async (req, res) => {
     const patch = req.body?.services ?? req.body;
     res.json(await updateServices(patch));
+  }),
+);
+
+router.get('/services', (_req, res) => {
+  res.json({ services: listServices() });
+});
+
+router.post(
+  '/services',
+  wrap(async (req, res) => {
+    res.status(201).json(await createService(req.body ?? {}));
+  }),
+);
+
+router.patch(
+  '/services/:code',
+  wrap(async (req, res) => {
+    res.json(await updateService(req.params.code, req.body ?? {}));
   }),
 );
 
@@ -298,7 +321,6 @@ router.get(
   wrap(async (_req, res) => {
     const t = todayString();
     const limit3 = addDaysTo(t, 3);
-    const cutoff24hMs = Date.now() - 24 * 3600 * 1000;
     const [bookings, settings] = await Promise.all([
       listAllBookings(),
       Promise.resolve(getSettings()),
@@ -317,13 +339,6 @@ router.get(
       byStatus[b.status] = (byStatus[b.status] ?? 0) + 1;
     }
 
-    const pendingTotal = bookings.filter((b) => b.status === 'pending').length;
-    const pendingOver24h = bookings.filter((b) => {
-      if (b.status !== 'pending' || !b.createdAt) return false;
-      const ms = new Date(b.createdAt).getTime();
-      return Number.isFinite(ms) && ms < cutoff24hMs;
-    }).length;
-
     const upcomingClosures = settings.closures
       .filter((c) => c.date >= t && c.date <= limit3)
       .map((c) => ({
@@ -331,13 +346,23 @@ router.get(
         affectedBookings: countBookingsOnDate(bookings, c.date),
       }));
 
+    const bookableServices = listBookableServices();
+    const activeVets = listStaff('veterinarian');
+    const activeAssistants = listStaff('medical_assistant');
+
     res.json({
       date: t,
       todayTotal: todayBookings.length,
       byStatus,
-      pendingTotal,
-      pendingOver24h,
+      confirmedToday: byStatus.confirmed,
+      completedToday: byStatus.completed,
       vetsOnDutyToday: vetsOnDuty(t).map(({ id, name }) => ({ id, name })),
+      staffReady: {
+        veterinarians: activeVets.length,
+        assistants: activeAssistants.length,
+        total: activeVets.length + activeAssistants.length,
+      },
+      onlineServices: bookableServices.length,
       upcomingClosures,
     });
   }),

@@ -56,11 +56,45 @@ export const CLINIC_SERVICE_PRICES = {
   },
 };
 
+/** Live catalog from /public/clinic-info (fallback to BOOKING_SERVICES / CLINIC_SERVICE_PRICES). */
+let liveCatalog = null;
+
+export function setLiveClinicCatalog(services) {
+  if (!Array.isArray(services)) {
+    liveCatalog = null;
+    return;
+  }
+  liveCatalog = services
+    .filter((item) => item && typeof item.code === 'string')
+    .map((item) => ({
+      code: item.code,
+      label: item.label || item.code,
+      labelDog: item.labelDog || '',
+      labelCat: item.labelCat || '',
+      hint: item.hint || '',
+      icon: item.icon || 'bi-calendar2-check',
+      prices: {
+        dog: Number(item.prices?.dog),
+        cat: Number(item.prices?.cat),
+      },
+    }));
+}
+
+export function getLiveClinicCatalog() {
+  return liveCatalog;
+}
+
 export function clinicServiceLabel(serviceCode, species) {
   const code = normalizeServiceCode(serviceCode);
+  const group = petSpeciesPriceGroup(species);
+  const live = liveCatalog?.find((item) => item.code === code);
+  if (live) {
+    if (group === 'cat' && live.labelCat) return live.labelCat;
+    if (group === 'dog' && live.labelDog) return live.labelDog;
+    return live.label || code;
+  }
   const meta = BOOKING_SERVICES.find((s) => s.value === code);
   if (!meta) return code;
-  const group = petSpeciesPriceGroup(species);
   if (group === 'cat' && meta.labelCat) return meta.labelCat;
   if (meta.labelDog) return meta.labelDog;
   return meta.label;
@@ -69,6 +103,11 @@ export function clinicServiceLabel(serviceCode, species) {
 export function clinicServicePrice(serviceCode, species) {
   const code = normalizeServiceCode(serviceCode);
   const group = petSpeciesPriceGroup(species);
+  const live = liveCatalog?.find((item) => item.code === code);
+  if (live) {
+    const value = live.prices?.[group];
+    if (Number.isFinite(value) && value >= 0) return value;
+  }
   const table = CLINIC_SERVICE_PRICES[group];
   return table[code] ?? table.checkup;
 }
@@ -94,9 +133,17 @@ export const FALLBACK_CLINIC_INFO = {
     5: { open: OPENING_HOURS.weekday.open, close: OPENING_HOURS.weekday.close },
     6: { open: OPENING_HOURS.weekend.open, close: OPENING_HOURS.weekend.close },
   },
-  services: BOOKING_SERVICES.map(({ value, label, labelDog }) => ({
-    code: value,
-    label: label || labelDog,
+  services: BOOKING_SERVICES.map((item) => ({
+    code: item.value,
+    label: item.label || item.labelDog,
+    labelDog: item.labelDog,
+    labelCat: item.labelCat,
+    hint: item.hint,
+    icon: item.icon,
+    prices: {
+      dog: CLINIC_SERVICE_PRICES.dog[item.value],
+      cat: CLINIC_SERVICE_PRICES.cat[item.value],
+    },
   })),
   vets: [],
   closures: [],
@@ -180,6 +227,7 @@ export async function fetchClinicInfo() {
     if (!res.ok) return null;
     const body = await res.json().catch(() => null);
     if (!isValidClinicInfo(body)) return null;
+    setLiveClinicCatalog(body.services);
     return {
       hours: body.hours,
       services: body.services,
@@ -204,6 +252,8 @@ function getFreshCachedInfo() {
   return cachedInfo;
 }
 
+setLiveClinicCatalog(FALLBACK_CLINIC_INFO.services);
+
 export function useClinicInfo() {
   const initialFresh = getFreshCachedInfo();
   const [info, setInfo] = useState(() => initialFresh ?? FALLBACK_CLINIC_INFO);
@@ -212,6 +262,7 @@ export function useClinicInfo() {
   useEffect(() => {
     const fresh = getFreshCachedInfo();
     if (fresh) {
+      setLiveClinicCatalog(fresh.services);
       setInfo(fresh);
       setLoading(false);
       return undefined;
@@ -231,7 +282,9 @@ export function useClinicInfo() {
         cachedAt = Date.now();
       }
       if (!cancelled) {
-        setInfo(result ?? FALLBACK_CLINIC_INFO);
+        const next = result ?? FALLBACK_CLINIC_INFO;
+        setLiveClinicCatalog(next.services);
+        setInfo(next);
         setLoading(false);
       }
     });

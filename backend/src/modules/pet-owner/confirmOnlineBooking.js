@@ -6,9 +6,8 @@ import { confirmBookingOnline, listAllBookings } from './bookingStore.js';
 export async function confirmOnlineBooking(pendingBooking) {
   const [bookings, visits] = await Promise.all([listAllBookings(), listVisits()]);
   const visitsMap = new Map(visits.map((v) => [v.bookingId, v]));
-  const slotMin = Number(getSettings().slotMinutes) || 60;
-  const lineCount = Math.max(1, pendingBooking.petLines?.length || 1);
-  const durationMin = slotMin * lineCount;
+  // หนึ่งนัดออนไลน์ = หนึ่งช่องเวลาคลินิก (ไม่คูณจำนวนบริการ/สัตว์ ไม่งั้นจะบล็อกทั้งวัน)
+  const durationMin = Number(getSettings().slotMinutes) || 60;
 
   const vet = pickVetForOnlineBooking({
     date: pendingBooking.date,

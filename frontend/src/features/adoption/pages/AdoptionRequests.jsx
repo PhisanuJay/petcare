@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adoptionStaffFetch, readAdoptionResponse } from '../api.js';
+import { useAdoptionBasePath } from '../useAdoptionBasePath.js';
 
 const STATUS_LABELS = {
   pending: 'รอพิจารณา',
@@ -28,6 +29,7 @@ function matchesFilter(status, filter) {
 }
 
 export default function AdoptionRequestsPage() {
+  const base = useAdoptionBasePath();
   const [requests, setRequests] = useState([]);
   const [filter, setFilter] = useState('pending');
   const [loading, setLoading] = useState(true);
@@ -95,7 +97,7 @@ export default function AdoptionRequestsPage() {
                 {STATUS_LABELS[request.status] || request.status}
               </span>
             </div>
-            <Link className="btn btn-soft btn-sm mt-3" to={`/adoption/requests/${request.id}`}>
+            <Link className="btn btn-soft btn-sm mt-3" to={`${base}/requests/${request.id}`}>
               ดูรายละเอียดคำร้อง
             </Link>
           </article>

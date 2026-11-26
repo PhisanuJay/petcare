@@ -62,11 +62,50 @@ function normalizeRoster(raw) {
   return list;
 }
 
+const DEFAULT_VET_ROSTER_IDS = ['staff-vet-1', 'staff-vet-2', 'staff-vet-3', 'staff-vet-4'];
+
+function defaultRosterSeed() {
+  return DEFAULT_VET_ROSTER_IDS.map((staffId) => ({
+    staffId,
+    weekdays: [...ALL_WEEKDAYS],
+    leaves: [],
+  }));
+}
+
 const rosterStore = createSyncJsonStore(rosterFile, {
-  defaults: () => [],
-  normalize: normalizeRoster,
+  defaults: defaultRosterSeed,
+  normalize: (raw) => {
+    const list = normalizeRoster(raw);
+    // ไฟล์ว่าง = ใส่ตารางเวรครบทุกหมอ demo ทันที ไม่ต้องให้แอดมิน/ผู้ช่วยตั้งเอง
+    return list.length ? list : defaultRosterSeed();
+  },
   label: 'rosterStore',
 });
+
+/** เติมตารางเวรให้สัตวแพทย์ที่ยังไม่มีเรคคอร์ด (เข้าเวรทุกวัน) */
+export function ensureRosterForActiveVets() {
+  const vets = listStaff('veterinarian');
+  if (!vets.length) return rosterStore.get();
+  const current = rosterStore.get();
+  const missing = vets.filter((vet) => !current.some((row) => row.staffId === vet.id));
+  if (!missing.length) return current;
+  rosterStore.update((records) => {
+    const seen = new Set(records.map((row) => row.staffId));
+    const next = records.slice();
+    for (const vet of missing) {
+      if (seen.has(vet.id)) continue;
+      seen.add(vet.id);
+      next.push({ staffId: vet.id, weekdays: [...ALL_WEEKDAYS], leaves: [] });
+    }
+    return { value: next, result: next };
+  }).catch((err) => {
+    console.warn('[rosterStore] ensureRosterForActiveVets failed:', err?.message ?? err);
+  });
+  return [
+    ...current,
+    ...missing.map((vet) => ({ staffId: vet.id, weekdays: [...ALL_WEEKDAYS], leaves: [] })),
+  ];
+}
 
 export function getRoster(staffId) {
   return rosterStore.get().find((r) => r.staffId === staffId) ?? null;
@@ -74,17 +113,20 @@ export function getRoster(staffId) {
 
 export function isVetOnDuty(staffId, date) {
   if (!staffId || !isValidDate(date)) return false;
+  // หมอที่เปิดใช้งานถือว่าเข้าเวรได้ทุกวันทำการของคลินิก (ลาค่อยตัดทีหลังถ้ามี)
+  const active = listStaff('veterinarian').some((vet) => vet.id === staffId);
+  if (!active) return false;
   const record = getRoster(staffId);
-  if (!record) return true; // Vets without a configured roster are assumed on duty every day
-  const day = dayOfWeek(date);
-  if (!record.weekdays.includes(day)) return false;
-  return !record.leaves.some((l) => date >= l.from && date <= l.to);
+  if (!record) return true;
+  if (record.leaves.some((l) => date >= l.from && date <= l.to)) return false;
+  return true;
 }
 
 export function vetsOnDuty(date) {
   if (!isValidDate(date)) return [];
   if (getClosure(date)) return [];
   if (getHoursForDay(dayOfWeek(date)) === null) return [];
+  ensureRosterForActiveVets();
   return listStaff('veterinarian').filter((vet) => isVetOnDuty(vet.id, date));
 }
 

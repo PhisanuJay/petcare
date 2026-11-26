@@ -4,6 +4,7 @@ import { ADOPTION_API_URL, ADOPTION_STAFF_TOKEN_KEY } from './api.js';
 
 export default function AdoptionStaffGate() {
   const [access, setAccess] = useState('checking');
+  const [staff, setStaff] = useState(null);
   const [error, setError] = useState('');
   const location = useLocation();
 
@@ -28,6 +29,7 @@ export default function AdoptionStaffGate() {
           return;
         }
         if (!response.ok) throw new Error(result.error || 'ตรวจสอบสิทธิ์ไม่สำเร็จ');
+        setStaff(result.staff || null);
         setAccess('allowed');
       } catch (requestError) {
         if (requestError.name !== 'AbortError') {
@@ -45,7 +47,8 @@ export default function AdoptionStaffGate() {
     return <p className="adoption-staff-state" role="status">กำลังตรวจสอบสิทธิ์พนักงาน...</p>;
   }
   if (access === 'anonymous') {
-    return <Navigate to="/adoption/login" state={{ from: location }} replace />;
+    const next = encodeURIComponent(`${location.pathname}${location.search || ''}`);
+    return <Navigate to={`/login?next=${next || '%2Fadoption'}`} replace />;
   }
   if (access === 'error') {
     return (
@@ -57,5 +60,5 @@ export default function AdoptionStaffGate() {
       </div>
     );
   }
-  return <Outlet />;
+  return <Outlet context={{ staff }} />;
 }

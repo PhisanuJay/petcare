@@ -1,10 +1,15 @@
 /* Medical Assistant module styles — scoped under .ma-shell, using only theme.css variables */
 
 .ma-shell {
-  margin: -1.5rem;
-  padding: 2rem 0 4rem;
-  min-height: calc(100vh - 56px);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
   overflow-x: clip;
+}
+
+.ma-shell .ma-content--workspace {
+  min-width: 0;
+  width: 100%;
 }
 
 /* Override .app-shell a specificity for buttons & nav links inside .ma-shell */

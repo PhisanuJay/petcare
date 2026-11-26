@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { ADOPTION_API_URL } from '../api.js';
+import { ADOPTION_API_URL, adoptionCustomerHeaders } from '../api.js';
 import { animalListingPhoto } from '../../pet-owner/petUtils.js';
 import './FindHome.css';
 
@@ -105,7 +105,7 @@ export function AnimalCard({ animal, onApply, onEdit }) {
   );
 }
 
-export function ApplicationDialog({ animal, authToken, onClose, onSubmitted }) {
+export function ApplicationDialog({ animal, authToken, ownerId, onClose, onSubmitted }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
@@ -188,10 +188,10 @@ export function ApplicationDialog({ animal, authToken, onClose, onSubmitted }) {
       const formData = new FormData(event.currentTarget);
       const response = await fetch(`${ADOPTION_API_URL}/applications`, {
         method: 'POST',
-        headers: {
+        headers: adoptionCustomerHeaders(ownerId, {
           'Content-Type': 'application/json',
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-        },
+        }),
         body: JSON.stringify({
           animalId: animal.id,
           firstName: formData.get('firstName'),
@@ -384,7 +384,7 @@ export function ApplicationDialog({ animal, authToken, onClose, onSubmitted }) {
   );
 }
 
-export function AddAnimalDialog({ animal, authToken, onCreated, onClose }) {
+export function AddAnimalDialog({ animal, authToken, ownerId, onCreated, onClose }) {
   const isEditing = Boolean(animal);
   const [photo, setPhoto] = useState(animal?.photo || '');
   const [vaccination, setVaccination] = useState(animal?.vaccination || '');
@@ -438,10 +438,10 @@ export function AddAnimalDialog({ animal, authToken, onCreated, onClose }) {
           : `${ADOPTION_API_URL}/animals`,
         {
           method: isEditing ? 'PATCH' : 'POST',
-          headers: {
+          headers: adoptionCustomerHeaders(ownerId, {
             'Content-Type': 'application/json',
             ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-          },
+          }),
           body: JSON.stringify({
             name: formData.get('name'),
             species: formData.get('species'),

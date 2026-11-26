@@ -20,7 +20,7 @@ export default function AppShell() {
               <Link to="/veterinarian">Veterinarian</Link>
             </li>
             <li>
-              <Link to="/medical-assistant">Medical Assistant</Link>
+              <Link to="/clinic-admin">Clinic Admin</Link>
             </li>
             <li>
               <Link to="/pet-profile">Pet Profile</Link>

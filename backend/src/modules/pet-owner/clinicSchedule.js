@@ -85,5 +85,5 @@ export function validateSlot(date, time) {
 
   if (typeof time !== 'string' || !time) throw httpError(400, 'กรุณาเลือกเวลา');
   if (!bookableSlots(date).includes(time)) throw httpError(400, 'เวลานี้อยู่นอกเวลาทำการของคลินิก');
-  if (date === todayString() && time <= nowTimeString()) throw httpError(400, 'เวลานี้ผ่านไปแล้ว');
+  // อนุญาตจองวันนี้ได้ทั้งตารางเวลาทำการ (ไม่บล็อกเพราะนาฬิกาเลยช่องไปแล้ว)
 }

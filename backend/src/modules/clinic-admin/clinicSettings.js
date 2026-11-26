@@ -4,17 +4,75 @@ import { httpError } from '../pet-owner/jsonCollection.js';
 import { createSyncJsonStore } from './syncJsonStore.js';
 
 // Note: Must NEVER import from `pet-owner/clinicSchedule.js` to avoid circular dependency.
-export const DEFAULT_SERVICES = {
-  triage: 'ประเมินอาการเบื้องต้น',
-  checkup: 'ตรวจสุขภาพทั่วไป',
-  vaccine_combo: 'ฉีดวัคซีนรวม',
-  vaccine_rabies: 'วัคซีนพิษสุนัขบ้า',
-  deworming: 'ถ่ายพยาธิ',
-  flea_prevention: 'ป้องกันเห็บหมัด',
-};
 
-export const DEFAULT_WEEKDAY_HOURS = { open: '09:00', close: '18:00' };
-export const DEFAULT_WEEKEND_HOURS = { open: '09:00', close: '17:00' };
+/** Seed catalog — used for defaults and first-run migration. */
+export const DEFAULT_SERVICE_CATALOG = [
+  {
+    code: 'triage',
+    label: 'ประเมินอาการเบื้องต้น',
+    hint: 'เหมาะเมื่อน้องมีอาการผิดปกติ',
+    icon: 'bi-clipboard2-pulse',
+    prices: { dog: 350, cat: 320 },
+    online: true,
+    active: true,
+    sortOrder: 0,
+  },
+  {
+    code: 'checkup',
+    label: 'ตรวจสุขภาพทั่วไป',
+    icon: 'bi-heart-pulse',
+    prices: { dog: 450, cat: 400 },
+    online: true,
+    active: true,
+    sortOrder: 1,
+  },
+  {
+    code: 'vaccine_combo',
+    label: 'ฉีดวัคซีนรวม',
+    labelDog: 'ฉีดวัคซีนรวม 5–6 โรค',
+    labelCat: 'ฉีดวัคซีนรวม 3–4 โรค',
+    icon: 'bi-capsule',
+    prices: { dog: 550, cat: 500 },
+    online: true,
+    active: true,
+    sortOrder: 2,
+  },
+  {
+    code: 'vaccine_rabies',
+    label: 'วัคซีนพิษสุนัขบ้า',
+    icon: 'bi-shield-plus',
+    prices: { dog: 250, cat: 200 },
+    online: true,
+    active: true,
+    sortOrder: 3,
+  },
+  {
+    code: 'deworming',
+    label: 'ถ่ายพยาธิ',
+    icon: 'bi-bug',
+    prices: { dog: 150, cat: 150 },
+    online: true,
+    active: true,
+    sortOrder: 4,
+  },
+  {
+    code: 'flea_prevention',
+    label: 'ป้องกันเห็บหมัด',
+    icon: 'bi-droplet',
+    prices: { dog: 450, cat: 350 },
+    online: true,
+    active: true,
+    sortOrder: 5,
+  },
+];
+
+/** Legacy label map for older imports (reports / booking labels). */
+export const DEFAULT_SERVICES = Object.fromEntries(
+  DEFAULT_SERVICE_CATALOG.map((item) => [item.code, item.label]),
+);
+
+export const DEFAULT_WEEKDAY_HOURS = { open: '09:00', close: '21:00' };
+export const DEFAULT_WEEKEND_HOURS = { open: '09:00', close: '21:00' };
 export const DEFAULT_LUNCH_BREAK = { start: '12:00', end: '13:00' };
 export const DEFAULT_SLOT_MINUTES = 60;
 
@@ -26,6 +84,7 @@ const settingsFile = path.join(
 
 const SLOT_TIME_RE = /^([01]\d|2[0-3]):(00|30)$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CODE_RE = /^[a-z][a-z0-9_]{1,31}$/;
 
 const toMinutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3));
 
@@ -52,18 +111,102 @@ function isValidDayHours(val) {
   return toMinutes(val.close) - toMinutes(val.open) >= 30;
 }
 
+function moneyOr(value, fallback) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.round(n * 100) / 100;
+}
+
+function cloneDefaultCatalog() {
+  return DEFAULT_SERVICE_CATALOG.map((item, index) => ({
+    code: item.code,
+    label: item.label,
+    labelDog: item.labelDog || '',
+    labelCat: item.labelCat || '',
+    hint: item.hint || '',
+    icon: item.icon || 'bi-calendar2-check',
+    prices: {
+      dog: moneyOr(item.prices?.dog, 0),
+      cat: moneyOr(item.prices?.cat, 0),
+    },
+    online: item.online !== false,
+    active: item.active !== false,
+    sortOrder: Number.isFinite(item.sortOrder) ? item.sortOrder : index,
+  }));
+}
+
+function normalizeCatalogEntry(raw, fallback = null, index = 0) {
+  const seed = fallback || DEFAULT_SERVICE_CATALOG.find((s) => s.code === raw?.code) || null;
+  const code = typeof raw?.code === 'string' ? raw.code.trim().toLowerCase() : seed?.code;
+  if (!code || !CODE_RE.test(code)) return null;
+
+  const label = typeof raw?.label === 'string' && raw.label.trim()
+    ? raw.label.trim().slice(0, 80)
+    : (seed?.label || code);
+  const labelDog = typeof raw?.labelDog === 'string' ? raw.labelDog.trim().slice(0, 80) : (seed?.labelDog || '');
+  const labelCat = typeof raw?.labelCat === 'string' ? raw.labelCat.trim().slice(0, 80) : (seed?.labelCat || '');
+  const hint = typeof raw?.hint === 'string' ? raw.hint.trim().slice(0, 160) : (seed?.hint || '');
+  const icon = typeof raw?.icon === 'string' && raw.icon.trim()
+    ? raw.icon.trim().slice(0, 40)
+    : (seed?.icon || 'bi-calendar2-check');
+
+  return {
+    code,
+    label,
+    labelDog,
+    labelCat,
+    hint,
+    icon,
+    prices: {
+      dog: moneyOr(raw?.prices?.dog, seed?.prices?.dog ?? 0),
+      cat: moneyOr(raw?.prices?.cat, seed?.prices?.cat ?? 0),
+    },
+    online: typeof raw?.online === 'boolean' ? raw.online : (seed?.online !== false),
+    active: typeof raw?.active === 'boolean' ? raw.active : (seed?.active !== false),
+    sortOrder: Number.isFinite(Number(raw?.sortOrder)) ? Number(raw.sortOrder) : (seed?.sortOrder ?? index),
+  };
+}
+
+function migrateCatalogFromLegacy(raw) {
+  const catalog = cloneDefaultCatalog();
+  if (!raw?.services || typeof raw.services !== 'object' || Array.isArray(raw.services)) {
+    return catalog;
+  }
+  return catalog.map((item) => {
+    const legacy = raw.services[item.code];
+    if (!legacy || typeof legacy !== 'object') return item;
+    return {
+      ...item,
+      online: typeof legacy.online === 'boolean' ? legacy.online : item.online,
+    };
+  });
+}
+
+function normalizeCatalog(raw) {
+  if (Array.isArray(raw?.catalog) && raw.catalog.length) {
+    const seen = new Set();
+    const list = [];
+    raw.catalog.forEach((entry, index) => {
+      const normalized = normalizeCatalogEntry(entry, null, index);
+      if (!normalized || seen.has(normalized.code)) return;
+      seen.add(normalized.code);
+      list.push(normalized);
+    });
+    if (list.length) {
+      return list.sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'th'));
+    }
+  }
+  return migrateCatalogFromLegacy(raw);
+}
+
 function createDefaultSettings() {
   const hours = {};
   for (let d = 0; d <= 6; d += 1) {
     hours[String(d)] = defaultHoursForDay(d);
   }
-  const services = {};
-  for (const code of Object.keys(DEFAULT_SERVICES)) {
-    services[code] = { online: true };
-  }
   return {
     hours,
-    services,
+    catalog: cloneDefaultCatalog(),
     closures: [],
     slotMinutes: DEFAULT_SLOT_MINUTES,
     lunchBreak: { ...DEFAULT_LUNCH_BREAK },
@@ -97,14 +240,6 @@ function normalizeSettings(raw) {
     }
   }
 
-  const services = {};
-  for (const code of Object.keys(DEFAULT_SERVICES)) {
-    const entry = raw.services?.[code];
-    services[code] = {
-      online: entry && typeof entry.online === 'boolean' ? entry.online : true,
-    };
-  }
-
   const seenDates = new Set();
   const closures = [];
   if (Array.isArray(raw.closures)) {
@@ -126,7 +261,7 @@ function normalizeSettings(raw) {
 
   return {
     hours,
-    services,
+    catalog: normalizeCatalog(raw),
     closures,
     slotMinutes: Number.isFinite(slotMinutes) && slotMinutes >= 30 ? slotMinutes : base.slotMinutes,
     lunchBreak,
@@ -140,6 +275,27 @@ const settingsStore = createSyncJsonStore(settingsFile, {
   label: 'clinicSettings',
 });
 
+function publicServiceView(item) {
+  return {
+    code: item.code,
+    label: item.label,
+    labelDog: item.labelDog || undefined,
+    labelCat: item.labelCat || undefined,
+    hint: item.hint || undefined,
+    icon: item.icon,
+    prices: { dog: item.prices.dog, cat: item.prices.cat },
+    online: item.online,
+  };
+}
+
+function adminServiceView(item) {
+  return {
+    ...publicServiceView(item),
+    active: item.active,
+    sortOrder: item.sortOrder,
+  };
+}
+
 export function getHoursForDay(day) {
   const key = String(day);
   return settingsStore.get().hours[key] ?? null;
@@ -150,22 +306,62 @@ export function getClosure(dateString) {
   return settingsStore.get().closures.find((c) => c.date === dateString) ?? null;
 }
 
+/** Admin list (includes inactive). */
 export function listServices() {
-  const { services } = settingsStore.get();
-  return Object.entries(DEFAULT_SERVICES).map(([code, label]) => ({
-    code,
-    label,
-    online: services[code]?.online !== false,
-  }));
+  return settingsStore.get().catalog
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'th'))
+    .map(adminServiceView);
+}
+
+/** Bookable online services for public/booking. */
+export function listBookableServices() {
+  return settingsStore.get().catalog
+    .filter((item) => item.active && item.online)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'th'))
+    .map(publicServiceView);
+}
+
+export function getService(code) {
+  const key = String(code || '').trim().toLowerCase();
+  return settingsStore.get().catalog.find((item) => item.code === key) || null;
+}
+
+export function isKnownService(code) {
+  const item = getService(code);
+  return Boolean(item?.active);
 }
 
 export function isServiceOnline(code) {
-  if (!Object.hasOwn(DEFAULT_SERVICES, code)) return false;
-  return settingsStore.get().services[code]?.online !== false;
+  const item = getService(code);
+  return Boolean(item?.active && item.online);
+}
+
+export function servicePrice(code, species) {
+  const item = getService(code);
+  if (!item) return 0;
+  const group = String(species || '').toLowerCase() === 'cat' ? 'cat' : 'dog';
+  return moneyOr(item.prices?.[group], item.prices?.dog ?? 0);
+}
+
+export function serviceLabel(code, species) {
+  const item = getService(code);
+  if (!item) return code;
+  const group = String(species || '').toLowerCase() === 'cat' ? 'cat' : 'dog';
+  if (group === 'cat' && item.labelCat) return item.labelCat;
+  if (group === 'dog' && item.labelDog) return item.labelDog;
+  return item.label;
 }
 
 export function getSettings() {
-  return settingsStore.get();
+  const settings = settingsStore.get();
+  return {
+    ...settings,
+    // Compat shape for older readers that still expect services map
+    services: Object.fromEntries(
+      settings.catalog.map((item) => [item.code, { online: item.online }]),
+    ),
+  };
 }
 
 /** Bookable start times for a date (respects hours, lunch break, slot length). */
@@ -225,6 +421,7 @@ export async function updateHours(nextHours) {
   });
 }
 
+/** Patch online flags: `{ checkup: true, triage: false }`. */
 export async function updateServices(patch) {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
     throw httpError(400, 'ข้อมูลบริการไม่ถูกต้อง');
@@ -235,34 +432,118 @@ export async function updateServices(patch) {
     throw httpError(400, 'กรุณาระบุบริการที่ต้องการปรับปรุง');
   }
   for (const [code, online] of entries) {
-    if (!Object.hasOwn(DEFAULT_SERVICES, code)) {
-      throw httpError(400, `ไม่พบรหัสบริการ ${code}`);
-    }
+    if (!getService(code)) throw httpError(400, `ไม่พบรหัสบริการ ${code}`);
     if (typeof online !== 'boolean') {
       throw httpError(400, `ค่าสถานะบริการ ${code} ต้องเป็น boolean`);
     }
   }
 
   return settingsStore.update((current) => {
-    const nextServices = { ...current.services };
-    for (const [code, online] of entries) {
-      nextServices[code] = { online };
-    }
+    const catalog = current.catalog.map((item) => {
+      if (!Object.hasOwn(patch, item.code)) return item;
+      return { ...item, online: patch[item.code] };
+    });
     const updated = {
       ...current,
-      services: nextServices,
+      catalog,
       updatedAt: new Date().toISOString(),
     };
-    return { value: updated, result: listServicesFrom(updated) };
+    return {
+      value: updated,
+      result: catalog
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+        .map(adminServiceView),
+    };
   });
 }
 
-function listServicesFrom(settings) {
-  return Object.entries(DEFAULT_SERVICES).map(([code, label]) => ({
+function parseServiceInput(body, { requireCode = false, existing = null } = {}) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw httpError(400, 'ข้อมูลบริการไม่ถูกต้อง');
+  }
+
+  let code = existing?.code;
+  if (requireCode || body.code !== undefined) {
+    if (typeof body.code !== 'string' || !CODE_RE.test(body.code.trim().toLowerCase())) {
+      throw httpError(400, 'รหัสบริการต้องเป็นภาษาอังกฤษตัวเล็ก ตัวเลข หรือ _ (2–32 ตัว)');
+    }
+    code = body.code.trim().toLowerCase();
+  }
+  if (!code) throw httpError(400, 'กรุณาระบุรหัสบริการ');
+
+  const label = body.label !== undefined
+    ? String(body.label || '').trim()
+    : (existing?.label || '');
+  if (!label) throw httpError(400, 'กรุณาระบุชื่อบริการ');
+  if (label.length > 80) throw httpError(400, 'ชื่อบริการต้องไม่เกิน 80 ตัวอักษร');
+
+  const pricesIn = body.prices && typeof body.prices === 'object' ? body.prices : {};
+  const dog = body.priceDog !== undefined ? body.priceDog : pricesIn.dog;
+  const cat = body.priceCat !== undefined ? body.priceCat : pricesIn.cat;
+
+  return {
     code,
     label,
-    online: settings.services[code]?.online !== false,
-  }));
+    labelDog: body.labelDog !== undefined
+      ? String(body.labelDog || '').trim().slice(0, 80)
+      : (existing?.labelDog || ''),
+    labelCat: body.labelCat !== undefined
+      ? String(body.labelCat || '').trim().slice(0, 80)
+      : (existing?.labelCat || ''),
+    hint: body.hint !== undefined
+      ? String(body.hint || '').trim().slice(0, 160)
+      : (existing?.hint || ''),
+    icon: body.icon !== undefined
+      ? String(body.icon || 'bi-calendar2-check').trim().slice(0, 40) || 'bi-calendar2-check'
+      : (existing?.icon || 'bi-calendar2-check'),
+    prices: {
+      dog: moneyOr(dog, existing?.prices?.dog ?? 0),
+      cat: moneyOr(cat, existing?.prices?.cat ?? 0),
+    },
+    online: typeof body.online === 'boolean' ? body.online : (existing?.online !== false),
+    active: typeof body.active === 'boolean' ? body.active : (existing?.active !== false),
+    sortOrder: Number.isFinite(Number(body.sortOrder))
+      ? Number(body.sortOrder)
+      : (existing?.sortOrder ?? 100),
+  };
+}
+
+export async function createService(body) {
+  const entry = parseServiceInput(body, { requireCode: true });
+  return settingsStore.update((current) => {
+    if (current.catalog.some((item) => item.code === entry.code)) {
+      throw httpError(409, 'รหัสบริการนี้มีอยู่แล้ว');
+    }
+    const catalog = [...current.catalog, entry]
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, 'th'));
+    const updated = {
+      ...current,
+      catalog,
+      updatedAt: new Date().toISOString(),
+    };
+    return { value: updated, result: adminServiceView(entry) };
+  });
+}
+
+export async function updateService(code, body) {
+  const existing = getService(code);
+  if (!existing) throw httpError(404, 'ไม่พบบริการนี้');
+  const entry = parseServiceInput(
+    { ...body, code: existing.code },
+    { existing },
+  );
+  return settingsStore.update((current) => {
+    const catalog = current.catalog.map((item) => (
+      item.code === existing.code ? entry : item
+    ));
+    const updated = {
+      ...current,
+      catalog,
+      updatedAt: new Date().toISOString(),
+    };
+    return { value: updated, result: adminServiceView(entry) };
+  });
 }
 
 export async function addClosure({ date, reason } = {}) {

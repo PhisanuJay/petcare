@@ -15,7 +15,7 @@ export function findVetConflict(
   excludeId = null,
 ) {
   const targetStart = toMinutes(time);
-  const targetDur = Number(durationMin) || 30;
+  const targetDur = Math.min(Math.max(Number(durationMin) || 30, 15), 120);
   if (Number.isNaN(targetStart)) return null;
 
   for (const b of bookings) {
@@ -26,7 +26,8 @@ export function findVetConflict(
     if (!v || !sameVet(v, { vetId, vet })) continue;
 
     const bStart = toMinutes(b.time);
-    const bDur = Number(v.durationMin) || 30;
+    // กัน duration ผิดปกติ (เคยคูณจำนวนบริการจนบล็อกทั้งวัน)
+    const bDur = Math.min(Math.max(Number(v.durationMin) || 30, 15), 120);
     if (overlaps(targetStart, targetDur, bStart, bDur)) {
       return {
         booking: b,
@@ -53,22 +54,20 @@ export function pickVetForOnlineBooking({
   const onDuty = [...vetsOnDuty(date)].sort((a, b) => String(a.id).localeCompare(String(b.id)));
   const preferred = typeof preferredVetId === 'string' ? preferredVetId.trim() : '';
 
-  let candidates;
   if (preferred) {
     const match = onDuty.find((v) => v.id === preferred);
     if (!match) {
       throw httpError(400, 'สัตวแพทย์ที่เลือกไม่ได้เข้าเวรวันนี้');
     }
-    candidates = [match];
-  } else {
-    candidates = onDuty;
+    // จองออนไลน์ยึดหมอที่ลูกค้าเลือกได้เลย (ตารางเวรครบทุกคน)
+    return { id: match.id, name: match.name ?? '' };
   }
 
-  if (candidates.length === 0) {
+  if (onDuty.length === 0) {
     throw httpError(409, 'ไม่มีสัตวแพทย์ว่างในช่วงเวลานี้ กรุณาเลือกเวลาอื่น');
   }
 
-  for (const vet of candidates) {
+  for (const vet of onDuty) {
     const conflict = findVetConflict(
       bookings,
       visitsMap,
@@ -80,11 +79,7 @@ export function pickVetForOnlineBooking({
     }
   }
 
-  if (preferred) {
-    throw httpError(
-      409,
-      'สัตวแพทย์ที่เลือกมีนัดในช่วงเวลานี้แล้ว กรุณาเลือกเวลาอื่นหรือเลือกให้คลินิกจัดสรร',
-    );
-  }
-  throw httpError(409, 'ไม่มีสัตวแพทย์ว่างในช่วงเวลานี้ กรุณาเลือกเวลาอื่น');
+  // ถ้าทุกคนชนนัดเก่า ให้จัดสรรคนแรกที่เข้าเวร — ไม่บล็อกการจองออนไลน์
+  const fallback = onDuty[0];
+  return { id: fallback.id, name: fallback.name ?? '' };
 }

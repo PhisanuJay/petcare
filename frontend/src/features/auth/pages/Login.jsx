@@ -3,9 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DEMO_ACCOUNTANT_LOGIN,
   DEMO_ADMIN_LOGIN,
-  DEMO_ADOPTION_STAFF_LOGIN,
   DEMO_DRIVER_LOGIN,
-  DEMO_FIND_HOME_LOGIN,
   DEMO_OWNER_LOGIN,
   DEMO_SUPER_ADMIN_LOGIN,
   useAuth,
@@ -13,18 +11,27 @@ import {
 import AuthCard, { safeNext } from '../components/AuthCard.jsx';
 import { canAccessPath, homePathForRole, normalizeRole } from '../roles.js';
 import { STAFF_HOME } from '../staffSession.js';
-import { ADOPTION_API_URL, ADOPTION_STAFF_TOKEN_KEY } from '../../adoption/api.js';
-
-function isStaffPath(path) {
-  return Object.values(STAFF_HOME).some((home) => path === home || path.startsWith(`${home}/`));
-}
 
 function staffDestination(staff, next) {
   const home = STAFF_HOME[staff.role] || '/';
   return next === home || next.startsWith(`${home}/`) ? next : home;
 }
 
+const DEMO_CLINIC_ADMIN_LOGIN = { email: 'admin@petcare.clinic', password: 'vet12345' };
+const DEMO_VET_LOGIN = { email: 'vet1@petcare.clinic', password: 'vet12345' };
+
+const DEMO_SHORTCUTS = [
+  { label: 'แอดมินโรงแรม', ...DEMO_ADMIN_LOGIN },
+  { label: 'แอดมินคลินิก', ...DEMO_CLINIC_ADMIN_LOGIN },
+  { label: 'สัตวแพทย์', ...DEMO_VET_LOGIN },
+  { label: 'คนขับ (โรงแรม)', ...DEMO_DRIVER_LOGIN },
+  { label: 'บัญชี', ...DEMO_ACCOUNTANT_LOGIN },
+  { label: 'เจ้าของสัตว์', ...DEMO_OWNER_LOGIN },
+  { label: 'Super Admin', ...DEMO_SUPER_ADMIN_LOGIN },
+];
+
 export default function LoginPage() {
+
   const { currentUser, currentStaff, login, staffLogin } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -65,72 +72,49 @@ export default function LoginPage() {
     try {
       let cctvError = '';
       const email = form.email.trim().toLowerCase();
-      if (email === DEMO_SUPER_ADMIN_LOGIN.email) {
-        try {
-          const response = await fetch('/api/cctv-auth/login', {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password: form.password }),
-          });
-          const result = await response.json().catch(() => ({}));
-          if (response.ok) {
-            navigate('/super-admin', { replace: true });
-            return;
-          }
-          if (response.status !== 401) {
-            cctvError = result.error?.message || 'เข้าสู่ระบบ CCTV ไม่สำเร็จ';
-          }
-        } catch {
-          cctvError = 'เชื่อมต่อระบบ CCTV ไม่ได้ กรุณาตรวจสอบว่า Backend ทำงานอยู่';
-        }
-      }
 
       let customerError;
       try {
         const user = await login(form.email, form.password, form.remember);
         const role = normalizeRole(user.role);
+
+        // Super Admin: เปิด session CCTV ควบคู่ (best-effort) เพื่อเข้าโมดูลกล้องได้
+        if (role === 'super_admin' || email === DEMO_SUPER_ADMIN_LOGIN.email) {
+          try {
+            const response = await fetch('/api/cctv-auth/login', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, password: form.password }),
+            });
+            if (!response.ok && response.status !== 401) {
+              const result = await response.json().catch(() => ({}));
+              cctvError = result.error?.message || 'เข้าสู่ระบบ CCTV ไม่สำเร็จ';
+            }
+          } catch {
+            cctvError = 'เชื่อมต่อระบบ CCTV ไม่ได้ (ภาพรวม PetCare ยังใช้ได้)';
+          }
+        }
+
         const destination =
           requestedNext && canAccessPath(role, requestedNext)
             ? requestedNext
             : homePathForRole(role);
         navigate(destination, { replace: true });
+        if (cctvError) {
+          // ไม่บล็อกเข้า console — CCTV login ล้มเหลวแค่แจ้งใน console
+          console.warn(cctvError);
+        }
         return;
       } catch (loginError) {
         customerError = loginError;
-      }
-
-      let adoptionError = '';
-      try {
-        const response = await fetch(`${ADOPTION_API_URL}/staff/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: form.email, password: form.password }),
-        });
-        const result = await response.json();
-        if (response.ok) {
-          sessionStorage.setItem(ADOPTION_STAFF_TOKEN_KEY, result.token);
-          navigate('/adoption', { replace: true });
-          return;
-        }
-        if (response.status !== 401) {
-          adoptionError = result.error || 'เข้าสู่ระบบพนักงานไม่สำเร็จ';
-        }
-      } catch (requestError) {
-        adoptionError = requestError instanceof TypeError
-          ? 'เชื่อมต่อระบบพนักงานไม่ได้ กรุณาตรวจสอบว่า Backend ทำงานอยู่'
-          : requestError.message || 'เข้าสู่ระบบพนักงานไม่สำเร็จ';
       }
 
       try {
         const staff = await staffLogin(form.email, form.password, form.remember);
         navigate(staffDestination(staff, next), { replace: true });
       } catch (staffError) {
-        setError(
-          adoptionError
-            ? `${adoptionError} (${customerError.message})`
-            : cctvError || staffError.message || customerError.message,
-        );
+        setError(cctvError || staffError.message || customerError.message);
       }
     } finally {
       setSubmitting(false);
@@ -138,7 +122,10 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthCard title="ยินดีต้อนรับกลับ" subtitle="เข้าสู่ระบบตามบทบาทของคุณ (Owner / หาบ้าน / พนักงานหาบ้าน / Admin / Staff / Super Admin)">
+    <AuthCard
+      title="ยินดีต้อนรับกลับ"
+      subtitle="เข้าสู่ระบบตามบทบาท (เจ้าของสัตว์ · แอดมินโรงแรม · แอดมินคลินิก · สัตวแพทย์ · MA · คนขับ · บัญชี · Super Admin)"
+    >
       <form onSubmit={handleSubmit} noValidate>
         {error && (
           <div className="alert-soft danger mb-3">
@@ -206,30 +193,31 @@ export default function LoginPage() {
           <Link to="/register" className="fw-medium">สมัครสมาชิกฟรี</Link>
         </p>
         <p className="text-center small text-muted mb-0">
-          คนขับไม่สามารถสมัครเองได้ — ให้แอดมินสร้างบัญชีให้
+          คนขับสมัครเองไม่ได้ — ให้แอดมินโรงแรมสร้างบัญชีให้
         </p>
-        <p className="text-center small text-muted mt-2 mb-0">
-          Owner: {DEMO_OWNER_LOGIN.email} / {DEMO_OWNER_LOGIN.password}
-        </p>
-        <p className="text-center small text-muted mt-1 mb-0">
-          หาบ้าน: {DEMO_FIND_HOME_LOGIN.email} / {DEMO_FIND_HOME_LOGIN.password}
-        </p>
-        <p className="text-center small text-muted mt-1 mb-0">
-          พนักงานหาบ้าน: {DEMO_ADOPTION_STAFF_LOGIN.email} / {DEMO_ADOPTION_STAFF_LOGIN.password}
-        </p>
-        <p className="text-center small text-muted mt-1 mb-0">
-          คนขับ: {DEMO_DRIVER_LOGIN.email} / {DEMO_DRIVER_LOGIN.password}
-          {' · '}แอดมิน: {DEMO_ADMIN_LOGIN.email} / {DEMO_ADMIN_LOGIN.password}
-        </p>
-        <p className="text-center small text-muted mt-1 mb-0">
-          บัญชี: {DEMO_ACCOUNTANT_LOGIN.email} / {DEMO_ACCOUNTANT_LOGIN.password}
-        </p>
-        <p className="text-center small text-muted mt-1 mb-0">
-          Super Admin: {DEMO_SUPER_ADMIN_LOGIN.email} / {DEMO_SUPER_ADMIN_LOGIN.password}
-        </p>
-        <p className="text-center small text-muted mt-1 mb-0">
-          Staff คลินิก: admin@petcare.clinic / vet12345
-        </p>
+        <div className="login-demo-shortcuts mt-3">
+          <p className="text-center small text-muted mb-2">ทางลัดบัญชีทดสอบ — กดเพื่อกรอกอีเมล/รหัสผ่าน</p>
+          <div className="login-demo-shortcuts__list">
+            {DEMO_SHORTCUTS.map((item) => (
+              <button
+                key={item.email}
+                type="button"
+                className="login-demo-shortcuts__chip"
+                onClick={() => {
+                  setError('');
+                  setForm((value) => ({
+                    ...value,
+                    email: item.email,
+                    password: item.password,
+                  }));
+                }}
+              >
+                <strong>{item.label}</strong>
+                <span>{item.email}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </form>
     </AuthCard>
   );

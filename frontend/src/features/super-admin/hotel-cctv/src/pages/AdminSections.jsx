@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { IconSearch } from '../components/Marks';
 import { api, bangkokInput, formatWhen, statusLabel } from '../api';
 import { listLocalOwnerAccounts } from '../../../../auth/AuthContext.jsx';
+import StayAccessPanel from './StayAccessPanel.jsx';
 
 const CARE_LABEL = {
   feed: 'อาหาร',
@@ -63,7 +64,7 @@ export function RoomsHub({ canManage = true, canGrant = false } = {}) {
         ) : null}
       </div>
       {view === 'access' && canGrant ? (
-        <RolesPanel embedded initialCameraId={grantCamera} />
+        <StayAccessPanel embedded initialCameraId={grantCamera} />
       ) : (
         <RoomsPanel
           canManage={canManage}

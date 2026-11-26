@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import PetPhoto from '../../pet-owner/components/PetPhoto.jsx';
 import {
@@ -118,7 +118,7 @@ export default function PatientDetailPage() {
     return (
       <section>
         <div className="mb-3">
-          <Link to="/medical-assistant/patients" className="small text-decoration-none">
+          <Link to="/clinic-admin/patients" className="small text-decoration-none">
             <i className="bi bi-arrow-left me-1" />
             กลับไปหน้ารายชื่อสัตว์เลี้ยง
           </Link>
@@ -131,7 +131,7 @@ export default function PatientDetailPage() {
             <i className="bi bi-question-circle" />
             <div>ไม่พบข้อมูลสัตว์เลี้ยงนี้</div>
             <div className="mt-3">
-              <Link to="/medical-assistant/patients" className="btn btn-sky">
+              <Link to="/clinic-admin/patients" className="btn btn-sky">
                 กลับไปหน้ารายชื่อสัตว์เลี้ยง
               </Link>
             </div>
@@ -212,7 +212,7 @@ export default function PatientDetailPage() {
   return (
     <section>
       <div className="mb-3">
-        <Link to="/medical-assistant/patients" className="small text-decoration-none">
+        <Link to="/clinic-admin/patients" className="small text-decoration-none">
           <i className="bi bi-arrow-left me-1" />
           กลับไปหน้ารายชื่อสัตว์เลี้ยง
         </Link>
@@ -494,7 +494,7 @@ export default function PatientDetailPage() {
                       {checkedIn && (
                         <div className="mt-1">
                           <Link
-                            to={`/medical-assistant/medical-support/${a.id}`}
+                            to={`/clinic-admin/appointments`}
                             className="small text-decoration-none"
                           >
                             เปิดข้อมูลสนับสนุนการรักษา <i className="bi bi-arrow-right-short" />

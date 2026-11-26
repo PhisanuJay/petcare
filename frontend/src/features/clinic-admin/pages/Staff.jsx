@@ -10,7 +10,6 @@ import { useCaResource } from '../data/useCaResource.js';
 const ROLE_TABS = [
   { key: 'all', label: 'ทั้งหมด' },
   { key: 'veterinarian', label: 'สัตวแพทย์' },
-  { key: 'medical_assistant', label: 'ผู้ช่วยฯ' },
   { key: 'clinic_admin', label: 'แอดมิน' },
 ];
 
@@ -89,7 +88,6 @@ export default function Staff() {
     return {
       all: list.length,
       veterinarian: list.filter((m) => m.role === 'veterinarian').length,
-      medical_assistant: list.filter((m) => m.role === 'medical_assistant').length,
       clinic_admin: list.filter((m) => m.role === 'clinic_admin').length,
     };
   }, [staffList, showInactive]);
@@ -551,7 +549,6 @@ export default function Staff() {
               onChange={(e) => setCreateForm((f) => ({ ...f, role: e.target.value }))}
             >
               <option value="veterinarian">{ROLE_LABELS.veterinarian}</option>
-              <option value="medical_assistant">{ROLE_LABELS.medical_assistant}</option>
               <option value="clinic_admin">{ROLE_LABELS.clinic_admin}</option>
             </select>
           </div>
@@ -668,7 +665,6 @@ export default function Staff() {
               }}
             >
               <option value="veterinarian">{ROLE_LABELS.veterinarian}</option>
-              <option value="medical_assistant">{ROLE_LABELS.medical_assistant}</option>
               <option value="clinic_admin">{ROLE_LABELS.clinic_admin}</option>
             </select>
           </div>

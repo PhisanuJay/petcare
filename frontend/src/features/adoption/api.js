@@ -1,10 +1,27 @@
 import { API_BASE_URL } from '../../shared/api.js';
+import { ownerAuthHeaders } from '../../shared/ownerAuthHeaders.js';
 
 export const ADOPTION_API_URL = `${API_BASE_URL}/api/adoption`;
 export const ADOPTION_STAFF_TOKEN_KEY = 'petcare.adoption.staff-token';
 
+/** Headers สำหรับสมาชิกที่ล็อกอิน (Bearer + x-owner-id) */
+export function adoptionCustomerHeaders(ownerId, extra = {}) {
+  return ownerAuthHeaders(ownerId, extra);
+}
+
+/** Bearer ของแอดมินโรงแรมตอนทำงานหาบ้านใน /admin/adoption */
+let adoptionOpsBearer = '';
+
+export function setAdoptionOpsBearer(token) {
+  adoptionOpsBearer = typeof token === 'string' ? token : '';
+}
+
+export function getAdoptionOpsBearer() {
+  return adoptionOpsBearer || sessionStorage.getItem(ADOPTION_STAFF_TOKEN_KEY) || '';
+}
+
 export function adoptionStaffFetch(path, options = {}) {
-  const token = sessionStorage.getItem(ADOPTION_STAFF_TOKEN_KEY);
+  const token = getAdoptionOpsBearer();
   return fetch(`${ADOPTION_API_URL}/staff${path}`, {
     ...options,
     headers: {

@@ -5,9 +5,11 @@ import {
   readAdoptionResponse,
   updateAdoptionAnimalStatus,
 } from '../api.js';
+import { useAdoptionBasePath } from '../useAdoptionBasePath.js';
 import { adoptionListingPhoto } from './findHomeDialogs.jsx';
 
 export default function AdoptionDashboardPage() {
+  const base = useAdoptionBasePath();
   const [overview, setOverview] = useState(null);
   const [animals, setAnimals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,7 +68,7 @@ export default function AdoptionDashboardPage() {
     <section>
       <div className="adoption-staff-page-title">
         <h1>ภาพรวมการหาบ้าน</h1>
-        <p>จัดการคำร้องและติดตามสถานะน้องๆ · <Link to="/adoption/history">ประวัติรับเลี้ยง</Link></p>
+        <p>จัดการคำร้องและติดตามสถานะน้องๆ · <Link to={`${base}/history`}>ประวัติรับเลี้ยง</Link></p>
       </div>
       {error && <div className="alert alert-danger" role="alert">{error}</div>}
       {loading && <p role="status">กำลังโหลดข้อมูล...</p>}

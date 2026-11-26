@@ -40,7 +40,7 @@ export default function DriversPage() {
     <>
       <h1>จัดการคนขับ</h1>
       <p className="tp-lead">
-        Admin สร้างบัญชีคนขับเท่านั้น — คนขับสมัครเองไม่ได้ และบัญชีจะปรากฏใน Assign อัตโนมัติ
+        แอดมินโรงแรมสร้างบัญชีคนขับเท่านั้น — คนขับสมัครเองไม่ได้ และบัญชีจะปรากฏใน Assign อัตโนมัติ
       </p>
 
       {msg && <div className="tp-alert tp-alert--ok">{msg}</div>}

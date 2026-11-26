@@ -3,14 +3,68 @@ import { createJsonCollection, httpError } from './jsonCollection.js';
 import { withDemoHealthIfEmpty } from './seedPetHealth.js';
 
 const pets = createJsonCollection('pets.json');
+const DEMO_OWNER_ID = 'owner-seed';
 
-export function listPets(ownerId) {
-  return pets.read().then((all) =>
-    all
-      .filter((pet) => pet.ownerId === ownerId)
-      .map(withDemoHealthIfEmpty)
-      .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt))),
-  );
+function demoPetsForOwner(ownerId) {
+  const now = new Date().toISOString();
+  return [
+    {
+      id: 'pet-demo-didi',
+      ownerId,
+      name: 'ดีดี้',
+      species: 'dog',
+      breed: 'ปอมเมอเรเนียน',
+      sex: 'male',
+      birthDate: '2022-05-10',
+      weight: '3.2',
+      color: 'ครีม',
+      photo: '',
+      neutered: true,
+      vaccines: [],
+      treatments: [],
+      parasites: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: 'pet-demo-mali',
+      ownerId,
+      name: 'มะลิ',
+      species: 'cat',
+      breed: 'ไทย',
+      sex: 'female',
+      birthDate: '2023-01-20',
+      weight: '4.1',
+      color: 'ขาวส้ม',
+      photo: '',
+      neutered: true,
+      vaccines: [],
+      treatments: [],
+      parasites: [],
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
+}
+
+/** เติมสัตว์ demo ให้บัญชี owner@petcare.local ถ้ายังไม่มี — ให้จองได้ทันที */
+async function ensureDemoOwnerPets(ownerId) {
+  if (ownerId !== DEMO_OWNER_ID) return;
+  const all = await pets.read();
+  if (all.some((pet) => pet.ownerId === DEMO_OWNER_ID)) return;
+  await pets.update((current) => ({
+    records: [...current, ...demoPetsForOwner(DEMO_OWNER_ID)],
+    result: true,
+  }));
+}
+
+export async function listPets(ownerId) {
+  await ensureDemoOwnerPets(ownerId);
+  const all = await pets.read();
+  return all
+    .filter((pet) => pet.ownerId === ownerId)
+    .map(withDemoHealthIfEmpty)
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
 }
 
 export function findPet(ownerId, id) {

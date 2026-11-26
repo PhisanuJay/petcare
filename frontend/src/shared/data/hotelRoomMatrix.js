@@ -197,6 +197,8 @@ export function pricingRoomFromMatrix(row, priceOverride) {
     icon: row.icon,
     bg: row.bg,
     fg: row.fg,
+    species: row.species,
+    sizeCode: row.sizeCode,
     sizeHint: row.sizeHint,
     features: [...row.features],
   };

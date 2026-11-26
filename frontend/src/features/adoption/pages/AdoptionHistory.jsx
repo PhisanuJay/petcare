@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adoptionStaffFetch, readAdoptionResponse } from '../api.js';
+import { useAdoptionBasePath } from '../useAdoptionBasePath.js';
 import { adoptionListingPhoto } from './findHomeDialogs.jsx';
 
 export default function AdoptionHistoryPage() {
+  const base = useAdoptionBasePath();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -60,7 +62,7 @@ export default function AdoptionHistoryPage() {
                   </p>
                 )}
               </div>
-              <Link className="btn btn-soft btn-sm" to="/adoption/requests">
+              <Link className="btn btn-soft btn-sm" to={`${base}/requests`}>
                 ดูคำขอที่เกี่ยวข้อง
               </Link>
             </article>

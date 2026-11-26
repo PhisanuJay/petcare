@@ -13,11 +13,51 @@ export const STATS = [
 ];
 
 export const SERVICES = [
-  { icon: 'bi-clipboard2-pulse', title: 'ตรวจสุขภาพ', desc: 'ตรวจร่างกาย ตรวจเลือด', bg: '#dcecfc', fg: '#2f7fc8' },
-  { icon: 'bi-capsule', title: 'ฉีดวัคซีน', desc: 'แจ้งเตือนนัดอัตโนมัติ', bg: '#dff5e8', fg: '#2a9d64' },
-  { icon: 'bi-bandaid', title: 'ผ่าตัด / ทำหมัน', desc: 'ห้องผ่าตัดมาตรฐาน', bg: '#e6e3ff', fg: '#5b52d6' },
-  { icon: 'bi-emoji-smile', title: 'ทันตกรรม', desc: 'ขูดหินปูน ดูแลช่องปาก', bg: '#fff1c9', fg: '#c48f00' },
-  { icon: 'bi-building', title: 'โรงแรมสัตว์', desc: 'ดูแลตลอด 24 ชม.', bg: '#dff3fb', fg: '#1f97c7' },
+  {
+    icon: 'bi-clipboard2-pulse',
+    title: 'ตรวจสุขภาพ',
+    desc: 'ตรวจร่างกาย เลือด และปรึกษาคุณหมอตามอาการ',
+    bg: '#dcecfc',
+    fg: '#2f7fc8',
+    href: '/pet-owner/services',
+    cta: 'จองคิวตรวจ',
+  },
+  {
+    icon: 'bi-capsule',
+    title: 'ฉีดวัคซีน',
+    desc: 'แพ็กวัคซีนครบตามวัย พร้อมแจ้งเตือนนัดถัดไป',
+    bg: '#dff5e8',
+    fg: '#2a9d64',
+    href: '/pet-owner/services',
+    cta: 'จองฉีดวัคซีน',
+  },
+  {
+    icon: 'bi-bandaid',
+    title: 'ผ่าตัด / ทำหมัน',
+    desc: 'ห้องผ่าตัดมาตรฐาน มีทีมเฝ้าระวังหลังทำหัตถการ',
+    bg: '#e8eefc',
+    fg: '#3d5a98',
+    href: '/pet-owner/services',
+    cta: 'ปรึกษาคิวผ่าตัด',
+  },
+  {
+    icon: 'bi-emoji-smile',
+    title: 'ทันตกรรม',
+    desc: 'ขูดหินปูน ตรวจช่องปาก และดูแลฟันให้สะอาด',
+    bg: '#fff1c9',
+    fg: '#c48f00',
+    href: '/pet-owner/services',
+    cta: 'จองทันตกรรม',
+  },
+  {
+    icon: 'bi-building',
+    title: 'โรงแรมสัตว์',
+    desc: 'ฝากน้องได้ทั้งวัน มี CCTV และคุณหมอดูแล 24 ชม.',
+    bg: '#dff3fb',
+    fg: '#1f97c7',
+    href: '/#hotel',
+    cta: 'ดูห้องพัก',
+  },
 ];
 
 export const HOTEL_ROOMS = [

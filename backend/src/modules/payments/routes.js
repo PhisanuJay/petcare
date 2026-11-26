@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Router } from 'express';
 import { queryAll, queryOne, run, transaction } from '../../db/mssql.js';
 import { requireStaff } from '../auth/middleware.js';
-import { getCustomerSession } from '../auth/store.js';
+import { resolveCustomerIdentity } from '../auth/store.js';
 import { ensurePetTransportReady } from '../pet-transport/routes.js';
 import { approveTransportPayment, ownerConfirmPayment } from '../pet-transport/service.js';
 
@@ -145,14 +145,9 @@ function validateCancellation(input, ownerId) {
 
 async function httpOwner(req, _res, next) {
   try {
-    const session = await getCustomerSession(req);
-    if (session?.user?.id) {
-      req.ownerId = session.user.id;
-      return next();
-    }
-    const headerId = req.get('x-owner-id')?.trim();
-    if (headerId) {
-      req.ownerId = headerId;
+    const identity = await resolveCustomerIdentity(req);
+    if (identity?.user?.id) {
+      req.ownerId = identity.user.id;
       return next();
     }
     return next(httpError(401, 'กรุณาเข้าสู่ระบบ'));

@@ -19,6 +19,8 @@ import {
   newRoomLineKey,
   petHotelSpecies,
   selectedSpeciesGroups,
+  totalRoomUnits,
+  trimRoomLinesToPetCount,
   validateAssignment,
   validateRoomLines,
   validateRoomSpeciesCoverage,
@@ -39,7 +41,16 @@ const STAY_STEPS = [
 
 function stayHubWizardHint(
   stepId,
-  { petCount, roomLineCount, speciesGroups, hasDogRoomLine, hasCatRoomLine, hubMixedRoomPhase },
+  {
+    petCount,
+    roomLineCount,
+    roomUnitsTotal,
+    roomsAtPetCap,
+    speciesGroups,
+    hasDogRoomLine,
+    hasCatRoomLine,
+    hubMixedRoomPhase,
+  },
 ) {
   if (stepId === 'pets') {
     return `กดการ์ดเพื่อเลือก — เลือกแล้ว ${petCount} ตัว${
@@ -47,6 +58,14 @@ function stayHubWizardHint(
     }`;
   }
   if (stepId === 'rooms') {
+    if (petCount === 1) {
+      return roomsAtPetCap
+        ? 'สัตว์เลี้ยงตัวเดียว — เลือกได้ 1 ห้องแล้ว กดไปขั้นถัดไปได้'
+        : 'สัตว์เลี้ยงตัวเดียว — เลือกได้แค่ 1 ห้อง';
+    }
+    if (roomsAtPetCap) {
+      return `เลือกครบแล้ว ${roomUnitsTotal}/${petCount} ห้อง — ปรับหรือลบรายการ แล้วไปขั้นถัดไป`;
+    }
     if (hubMixedRoomPhase === 'dog') {
       return 'เลือกห้องสุนัข แล้วกดเพิ่มห้อง — ขั้นถัดไปจะให้เลือกห้องแมว';
     }
@@ -57,8 +76,8 @@ function stayHubWizardHint(
       return 'เลือกห้องครบแล้ว — ปรับจำนวนหรือลบรายการ แล้วไปขั้นถัดไป';
     }
     return roomLineCount
-      ? `เลือกห้องทีละประเภท — ในรายการ ${roomLineCount} รายการ`
-      : 'เลือกห้องทีละประเภท แล้วกดเพิ่มห้อง';
+      ? `เลือกห้องทีละประเภท — ในรายการ ${roomLineCount} รายการ (สูงสุด ${petCount} ห้อง)`
+      : `เลือกห้องทีละประเภท แล้วกดเพิ่มห้อง (สูงสุด ${petCount} ห้อง)`;
   }
   if (stepId === 'dates') {
     return 'เลือกวันเข้าพักและวันรับกลับ · หมายเหตุไม่บังคับ';
@@ -194,14 +213,14 @@ export function StayBookPage({
       return '';
     }
     if (stepId === 'rooms') {
-      const base = validateRoomLines(roomLines, catalogById, null);
+      const base = validateRoomLines(roomLines, catalogById, null, petIds.length);
       if (base) return base;
       return validateRoomSpeciesCoverage(roomLines, catalogById, speciesGroups);
     }
     if (stepId === 'dates') {
       if (!checkIn || !checkOut) return 'เลือกวันเข้าพักและวันรับกลับ';
       if (!nights) return 'จำนวนคืนไม่ถูกต้อง';
-      const base = validateRoomLines(roomLines, catalogById, availMap);
+      const base = validateRoomLines(roomLines, catalogById, availMap, petIds.length);
       if (base) return base;
       return validateRoomSpeciesCoverage(roomLines, catalogById, speciesGroups);
     }
@@ -234,10 +253,13 @@ export function StayBookPage({
 
   function goNextStayStep() {
     if (stayStep === 'rooms' && pendingRoomTypeId) {
-      setError('');
-      addRoomLine(pendingRoomTypeId);
+      if (!(petIds.length && totalRoomUnits(roomLines) >= petIds.length)) {
+        setError('');
+        addRoomLine(pendingRoomTypeId);
+        setPendingRoomTypeId('');
+        return;
+      }
       setPendingRoomTypeId('');
-      return;
     }
     const err = validateStayStep(stayStep);
     if (err) {
@@ -266,19 +288,35 @@ export function StayBookPage({
   }
 
   function onPetCreated(pet) {
-    setPetIds((ids) => (ids.includes(pet.id) ? ids : [...ids, pet.id]));
+    setPetIds((ids) => {
+      const next = ids.includes(pet.id) ? ids : [...ids, pet.id];
+      setRoomLines((lines) => trimRoomLinesToPetCount(lines, next.length));
+      return next;
+    });
   }
 
   function togglePet(id) {
-    setPetIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]));
+    setPetIds((ids) => {
+      const next = ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
+      setRoomLines((lines) => trimRoomLinesToPetCount(lines, next.length));
+      setPendingRoomTypeId('');
+      return next;
+    });
   }
 
   function addRoomLine(roomTypeId) {
-    setRoomLines((lines) => [...lines, { key: newRoomLineKey(), roomTypeId, units: 1, petIds: [] }]);
+    setRoomLines((lines) => {
+      if (petIds.length && totalRoomUnits(lines) >= petIds.length) return lines;
+      return [...lines, { key: newRoomLineKey(), roomTypeId, units: 1, petIds: [] }];
+    });
   }
 
   function updateRoomLine(key, patch) {
-    setRoomLines((lines) => lines.map((line) => (line.key === key ? { ...line, ...patch } : line)));
+    setRoomLines((lines) => {
+      const next = lines.map((line) => (line.key === key ? { ...line, ...patch } : line));
+      if (patch.units == null || !petIds.length) return next;
+      return trimRoomLinesToPetCount(next, petIds.length);
+    });
   }
 
   function removeRoomLine(key) {
@@ -441,21 +479,24 @@ export function StayBookPage({
   const needCatRoom = speciesGroups.hasCat;
   const hasDogRoomLine = roomLines.some((line) => catalogById.get(line.roomTypeId)?.species === 'dog');
   const hasCatRoomLine = roomLines.some((line) => catalogById.get(line.roomTypeId)?.species === 'cat');
+  const roomUnitsTotal = totalRoomUnits(roomLines);
+  const roomsAtPetCap = petIds.length > 0 && roomUnitsTotal >= petIds.length;
   const hubMixedRoomPhase = hubCheckout && needDogRoom && needCatRoom
     ? (!hasDogRoomLine ? 'dog' : !hasCatRoomLine ? 'cat' : 'both')
     : null;
-  const showDogRoomPick = needDogRoom && (
+  const showDogRoomPick = !roomsAtPetCap && needDogRoom && (
     !hubMixedRoomPhase || hubMixedRoomPhase === 'dog'
   );
-  const showCatRoomPick = needCatRoom && (
+  const showCatRoomPick = !roomsAtPetCap && needCatRoom && (
     !hubMixedRoomPhase || hubMixedRoomPhase === 'cat'
   );
-  const hubRoomsComplete = hubMixedRoomPhase === 'both';
+  const hubRoomsComplete = roomsAtPetCap || hubMixedRoomPhase === 'both';
 
   function roomsStepNextLabel() {
     if (stayStep !== 'rooms') return 'ดำเนินการต่อ';
-    if (pendingRoomTypeId) {
+    if (pendingRoomTypeId && !roomsAtPetCap) {
       const species = catalogById.get(pendingRoomTypeId)?.species;
+      if (petIds.length === 1) return 'ใช้ห้องนี้';
       if (hubMixedRoomPhase === 'dog' || species === 'dog') {
         return 'เพิ่มห้องสุนัข — ต่อไปเลือกแมว';
       }
@@ -513,6 +554,8 @@ export function StayBookPage({
                   {stayHubWizardHint(stayStep, {
                     petCount: petIds.length,
                     roomLineCount: roomLines.length,
+                    roomUnitsTotal,
+                    roomsAtPetCap,
                     speciesGroups,
                     hasDogRoomLine,
                     hasCatRoomLine,
@@ -674,8 +717,10 @@ export function StayBookPage({
                   <>
                     <h2 className="h6 mb-1">เลือกประเภทและขนาดห้อง</h2>
                     <p className="small text-muted mb-3">
-                      เลือกห้องทีละประเภท แล้วกดดำเนินการต่อ — จะเพิ่มในรายการและเลือกห้องถัดไปได้ในขั้นนี้
-                      {roomLines.length ? ` (เลือกแล้ว ${roomLines.length} รายการ)` : ''}
+                      {petIds.length === 1
+                        ? 'สัตว์เลี้ยงตัวเดียวเลือกได้แค่ 1 ห้อง'
+                        : `เลือกห้องทีละประเภท แล้วกดดำเนินการต่อ — สูงสุด ${petIds.length || '—'} ห้องตามจำนวนสัตว์`}
+                      {roomLines.length ? ` (เลือกแล้ว ${roomUnitsTotal} ห้อง)` : ''}
                     </p>
                   </>
                 ) : null}
@@ -717,9 +762,10 @@ export function StayBookPage({
                               <input
                                 type="number"
                                 min="1"
-                                max="10"
+                                max={Math.max(1, petIds.length - (roomUnitsTotal - Math.max(1, Number(line.units) || 1)))}
                                 className="form-control form-control-sm"
                                 value={line.units}
+                                disabled={petIds.length === 1}
                                 onChange={(e) => updateRoomLine(line.key, { units: Number(e.target.value) || 1 })}
                               />
                             </label>

@@ -258,6 +258,16 @@
   min-height: 100vh;
 }
 
+.acct-page--workspace {
+  padding: 0;
+  min-height: 0;
+}
+
+.acct-page--workspace .acct-main {
+  padding: 0;
+  max-width: none;
+}
+
 .acct-shell {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
@@ -963,6 +973,144 @@
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.acct-account-form {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.acct-csv-actions {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.acct-csv-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.acct-csv-btn.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.acct-account-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.acct-account-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+  padding: 0.55rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.acct-account-row.is-on {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.acct-account-pick {
+  flex: 1;
+  display: grid;
+  gap: 0.15rem;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 0.2rem 0.35rem;
+  cursor: pointer;
+}
+
+.acct-account-pick strong {
+  font-size: 0.95rem;
+}
+
+.acct-account-pick small {
+  color: #64748b;
+  font-size: 0.8rem;
+}
+
+.acct-expense-list {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.acct-expense-card {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.acct-expense-card.is-cancelled {
+  opacity: 0.62;
+}
+
+.acct-expense-card > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.acct-expense-card > header h3 {
+  margin: 0.25rem 0 0.15rem;
+  font-size: 1rem;
+}
+
+.acct-expense-card > header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.acct-expense-card > header strong {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #9a3412;
+}
+
+.acct-expense-note {
+  margin: 0;
+  color: #475569;
+  font-size: 0.88rem;
+}
+
+.acct-expense-card > footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.acct-expense-status {
+  font-size: 0.78rem;
+  color: #334155;
+  background: #f1f5f9;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.acct-expense-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 @media (max-width: 900px) {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import { getCustomerSession, requireCustomer } from '../auth/store.js';
+import { resolveCustomerIdentity, requireCustomer } from '../auth/store.js';
 import { findUserByEmail } from '../auth/usersRepository.js';
 import { ensureAdoptionReady } from './adoptionBootstrap.js';
 import {
@@ -48,16 +48,52 @@ async function verifyUserPassword(password, user) {
   return expected.length === candidate.length && timingSafeEqual(expected, candidate);
 }
 
-function requireAdoptionStaff(req, res, next) {
-  const token = req.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
-  const expiresAt = token ? staffSessions.get(token) : null;
+/** โต๊ะหาบ้าน: พนักงานหาบ้าน (legacy session) หรือแอดมินโรงแรม (Bearer customer) */
+async function requireAdoptionOps(req, res, next) {
+  try {
+    const token = req.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+    if (!token) {
+      return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบใหม่' });
+    }
 
-  if (!expiresAt || expiresAt <= Date.now()) {
-    if (token) staffSessions.delete(token);
-    return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบพนักงานใหม่' });
+    const staffSession = staffSessions.get(token);
+    const expiresAt = typeof staffSession === 'number' ? staffSession : staffSession?.expiresAt;
+    if (expiresAt && expiresAt > Date.now()) {
+      req.adoptionStaff = typeof staffSession === 'object' && staffSession?.staff
+        ? staffSession.staff
+        : null;
+      req.adoptionActor = 'adoption_staff';
+      return next();
+    }
+    if (staffSession) staffSessions.delete(token);
+
+    const customerSession = await resolveCustomerIdentity(req);
+    if (customerSession?.user?.role === 'admin' && customerSession.user.active !== false) {
+      req.customer = customerSession.user;
+      req.customerSessionToken = customerSession.token;
+      req.adoptionStaff = {
+        id: customerSession.user.id,
+        email: customerSession.user.email,
+        role: 'admin',
+        name: [customerSession.user.firstName, customerSession.user.lastName].filter(Boolean).join(' ')
+          || customerSession.user.email,
+      };
+      req.adoptionActor = 'hotel_admin';
+      return next();
+    }
+
+    return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบแอดมินโรงแรมหรือพนักงานหาบ้านใหม่' });
+  } catch (error) {
+    return next(error);
   }
+}
 
-  return next();
+function requireAdoptionStaff(req, res, next) {
+  return requireAdoptionOps(req, res, next);
+}
+
+function adoptionActor(req) {
+  return req.adoptionActor || 'adoption_staff';
 }
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -197,7 +233,7 @@ router.get('/', (_req, res) => {
 });
 
 router.get('/animals', wrap(async (req, res) => {
-  const customerSession = await getCustomerSession(req);
+  const customerSession = await resolveCustomerIdentity(req);
   const animals = await listPublicAnimals();
   res.json({
     animals: animals.map((animal) => publicAnimal(animal, customerSession?.user?.id)),
@@ -250,32 +286,34 @@ router.post('/staff/login', async (req, res, next) => {
     }
 
     const now = Date.now();
-    for (const [sessionToken, expiresAt] of staffSessions) {
-      if (expiresAt <= now) staffSessions.delete(sessionToken);
+    for (const [sessionToken, entry] of staffSessions) {
+      const expiresAt = typeof entry === 'number' ? entry : entry?.expiresAt;
+      if (!expiresAt || expiresAt <= now) staffSessions.delete(sessionToken);
     }
 
     const token = randomBytes(32).toString('hex');
     const expiresAt = now + STAFF_SESSION_DURATION_MS;
-    staffSessions.set(token, expiresAt);
+    const staff = {
+      id: dbUser?.id || 'adoption-staff',
+      email: normalizedEmail,
+      role: 'adoption_staff',
+      name: dbUser
+        ? [dbUser.firstName, dbUser.lastName].filter(Boolean).join(' ') || normalizedEmail
+        : 'พนักงานหาบ้านสัตว์',
+    };
+    staffSessions.set(token, { expiresAt, staff });
     return res.json({
       token,
       expiresAt: new Date(expiresAt).toISOString(),
-      staff: {
-        id: dbUser?.id || 'adoption-staff',
-        email: normalizedEmail,
-        role: 'adoption_staff',
-        name: dbUser
-          ? [dbUser.firstName, dbUser.lastName].filter(Boolean).join(' ') || normalizedEmail
-          : 'พนักงานหาบ้านสัตว์',
-      },
+      staff,
     });
   } catch (error) {
     next(error);
   }
 });
 
-router.get('/staff/session', requireAdoptionStaff, (_req, res) => {
-  res.json({ ok: true });
+router.get('/staff/session', requireAdoptionStaff, (req, res) => {
+  res.json({ ok: true, staff: req.adoptionStaff });
 });
 
 router.get('/staff/overview', requireAdoptionStaff, wrap(async (_req, res) => {
@@ -305,7 +343,7 @@ router.patch('/staff/animals/:animalId/status', requireAdoptionStaff, wrap(async
   if (!animal) return res.status(404).json({ error: 'ไม่พบข้อมูลสัตว์' });
 
   const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
-  const updated = await setAnimalStatus(animal, mapped, 'adoption_staff', note);
+  const updated = await setAnimalStatus(animal, mapped, adoptionActor(req), note);
 
   if (mapped === ANIMAL_STATUS.adopted) {
     await closeOtherApplications(animal.id, '', 'สัตว์เลี้ยงมีบ้านแล้ว');
@@ -322,15 +360,15 @@ router.patch('/staff/animals/:animalId', requireAdoptionStaff, wrap(async (req, 
   const note = typeof req.body?.note === 'string' ? req.body.note.trim() : '';
 
   if (action === 'approve') {
-    const updated = await setAnimalStatus(animal, ANIMAL_STATUS.published, 'adoption_staff', note);
+    const updated = await setAnimalStatus(animal, ANIMAL_STATUS.published, adoptionActor(req), note);
     return res.json({ animal: publicAnimal(updated) });
   }
   if (action === 'reject') {
-    const updated = await setAnimalStatus(animal, ANIMAL_STATUS.rejected, 'adoption_staff', note);
+    const updated = await setAnimalStatus(animal, ANIMAL_STATUS.rejected, adoptionActor(req), note);
     return res.json({ animal: publicAnimal(updated) });
   }
   if (action === 'adopted') {
-    const updated = await setAnimalStatus(animal, ANIMAL_STATUS.adopted, 'adoption_staff', note);
+    const updated = await setAnimalStatus(animal, ANIMAL_STATUS.adopted, adoptionActor(req), note);
     await closeOtherApplications(animal.id, '', 'สัตว์เลี้ยงมีบ้านแล้ว');
     return res.json({ animal: publicAnimal(updated) });
   }
@@ -409,7 +447,7 @@ router.post('/applications', wrap(async (req, res, next) => {
       careReadiness,
       additionalInfo,
     } = req.body ?? {};
-    const customerSession = await getCustomerSession(req);
+    const customerSession = await resolveCustomerIdentity(req);
     const animal = await findAnimalById(animalId);
 
     if (!animal) {
@@ -603,13 +641,13 @@ router.patch('/staff/requests/:requestId', requireAdoptionStaff, wrap(async (req
     }
 
     const nextStatus = status === 'approved' ? APPLICATION_STATUS.approved : APPLICATION_STATUS.rejected;
-    const updated = await setApplicationStatus(application, nextStatus, 'adoption_staff', {
+    const updated = await setApplicationStatus(application, nextStatus, adoptionActor(req), {
       resolutionNote: note,
     });
 
     let nextAnimal = animal;
     if (status === 'approved') {
-      nextAnimal = await setAnimalStatus(animal, ANIMAL_STATUS.adopted, 'adoption_staff');
+      nextAnimal = await setAnimalStatus(animal, ANIMAL_STATUS.adopted, adoptionActor(req));
       await closeOtherApplications(animal.id, application.id, 'สัตว์เลี้ยงมีบ้านแล้ว');
     }
 
@@ -618,7 +656,7 @@ router.patch('/staff/requests/:requestId', requireAdoptionStaff, wrap(async (req
 
   if (status === 'reviewing' || status === 'interview') {
     const patch = { interviewAt: interviewAt || application.interviewAt };
-    const updated = await setApplicationStatus(application, status, 'adoption_staff', patch);
+    const updated = await setApplicationStatus(application, status, adoptionActor(req), patch);
     return res.json({ request: updated });
   }
 
@@ -642,13 +680,13 @@ router.patch('/staff/applications/:applicationId/status', requireAdoptionStaff, 
     }
 
     const nextStatus = status === 'approved' ? APPLICATION_STATUS.approved : APPLICATION_STATUS.rejected;
-    const updated = await setApplicationStatus(application, nextStatus, 'adoption_staff', {
+    const updated = await setApplicationStatus(application, nextStatus, adoptionActor(req), {
       resolutionNote: note,
     });
 
     let nextAnimal = animal;
     if (status === 'approved') {
-      nextAnimal = await setAnimalStatus(animal, ANIMAL_STATUS.adopted, 'adoption_staff');
+      nextAnimal = await setAnimalStatus(animal, ANIMAL_STATUS.adopted, adoptionActor(req));
       await closeOtherApplications(animal.id, application.id, 'สัตว์เลี้ยงมีบ้านแล้ว');
     }
 
@@ -657,7 +695,7 @@ router.patch('/staff/applications/:applicationId/status', requireAdoptionStaff, 
 
   if (status === 'reviewing' || status === 'interview' || status === 'completed') {
     const patch = { interviewAt: interviewAt || application.interviewAt };
-    const updated = await setApplicationStatus(application, status, 'adoption_staff', patch);
+    const updated = await setApplicationStatus(application, status, adoptionActor(req), patch);
     return res.json({ application: updated });
   }
 

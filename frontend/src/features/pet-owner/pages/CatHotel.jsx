@@ -236,6 +236,19 @@ export default function CatHotelPage() {
 
 const STAY_HEADERS = { 'X-Stay-View': '1' };
 
+async function ensureStayViewerSession(email) {
+  try {
+    await fetch('/api/auth/owner-link', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    /* stream may still fail; listing PetCare grants is independent */
+  }
+}
+
 function useStayCameras(ownerId, email) {
   const [cameras, setCameras] = useState(null);
 
@@ -245,21 +258,40 @@ function useStayCameras(ownerId, email) {
       return undefined;
     }
     let gone = false;
+    let linked = false;
     async function pull() {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
+        if (!linked) {
+          await ensureStayViewerSession(email);
+          linked = true;
+        }
         const data = await ownerRequest(ownerId, '/cctv/cameras', {
           headers: { 'x-owner-email': email },
         });
-        if (!gone) setCameras(data.items || []);
+        if (gone) return;
+        setCameras((prev) => {
+          const next = data.items || [];
+          if (prev && JSON.stringify(prev) === JSON.stringify(next)) return prev;
+          return next;
+        });
       } catch {
-        if (!gone) setCameras([]);
+        if (!gone) {
+          // keep last good list — avoid flash empty / remount Player
+          setCameras((prev) => (prev == null ? [] : prev));
+        }
       }
     }
     pull();
-    const timer = window.setInterval(pull, 8000);
+    const timer = window.setInterval(pull, 15000);
+    const onVisible = () => {
+      if (!document.hidden) pull();
+    };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
       gone = true;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
     };
   }, [ownerId, email]);
 
@@ -276,15 +308,21 @@ function useCameraCare(cameraId, enabled) {
     }
     let gone = false;
     async function pull() {
+      if (typeof document !== 'undefined' && document.hidden) return;
       try {
         const data = await api(`/api/cameras/${cameraId}/care`, { headers: STAY_HEADERS });
-        if (!gone) setCare(data.items || []);
+        if (gone) return;
+        setCare((prev) => {
+          const next = data.items || [];
+          if (JSON.stringify(prev) === JSON.stringify(next)) return prev;
+          return next;
+        });
       } catch {
-        if (!gone) setCare([]);
+        /* keep previous care rows */
       }
     }
     pull();
-    const timer = window.setInterval(pull, 8000);
+    const timer = window.setInterval(pull, 15000);
     return () => {
       gone = true;
       window.clearInterval(timer);
@@ -693,7 +731,7 @@ export function StayWatchPage() {
               )}
             </div>
             <div className="hotel-watch">
-              <Player cameraId={camera.id} mode="customer" />
+              <Player key={`watch-${camera.id}`} cameraId={camera.id} mode="customer" />
             </div>
           </article>
         ) : null}

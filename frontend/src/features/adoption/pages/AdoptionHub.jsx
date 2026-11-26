@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ADOPTION_API_URL } from '../api.js';
+import { ADOPTION_API_URL, adoptionCustomerHeaders } from '../api.js';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { useMyAdoptionApplications } from '../useMyAdoptionApplications.js';
 import { formatDate } from '../../pet-owner/petUtils.js';
@@ -129,7 +129,9 @@ function AnimalGrid({
 }
 
 export default function AdoptionHub() {
-  const { authToken } = useAuth();
+  const { authToken, currentUser } = useAuth();
+  const ownerId = currentUser?.id || '';
+  const isMember = Boolean(ownerId);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -155,7 +157,7 @@ export default function AdoptionHub() {
     error: appsError,
     reload: reloadApps,
     cancelApplication,
-  } = useMyAdoptionApplications(authToken);
+  } = useMyAdoptionApplications(authToken, ownerId);
 
   async function loadAnimals(signal) {
     setLoading(true);
@@ -163,7 +165,7 @@ export default function AdoptionHub() {
     try {
       const response = await fetch(`${ADOPTION_API_URL}/animals`, {
         signal,
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        headers: adoptionCustomerHeaders(ownerId),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'โหลดข้อมูลน้องๆ ไม่สำเร็จ');
@@ -182,10 +184,10 @@ export default function AdoptionHub() {
     const controller = new AbortController();
     loadAnimals(controller.signal);
     return () => controller.abort();
-  }, [authToken]);
+  }, [ownerId, authToken]);
 
   async function loadMyPosts(signal) {
-    if (!authToken) {
+    if (!isMember) {
       setMyPostAnimals([]);
       return;
     }
@@ -193,7 +195,7 @@ export default function AdoptionHub() {
     try {
       const response = await fetch(`${ADOPTION_API_URL}/animals/mine`, {
         signal,
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: adoptionCustomerHeaders(ownerId),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'โหลดประกาศของฉันไม่สำเร็จ');
@@ -208,11 +210,11 @@ export default function AdoptionHub() {
   }
 
   useEffect(() => {
-    if (tab !== 'my-posts' || !authToken) return undefined;
+    if (tab !== 'my-posts' || !isMember) return undefined;
     const controller = new AbortController();
     loadMyPosts(controller.signal);
     return () => controller.abort();
-  }, [tab, authToken]);
+  }, [tab, isMember, ownerId, authToken]);
 
   function setTab(next) {
     if (next === 'browse') {
@@ -223,7 +225,7 @@ export default function AdoptionHub() {
   }
 
   function handleAddAnimal() {
-    if (!authToken) {
+    if (!isMember) {
       navigate('/login?next=%2Fpet-owner%2Fadoption');
       return;
     }
@@ -231,7 +233,7 @@ export default function AdoptionHub() {
   }
 
   function openTabRequiringAuth(next) {
-    if (!authToken) {
+    if (!isMember) {
       navigate(`/login?next=${encodeURIComponent(`/pet-owner/adoption?tab=${next}`)}`);
       return;
     }
@@ -434,7 +436,7 @@ export default function AdoptionHub() {
       {tab === 'my-posts' && (
         <section className="find-home-listing">
           <div className="container">
-            {!authToken ? (
+            {!isMember ? (
               <LoginGate
                 title="ประกาศของฉัน"
                 description="เข้าสู่ระบบเพื่อดูและแก้ไขประกาศหาบ้านที่คุณลงไว้"
@@ -469,7 +471,7 @@ export default function AdoptionHub() {
       {tab === 'requests' && (
         <section className="find-home-listing">
           <div className="container adoption-hub-requests">
-            {!authToken ? (
+            {!isMember ? (
               <LoginGate
                 title="คำขอรับเลี้ยง"
                 description="เข้าสู่ระบบเพื่อดูคำขอที่คุณส่งและสถานะการพิจารณา"
@@ -542,6 +544,7 @@ export default function AdoptionHub() {
         <ApplicationDialog
           animal={selectedAnimal}
           authToken={authToken}
+          ownerId={ownerId}
           onClose={() => setSelectedAnimal(null)}
           onSubmitted={() => {
             reloadApps();
@@ -552,6 +555,7 @@ export default function AdoptionHub() {
       {addingAnimal && (
         <AddAnimalDialog
           authToken={authToken}
+          ownerId={ownerId}
           onClose={() => setAddingAnimal(false)}
           onCreated={(animal) => {
             setAnimals((current) => [animal, ...current]);
@@ -564,6 +568,7 @@ export default function AdoptionHub() {
           key={editingAnimal.id}
           animal={editingAnimal}
           authToken={authToken}
+          ownerId={ownerId}
           onClose={() => setEditingAnimal(null)}
           onCreated={(updatedAnimal) => {
             setAnimals((current) =>

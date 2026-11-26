@@ -1,4 +1,4 @@
-import { DEFAULT_SERVICES } from './clinicSettings.js';
+import { listServices, serviceLabel } from './clinicSettings.js';
 
 function round1(val) {
   return Math.round(val * 10) / 10;
@@ -153,15 +153,15 @@ export function buildReport({ bookings = [], visits = [], staff = [], from, to, 
 
   // Services breakdown
   const svcMap = new Map();
-  for (const [code, label] of Object.entries(DEFAULT_SERVICES)) {
-    svcMap.set(code, { code, label, count: 0 });
+  for (const svc of listServices()) {
+    svcMap.set(svc.code, { code: svc.code, label: svc.label, count: 0 });
   }
   for (const b of rangeBookings) {
     const code = b.service || 'other';
     if (!svcMap.has(code)) {
       svcMap.set(code, {
         code,
-        label: b.serviceLabel || DEFAULT_SERVICES[code] || code,
+        label: b.serviceLabel || serviceLabel(code) || code,
         count: 0,
       });
     }

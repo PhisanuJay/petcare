@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PetPhoto from '../../pet-owner/components/PetPhoto.jsx';
 import { SPECIES, formatDate, speciesOf } from '../../pet-owner/petUtils.js';
@@ -82,7 +82,7 @@ export default function PatientsPage() {
   }
 
   function openDetail(petId) {
-    navigate(`/medical-assistant/patients/${encodeURIComponent(petId)}`);
+    navigate(`/clinic-admin/patients/${encodeURIComponent(petId)}`);
   }
 
   const tabs = [

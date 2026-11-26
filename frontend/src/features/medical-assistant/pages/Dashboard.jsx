@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PetPhoto from '../../pet-owner/components/PetPhoto.jsx';
 import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
@@ -234,7 +234,7 @@ export default function MedicalAssistantDashboardPage() {
         text: 'กรุณาติดต่อเจ้าของสัตว์เพื่อเลื่อนนัดหรือจัดการคำขอ',
         actionType: 'link',
         actionLabel: 'ดูนัดวันปิด',
-        actionTo: '/medical-assistant/booking-management?closure=1',
+        actionTo: '/clinic-admin/appointments?closure=1',
         actionVariant: 'btn-soft-danger',
       });
     }
@@ -256,7 +256,7 @@ export default function MedicalAssistantDashboardPage() {
           : `คำขอรอยืนยันนัดใกล้ถึง (${formatDate(a.date)} ${a.time} น. · ${a.serviceLabel || a.service})`,
         actionType: 'link',
         actionLabel: 'จัดการ',
-        actionTo: '/medical-assistant/booking-management',
+        actionTo: '/clinic-admin/appointments',
         actionVariant: isOverdue ? 'btn-soft-danger' : 'btn-sky',
       });
     }
@@ -293,7 +293,7 @@ export default function MedicalAssistantDashboardPage() {
         text: `เช็คอินแล้วยังไม่คัดกรอง (${a.serviceLabel || a.service}) · ${formatWaitText(mins)}`,
         actionType: 'link',
         actionLabel: 'คัดกรอง',
-        actionTo: `/medical-assistant/medical-support/${a.id}`,
+        actionTo: `/clinic-admin/appointments/${a.id}`,
         actionVariant: 'btn-sky',
       });
     }
@@ -312,7 +312,7 @@ export default function MedicalAssistantDashboardPage() {
         text: `ไม่มาตามนัดวันที่ ${formatDate(a.date)} — ยังไม่ติดต่อเจ้าของ`,
         actionType: 'phone_and_link',
         actionLabel: 'ติดต่อให้จองใหม่',
-        actionTo: '/medical-assistant/booking-management?tab=contact',
+        actionTo: '/clinic-admin/appointments?tab=contact',
         actionVariant: 'btn-soft',
       });
     }
@@ -330,7 +330,7 @@ export default function MedicalAssistantDashboardPage() {
         text: `${f.status === 'overdue' ? 'เลยวันนัดติดตาม' : 'นัดติดตามจากบันทึกหมอ'} ${formatDate(f.followUpDate)}${f.vet ? ` (${f.vet})` : ''} — ยังไม่มีนัดหลังวันตรวจ ${formatDate(f.visitDate)}`,
         actionType: 'phone_and_link',
         actionLabel: 'ดูประวัติ',
-        actionTo: `/medical-assistant/patients/${encodeURIComponent(f.petId)}`,
+        actionTo: `/clinic-admin/patients/${encodeURIComponent(f.petId)}`,
         actionVariant: 'btn-soft',
       });
     }
@@ -480,13 +480,13 @@ export default function MedicalAssistantDashboardPage() {
             <i className="bi bi-arrow-clockwise me-1" />
             รีเฟรช
           </button>
-          <Link to="/medical-assistant/patients" className="btn btn-soft">
+          <Link to="/clinic-admin/patients" className="btn btn-soft">
             <i className="bi bi-search me-1" />
             ค้นหาสัตว์เลี้ยง
           </Link>
-          <Link to="/medical-assistant/booking-management" className="btn btn-sky">
-            <i className="bi bi-journal-bookmark me-1" />
-            จัดการการจอง
+          <Link to="/clinic-admin/appointments" className="btn btn-sky">
+            <i className="bi bi-calendar2-check me-1" />
+            นัดหมาย
           </Link>
         </div>
       </div>
@@ -496,7 +496,7 @@ export default function MedicalAssistantDashboardPage() {
       {!blockedByState && (
         <>
           <div className="ma-stat-grid-5 mb-4">
-            <Link to="/medical-assistant/appointments" className="stat ma-stat-link">
+            <Link to="/clinic-admin/appointments" className="stat ma-stat-link">
               <span className="tag sky ma-stat-icon" aria-hidden="true">
                 <i className="bi bi-calendar2-week" />
               </span>
@@ -511,7 +511,7 @@ export default function MedicalAssistantDashboardPage() {
               </div>
             </Link>
 
-            <Link to="/medical-assistant/medical-support" className="stat ma-stat-link">
+            <Link to="/clinic-admin/appointments" className="stat ma-stat-link">
               <span className="tag sky ma-stat-icon" aria-hidden="true">
                 <i className="bi bi-hospital" />
               </span>
@@ -520,7 +520,7 @@ export default function MedicalAssistantDashboardPage() {
               <div className="small text-muted">กำลังตรวจ {treatmentList.length} เคส</div>
             </Link>
 
-            <Link to="/medical-assistant/medical-support?tab=triage" className="stat ma-stat-link">
+            <Link to="/clinic-admin/appointments?tab=triage" className="stat ma-stat-link">
               <span className="tag warn ma-stat-icon" aria-hidden="true">
                 <i className="bi bi-thermometer-half" />
               </span>
@@ -529,18 +529,18 @@ export default function MedicalAssistantDashboardPage() {
               <div className="small text-muted">พร้อมเข้าตรวจ {readyList.length}</div>
             </Link>
 
-            <Link to="/medical-assistant/booking-management" className="stat ma-stat-link">
+            <Link to="/clinic-admin/appointments" className="stat ma-stat-link">
               <span className="tag warn ma-stat-icon" aria-hidden="true">
                 <i className="bi bi-inbox" />
               </span>
               <div className="num">{pendingList.length}</div>
-              <div className="small fw-medium">คำขอรอยืนยัน</div>
+              <div className="small fw-medium">รอยืนยันอัตโนมัติ</div>
               <div className="small text-muted">
-                {pendingList.length > 0 ? 'รอตรวจสอบและเลือกหมอ' : 'ไม่มีคำขอค้าง'}
+                {pendingList.length > 0 ? 'ระบบยืนยันจากการจอง/โอน' : 'ไม่มีรายการค้าง'}
               </div>
             </Link>
 
-            <Link to="/medical-assistant/medical-support?tab=completed" className="stat ma-stat-link">
+            <Link to="/clinic-admin/appointments?tab=completed" className="stat ma-stat-link">
               <span className="tag ok ma-stat-icon" aria-hidden="true">
                 <i className="bi bi-check2-circle" />
               </span>
@@ -657,7 +657,7 @@ export default function MedicalAssistantDashboardPage() {
                     <i className="bi bi-people" />
                     คิวในคลินิกตอนนี้ ({inClinicQueue.length})
                   </div>
-                  <Link to="/medical-assistant/medical-support" className="small text-decoration-none">
+                  <Link to="/clinic-admin/appointments" className="small text-decoration-none">
                     ไปหน้าสนับสนุนการรักษา
                   </Link>
                 </div>
@@ -702,7 +702,7 @@ export default function MedicalAssistantDashboardPage() {
                             </div>
                           </div>
                           <Link
-                            to={`/medical-assistant/medical-support/${appt.id}`}
+                            to={`/clinic-admin/appointments/${appt.id}`}
                             className="btn btn-soft btn-sm flex-shrink-0"
                           >
                             เปิดเคส
@@ -818,7 +818,7 @@ export default function MedicalAssistantDashboardPage() {
                           return (
                             <Link
                               key={a.id}
-                              to={`/medical-assistant/appointments?date=${todayKey}`}
+                              to={`/clinic-admin/appointments?date=${todayKey}`}
                               className={`ma-gantt-bar ${ganttBarModifier(a.stage)}`}
                               style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
                               title={`${a.petName} · ${a.time}–${endText} น. (${a.serviceLabel || a.service})`}
@@ -855,7 +855,7 @@ export default function MedicalAssistantDashboardPage() {
                     return (
                       <Link
                         key={d.date}
-                        to={`/medical-assistant/appointments?date=${d.date}`}
+                        to={`/clinic-admin/appointments?date=${d.date}`}
                         className={`ma-bar-col${d.isToday ? ' is-today' : ''}`}
                         aria-label={`${formatDate(d.date)} จำนวน ${d.count} นัด`}
                         title={`${formatDate(d.date)} · ${d.count} นัด`}

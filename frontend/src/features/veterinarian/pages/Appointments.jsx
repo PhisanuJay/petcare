@@ -81,7 +81,7 @@ function VisitInfo({ visit }) {
     <div className="small mt-2 p-2 rounded-3 border bg-light">
       <div className="fw-medium mb-1">
         <i className="bi bi-clipboard2-pulse me-1" />
-        ข้อมูลจากผู้ช่วยสัตวแพทย์
+        ข้อมูลจากแอดมินคลินิก
         {triage && <span className={`tag ms-2 ${triage.tone}`}>{triage.label}</span>}
       </div>
       {visit.chiefComplaint && <div>อาการเบื้องต้น: {visit.chiefComplaint}</div>}
@@ -162,7 +162,7 @@ function AppointmentCard({ appointment: a, showDate, busy, onAction }) {
               type="button"
               className="btn btn-sky btn-sm"
               disabled={busy || !inRoom}
-              title={inRoom ? '' : 'ปิดเคสได้หลังผู้ช่วยสัตวแพทย์ส่งเข้าห้องตรวจแล้ว'}
+              title={inRoom ? '' : 'ปิดเคสได้หลังแอดมินคลินิกส่งเข้าห้องตรวจแล้ว'}
               onClick={() => onAction(a, 'completed')}>
               <i className="bi bi-check2-all me-1" />
               ตรวจเสร็จสิ้น
@@ -204,7 +204,7 @@ export default function AppointmentsPage() {
         <VetPageHeader
           icon="bi-calendar2-check"
           title="นัดหมาย"
-          subtitle="นัดที่ผู้ช่วยสัตวแพทย์มอบหมายให้คุณ บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ"
+          subtitle="นัดที่แอดมินคลินิกมอบหมายให้คุณ บันทึกการรักษา และปิดเคสเมื่อตรวจเสร็จ"
           stats={[
             { icon: 'bi-hourglass-split', value: count('confirmed'), label: 'รอตรวจ' },
             { icon: 'bi-check2-all', value: count('completed'), label: 'เสร็จสิ้น' },

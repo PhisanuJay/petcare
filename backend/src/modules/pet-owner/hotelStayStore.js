@@ -132,6 +132,44 @@ export async function listStaysForOwner(ownerId) {
   return result;
 }
 
+/** Staff / CCTV desk — every stay with room lines. */
+export async function listAllStays() {
+  const rows = await queryAll(
+    'SELECT * FROM dbo.hotel_stays ORDER BY created_at DESC',
+  );
+  const result = [];
+  for (const row of rows) {
+    const units = await queryAll('SELECT * FROM dbo.hotel_stay_units WHERE stay_id = ?', [row.id]);
+    result.push(mapStayRow(row, units));
+  }
+  return result;
+}
+
+const STAFF_STAY_STATUSES = new Set([
+  'waiting',
+  'pending',
+  'confirmed',
+  'checked_in',
+  'checked_out',
+  'cancelled',
+]);
+
+export async function updateStayStatus(stayId, status) {
+  if (!STAFF_STAY_STATUSES.has(status)) {
+    throw httpError(400, 'สถานะใบจองไม่ถูกต้อง');
+  }
+  const row = await queryOne('SELECT id, status FROM dbo.hotel_stays WHERE id = ?', [stayId]);
+  if (!row) throw httpError(404, 'ไม่พบใบจองนี้');
+  const now = new Date().toISOString();
+  await run(
+    'UPDATE dbo.hotel_stays SET status = ?, updated_at = ? WHERE id = ?',
+    [status, now, stayId],
+  );
+  const units = await queryAll('SELECT * FROM dbo.hotel_stay_units WHERE stay_id = ?', [stayId]);
+  const updated = await queryOne('SELECT * FROM dbo.hotel_stays WHERE id = ?', [stayId]);
+  return mapStayRow(updated, units);
+}
+
 export async function getStayForOwner(ownerId, stayId) {
   const row = await queryOne(
     'SELECT * FROM dbo.hotel_stays WHERE id = ? AND owner_id = ?',

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import PetPhoto from '../../pet-owner/components/PetPhoto.jsx';
 import { speciesOf } from '../../pet-owner/petUtils.js';
@@ -104,7 +104,7 @@ export default function MedicalSupportPage() {
             <i className="bi bi-arrow-clockwise me-1" />
             รีเฟรช
           </button>
-          <Link to="/medical-assistant/appointments" className="btn btn-sky">
+          <Link to="/clinic-admin/appointments" className="btn btn-sky">
             <i className="bi bi-calendar2-check me-1" />
             ไปหน้านัดหมาย
           </Link>
@@ -185,7 +185,7 @@ export default function MedicalSupportPage() {
                       : 'ยังไม่มีเคสที่เสร็จสิ้นในวันนี้'}
                 </div>
                 <div className="mt-3">
-                  <Link to="/medical-assistant/appointments" className="btn btn-sky">
+                  <Link to="/clinic-admin/appointments" className="btn btn-sky">
                     <i className="bi bi-calendar2-check me-1" />
                     ไปเช็คอินที่หน้านัดหมาย
                   </Link>
@@ -303,7 +303,7 @@ export default function MedicalSupportPage() {
                         {appt.stage === 'checked_in' && (
                           <>
                             <Link
-                              to={`/medical-assistant/medical-support/${appt.id}`}
+                              to={`/clinic-admin/medical-support/${appt.id}`}
                               className={`btn ${triaged ? 'btn-soft' : 'btn-sky'} btn-sm`}
                             >
                               <i className="bi bi-thermometer-half me-1" />
@@ -329,7 +329,7 @@ export default function MedicalSupportPage() {
                           <>
                             <span className="tag warn m-0">รอหมอปิดเคส</span>
                             <Link
-                              to={`/medical-assistant/medical-support/${appt.id}`}
+                              to={`/clinic-admin/medical-support/${appt.id}`}
                               className="btn btn-soft btn-sm"
                             >
                               <i className="bi bi-journal-medical me-1" />
@@ -340,7 +340,7 @@ export default function MedicalSupportPage() {
 
                         {isDone && (
                           <Link
-                            to={`/medical-assistant/medical-support/${appt.id}`}
+                            to={`/clinic-admin/medical-support/${appt.id}`}
                             className="btn btn-soft btn-sm"
                           >
                             <i className="bi bi-file-text me-1" />

@@ -1,6 +1,8 @@
 import { Navigate } from 'react-router-dom';
+import { useAdoptionBasePath } from '../useAdoptionBasePath.js';
 
-/** Staff adds animals via Adoption Hub — redirect to management list. */
+/** เพิ่มสัตว์ทำที่ประกาศของเจ้าของ — แอดมินไปหน้ารายการประกาศ */
 export default function AddAnimalPage() {
-  return <Navigate to="/adoption/animals" replace />;
+  const base = useAdoptionBasePath();
+  return <Navigate to={`${base}/animals`} replace />;
 }

@@ -515,8 +515,10 @@ export default function WatchBoard({ camera, mode, onClose, canLog: canLogProp }
             {picture === 'error' && !reconnecting ? (
               <div className="watch-camera-overlay">
                 <strong>{camera.streamStatus === 'offline' ? 'กล้องออฟไลน์' : 'ภาพสดหลุดชั่วคราว'}</strong>
-                <p>กด Reconnect เพื่อเชื่อมต่อกล้องอีกครั้ง</p>
-                <button type="button" className="watch-btn primary" onClick={reconnect}>Reconnect กล้อง</button>
+                <p>ยังรับสัญญาณภาพไม่ได้ตอนนี้ — ลองเชื่อมต่อใหม่อีกครั้ง</p>
+                <button type="button" className="watch-btn primary" onClick={reconnect}>
+                  เชื่อมต่อใหม่
+                </button>
               </div>
             ) : null}
             <div className="watch-osd top-left">
@@ -556,7 +558,7 @@ export default function WatchBoard({ camera, mode, onClose, canLog: canLogProp }
             ) : null}
             <button type="button" className="watch-btn" onClick={reconnect} disabled={reconnecting}>
               <RefreshIcon spinning={reconnecting} />
-              Reconnect กล้อง
+              {reconnecting ? 'กำลังเชื่อมต่อ…' : 'เชื่อมต่อใหม่'}
             </button>
           </div>
         </section>

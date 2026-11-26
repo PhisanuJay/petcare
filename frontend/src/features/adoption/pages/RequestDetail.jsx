@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { adoptionStaffFetch, readAdoptionResponse } from '../api.js';
+import { useAdoptionBasePath } from '../useAdoptionBasePath.js';
 
 const STATUS_LABELS = {
   pending: 'รอพิจารณา',
@@ -26,6 +27,7 @@ function Detail({ label, children }) {
 }
 
 export default function RequestDetailPage() {
+  const base = useAdoptionBasePath();
   const { requestId } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -99,7 +101,7 @@ export default function RequestDetailPage() {
   return (
     <section>
       <div className="adoption-staff-page-title">
-        <Link to="/adoption/requests">← กลับไปหน้าคำร้อง</Link>
+        <Link to={`${base}/requests`}>← กลับไปหน้าคำร้อง</Link>
         <h1 className="mt-2">คำร้องของ {request.firstName} {request.lastName}</h1>
         <p>
           น้องที่สนใจ: {animal?.name || 'ไม่พบข้อมูลสัตว์'} ·{' '}

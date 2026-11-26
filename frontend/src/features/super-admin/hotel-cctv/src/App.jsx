@@ -5,7 +5,7 @@ import { cctvPath } from './paths';
 import AdminCameras from './pages/AdminCameras';
 import CustomerLive from './pages/CustomerLive';
 
-const MAIN_LOGIN = '/login?next=/super-admin';
+const MAIN_LOGIN = '/login?next=/super-admin/cctv';
 
 function Gate() {
   const [target, setTarget] = useState('');

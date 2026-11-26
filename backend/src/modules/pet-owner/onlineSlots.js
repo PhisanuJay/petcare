@@ -1,8 +1,9 @@
 import { listStaff } from '../auth/staffAccounts.js';
-import { getSettings, getClosure, getHoursForDay, slotTimesForDate } from '../clinic-admin/clinicSettings.js';
-import { isVetOnDuty, vetsOnDuty } from '../clinic-admin/rosterStore.js';
+import { getClosure, getHoursForDay, slotTimesForDate } from '../clinic-admin/clinicSettings.js';
+import { ensureRosterForActiveVets, isVetOnDuty, vetsOnDuty } from '../clinic-admin/rosterStore.js';
 import { findVetConflict } from '../medical-assistant/vetScheduling.js';
 import { listVisits } from '../medical-assistant/visitStore.js';
+import { getSettings } from '../clinic-admin/clinicSettings.js';
 import { isSlotBlockingStatus, listAllBookings } from './bookingStore.js';
 import { isDateString, nowTimeString, todayString } from './clinicSchedule.js';
 
@@ -12,33 +13,38 @@ function dayOfWeek(dateString) {
 }
 
 function baseSlotsForDate(date) {
-  if (!isDateString(date)) return [];
+  if (!isDateString(date)) return { base: [], reason: 'วันที่ไม่ถูกต้อง' };
   const closure = getClosure(date);
   if (closure) return { base: [], reason: `คลินิกปิดทำการ: ${closure.reason}` };
   if (getHoursForDay(dayOfWeek(date)) === null) {
     return { base: [], reason: 'คลินิกปิดทำการวันนี้' };
   }
+  ensureRosterForActiveVets();
   if (!vetsOnDuty(date).length) {
     return { base: [], reason: 'วันนี้ไม่มีสัตวแพทย์เข้าเวร' };
   }
   let base = slotTimesForDate(date);
   if (date === todayString()) {
     const now = nowTimeString();
-    base = base.filter((t) => t > now);
+    const upcoming = base.filter((t) => t > now);
+    base = upcoming.length ? upcoming : base;
   }
   return { base, reason: null };
 }
 
-function isTimeSlotTaken(bookings, date, time, excludeBookingId = null) {
-  return bookings.some(
-    (b) => b.id !== excludeBookingId
-      && isSlotBlockingStatus(b.status)
-      && b.date === date
-      && b.time === time,
-  );
+function takenTimesForDate(bookings, date) {
+  const taken = new Set();
+  for (const b of bookings) {
+    if (!isSlotBlockingStatus(b.status)) continue;
+    if (b.date !== date || typeof b.time !== 'string' || !b.time) continue;
+    taken.add(b.time);
+  }
+  return taken;
 }
 
-/** Public online booking slots, optionally filtered by preferred vet (empty = any vet on duty free). */
+/**
+ * ช่องเวลาจองออนไลน์ — ไม่โชว์ช่วงที่มีการจองแล้ว (ตรงกับกฎ createBooking)
+ */
 export async function availableOnlineSlots(date, preferredVetId = '') {
   const vetId = typeof preferredVetId === 'string' ? preferredVetId.trim() : '';
   if (!isDateString(date)) {
@@ -52,20 +58,21 @@ export async function availableOnlineSlots(date, preferredVetId = '') {
 
   const durationMin = Number(getSettings().slotMinutes) || 60;
   const [bookings, visits] = await Promise.all([listAllBookings(), listVisits()]);
+  const taken = takenTimesForDate(bookings, date);
   const visitsMap = new Map(visits.map((v) => [v.bookingId, v]));
+  const freeClock = base.filter((time) => !taken.has(time));
 
   if (vetId) {
-    if (!isVetOnDuty(vetId, date)) {
-      return { date, bookable: false, reason: 'สัตวแพทย์ที่เลือกไม่ได้เข้าเวรวันนี้', slots: [] };
-    }
     const vet = listStaff('veterinarian').find((v) => v.id === vetId);
     if (!vet) {
       return { date, bookable: false, reason: 'ไม่พบสัตวแพทย์ที่เลือก', slots: [] };
     }
-    const slots = base.filter(
+    if (!isVetOnDuty(vetId, date)) {
+      return { date, bookable: false, reason: 'สัตวแพทย์ที่เลือกไม่ได้เข้าเวรวันนี้', slots: [] };
+    }
+    const slots = freeClock.filter(
       (time) =>
-        !isTimeSlotTaken(bookings, date, time)
-        && !findVetConflict(bookings, visitsMap, {
+        !findVetConflict(bookings, visitsMap, {
           vetId: vet.id,
           vet: vet.name,
           date,
@@ -76,29 +83,29 @@ export async function availableOnlineSlots(date, preferredVetId = '') {
     return {
       date,
       bookable: slots.length > 0,
-      reason: slots.length ? null : 'สัตวแพทย์ที่เลือกไม่มีช่วงเวลาว่างในวันนี้',
+      reason: slots.length ? null : 'ไม่มีช่วงเวลาว่างในวันนี้ กรุณาเลือกวันอื่น',
       slots,
     };
   }
 
   const onDuty = vetsOnDuty(date);
-  const slots = base.filter(
-    (time) => !isTimeSlotTaken(bookings, date, time)
-      && onDuty.some(
-        (vet) =>
-          !findVetConflict(bookings, visitsMap, {
-            vetId: vet.id,
-            vet: vet.name,
-            date,
-            time,
-            durationMin,
-          }),
-      ),
+  const slots = freeClock.filter((time) =>
+    onDuty.some(
+      (vet) =>
+        !findVetConflict(bookings, visitsMap, {
+          vetId: vet.id,
+          vet: vet.name,
+          date,
+          time,
+          durationMin,
+        }),
+    ),
   );
+
   return {
     date,
     bookable: slots.length > 0,
-    reason: slots.length ? null : 'ไม่มีช่วงเวลาว่างในวันนี้',
+    reason: slots.length ? null : 'ไม่มีช่วงเวลาว่างในวันนี้ กรุณาเลือกวันอื่น',
     slots,
   };
 }

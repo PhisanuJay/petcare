@@ -139,9 +139,19 @@ export default function HeroSection({ go }) {
               </>
             )}
             <div className="d-flex flex-wrap gap-2">
-              <Link to="/pet-owner/booking" className="btn btn-sky btn-lg">
-                <i className="bi bi-calendar-heart me-1" /> จองบริการ
-              </Link>
+              {currentUser?.role === 'owner' && !loadingPets && pets.length === 0 ? (
+                <Link to="/pet-owner/my-pets/new" className="btn btn-sky btn-lg">
+                  <i className="bi bi-heart me-1" /> เพิ่มสัตว์เลี้ยงก่อนจอง
+                </Link>
+              ) : (
+                <a
+                  href="/pet-owner/booking"
+                  className="btn btn-sky btn-lg"
+                  onClick={go ? go('/pet-owner/booking') : undefined}
+                >
+                  <i className="bi bi-calendar-heart me-1" /> จองบริการ
+                </a>
+              )}
               {currentUser?.role === 'owner' ? (
                 <Link to="/pet-owner/history" className="btn btn-soft btn-lg bg-white">
                   <i className="bi bi-clock-history me-1" /> ประวัติการจอง

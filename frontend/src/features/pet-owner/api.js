@@ -1,33 +1,28 @@
-import { STORAGE_KEYS, readJSON } from '../../shared/utils/storage.js';
+import { API_BASE_URL } from '../../shared/api.js';
+import { ownerAuthHeaders } from '../../shared/ownerAuthHeaders.js';
 
-export const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
-
-function ownerAuthHeaders(ownerId, extra = {}) {
-  const remembered = readJSON(STORAGE_KEYS.session, null);
-  const temporary = readJSON(STORAGE_KEYS.session, null, sessionStorage);
-  const session = remembered?.authToken ? remembered : temporary;
-  const headers = { ...extra };
-  if (session?.authToken) {
-    headers.Authorization = `Bearer ${session.authToken}`;
-  } else if (ownerId) {
-    headers['x-owner-id'] = ownerId;
-  }
-  return headers;
-}
+/** dev ใช้ path ว่างผ่าน Vite proxy · production / env ชี้ backend โดยตรง */
+export const API_BASE = (
+  import.meta.env.VITE_API_URL
+  || import.meta.env.VITE_API_BASE_URL
+  || (import.meta.env.DEV ? '' : API_BASE_URL)
+).replace(/\/$/, '');
 
 /**
  * Call the Pet Owner API for the logged-in owner (Bearer session, or x-owner-id fallback).
  */
 export async function ownerRequest(ownerId, url, options = {}) {
+  if (!ownerId) {
+    throw new Error('กรุณาเข้าสู่ระบบ');
+  }
   let res;
   try {
     res = await fetch(`${API_BASE}/api/pet-owner${url}`, {
       ...options,
-      headers: {
+      headers: ownerAuthHeaders(ownerId, {
         'Content-Type': 'application/json',
         ...(options.headers || {}),
-        ...ownerAuthHeaders(ownerId, {}),
-      },
+      }),
     });
   } catch {
     throw new Error('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาตรวจสอบว่า backend ทำงานอยู่');

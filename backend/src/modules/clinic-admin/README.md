@@ -34,6 +34,9 @@
 | `GET /settings` | ดูตั้งค่าเวลาทำการ วันปิดคลินิก และบริการทั้งหมด (`listServices`) | `clinic_admin` |
 | `PUT /settings/hours` | ปรับเวลาทำการรายวัน (`0`..`6`, `:00`/`:30` และ `open < close` ≥ 30 นาที หรือ `null`) | `clinic_admin` |
 | `PUT /settings/services` | เปิด/ปิดการจองออนไลน์รายบริการ | `clinic_admin` |
+| `GET /services` | รายการแคตตาล็อกบริการพร้อมราคา (รวมที่ปิดใช้งาน) | `clinic_admin` |
+| `POST /services` | เพิ่มบริการใหม่ (รหัส, ชื่อ, ราคา dog/cat, ออนไลน์) | `clinic_admin` |
+| `PATCH /services/:code` | แก้ไขบริการ/ราคา/สถานะ | `clinic_admin` |
 | `GET /closures` | วันปิดคลินิกในอนาคต พร้อม `affectedBookings` | `clinic_admin` |
 | `POST /closures` | เพิ่มวันปิดคลินิก (`201`) พร้อม `affectedBookings` | `clinic_admin` |
 | `DELETE /closures/:date` | ลบวันปิดคลินิก | `clinic_admin` |

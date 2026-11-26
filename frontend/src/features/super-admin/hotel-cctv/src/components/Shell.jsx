@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { cctvPath } from '../paths';
 import {
@@ -77,10 +77,13 @@ function roleLabelOf(userRole) {
 
 export default function Shell({ role, children }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [session, setSession] = useState(null);
   const [section, setSectionState] = useState(() => tabFromSearch(role, searchParams));
   const [profileOpen, setProfileOpen] = useState(false);
+  /** Nested under PetCare Super Admin StaffWorkspace — hide duplicate chrome */
+  const embedded = pathname.startsWith('/super-admin/cctv');
 
   function setSection(next) {
     setSectionState(next);
@@ -106,7 +109,7 @@ export default function Shell({ role, children }) {
         }
         setSession(data);
       })
-      .catch(() => navigate('/login?next=/super-admin', { replace: true }));
+      .catch(() => navigate('/login?next=/super-admin/cctv', { replace: true }));
   }, [navigate, role]);
 
   useEffect(() => {
@@ -153,7 +156,7 @@ export default function Shell({ role, children }) {
 
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    navigate('/login?next=/super-admin', { replace: true });
+    navigate('/login?next=/super-admin/cctv', { replace: true });
   }
 
   if (!session) return <main className="center-page">กำลังโหลด</main>;
@@ -171,75 +174,103 @@ export default function Shell({ role, children }) {
     : CUSTOMER_NAV;
   const active = nav.find((item) => item.id === section) || nav[0];
   const roleLabel = roleLabelOf(session.user.role);
+  const workspaceClass = [
+    'workspace',
+    role === 'admin' ? 'theme-admin' : '',
+    embedded ? 'workspace--embedded' : '',
+  ].filter(Boolean).join(' ');
+
+  const navButtons = nav.map((item) => {
+    const Icon = item.Icon;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        className={`nav-item ${section === item.id ? 'active' : ''}`}
+        onClick={() => setSection(item.id)}
+      >
+        <Icon />
+        <span>{item.label}</span>
+      </button>
+    );
+  });
 
   return (
-    <div className={`workspace ${role === 'admin' ? 'theme-admin' : ''}`}>
-      <aside className="sidebar">
-        <div className="sidebar-top">
-          <div className="brand">
-            <span className="brand-mark">
-              <img className="brand-mark-art" src="/brand-mark.jpg" alt="" draggable="false" />
-            </span>
-            <div>
-              <strong>Pet Hotel</strong>
-              <small>{role === 'admin' ? (session.user.role === 'driver' ? 'คนขับ' : session.user.role === 'staff' ? 'Staff Panel' : 'Admin Panel') : session.hotelName}</small>
+    <div className={workspaceClass}>
+      {!embedded ? (
+        <aside className="sidebar">
+          <div className="sidebar-top">
+            <div className="brand">
+              <span className="brand-mark">
+                <img className="brand-mark-art" src="/brand-mark.jpg" alt="" draggable="false" />
+              </span>
+              <div>
+                <strong>Pet Hotel</strong>
+                <small>{role === 'admin' ? (session.user.role === 'driver' ? 'คนขับ' : session.user.role === 'staff' ? 'Staff Panel' : 'Admin Panel') : session.hotelName}</small>
+              </div>
             </div>
+            <nav>{navButtons}</nav>
           </div>
-          <nav>
-            {nav.map((item) => {
-              const Icon = item.Icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`nav-item ${section === item.id ? 'active' : ''}`}
-                  onClick={() => setSection(item.id)}
-                >
-                  <Icon />
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
 
-        <div className="sidebar-foot">
-          <div className="sidebar-mascot" aria-hidden="true">
-            <img
-              className="mascot-art"
-              src="/sidebar-mascot.jpg"
-              alt=""
-              draggable="false"
-            />
-          </div>
-          <div className="sidebar-user">
-            <button className="avatar avatar-btn" type="button" onClick={() => setProfileOpen(true)} aria-label="ข้อมูลบัญชี">
-              {initial(session.user.displayName)}
-            </button>
-            <div>
-              <strong>{session.user.displayName}</strong>
-              <small>{roleLabel}</small>
+          <div className="sidebar-foot">
+            <div className="sidebar-mascot" aria-hidden="true">
+              <img
+                className="mascot-art"
+                src="/sidebar-mascot.jpg"
+                alt=""
+                draggable="false"
+              />
             </div>
-            <button className="button ghost tiny" type="button" onClick={logout}>ออก</button>
+            <div className="sidebar-user">
+              <button className="avatar avatar-btn" type="button" onClick={() => setProfileOpen(true)} aria-label="ข้อมูลบัญชี">
+                {initial(session.user.displayName)}
+              </button>
+              <div>
+                <strong>{session.user.displayName}</strong>
+                <small>{roleLabel}</small>
+              </div>
+              <button className="button ghost tiny" type="button" onClick={logout}>ออก</button>
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      ) : null}
 
       <div className="workspace-main">
-        <header className="topbar">
-          <div>
-            <p className="kicker">{session.hotelName}</p>
-            <strong className="top-title">{active.label}</strong>
-          </div>
-          <button className="who who-btn" type="button" onClick={() => setProfileOpen(true)} aria-label="ข้อมูลบัญชี">
-            <span className="avatar">{initial(session.user.displayName)}</span>
-            <div>
-              <strong>{session.user.displayName}</strong>
-              <small>{roleLabel}</small>
+        {embedded ? (
+          <header className="embedded-bar">
+            <div className="embedded-bar__title">
+              <p className="kicker">{session.hotelName || 'Pet Hotel CCTV'}</p>
+              <strong className="top-title">{active.label}</strong>
             </div>
-          </button>
-        </header>
-        <main>{children(session, { section, setSection })}</main>
+            <nav className="embedded-tabs" aria-label="เมนู CCTV">
+              {navButtons}
+            </nav>
+            <button
+              className="button ghost tiny embedded-profile"
+              type="button"
+              onClick={() => setProfileOpen(true)}
+            >
+              บัญชี CCTV
+            </button>
+          </header>
+        ) : (
+          <header className="topbar">
+            <div>
+              <p className="kicker">{session.hotelName}</p>
+              <strong className="top-title">{active.label}</strong>
+            </div>
+            <button className="who who-btn" type="button" onClick={() => setProfileOpen(true)} aria-label="ข้อมูลบัญชี">
+              <span className="avatar">{initial(session.user.displayName)}</span>
+              <div>
+                <strong>{session.user.displayName}</strong>
+                <small>{roleLabel}</small>
+              </div>
+            </button>
+          </header>
+        )}
+        <main className={embedded ? 'embedded-main' : undefined}>
+          {children(session, { section, setSection })}
+        </main>
       </div>
 
       {profileOpen ? (

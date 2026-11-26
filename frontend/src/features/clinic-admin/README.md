@@ -13,6 +13,7 @@
 | `/clinic-admin` | `pages/Overview.jsx` | ภาพรวมวันนี้ (สถิติ นัดตามสถานะ หมอเข้าเวร วันปิดคลินิกใน 3 วันข้างหน้า เมนูด่วน) |
 | `/clinic-admin/staff` | `pages/Staff.jsx` | ค้นหา กรองตามตำแหน่ง เพิ่มบัญชี แก้ไข (พร้อมคำเตือนนัดค้างของหมอ) ตั้งรหัสผ่านใหม่ และเปิด/ปิดใช้งานบัญชี |
 | `/clinic-admin/schedule` | `pages/Schedule.jsx` | ตั้งตารางเวรประจำสัปดาห์ของหมอ จ.–อา. เพิ่ม/ลบวันลา และเพิ่ม/ลบวันปิดคลินิก |
+| `/clinic-admin/services` | `pages/Services.jsx` | แคตตาล็อกบริการ เพิ่ม/แก้ไข ตั้งราคาแยกสุนัข–แมว เปิด-ปิดจองออนไลน์ |
 | `/clinic-admin/settings` | `pages/Settings.jsx` | ตั้งค่าเวลาทำการทุก 30 นาที และเปิด/ปิดบริการที่รับจองออนไลน์ |
 | `/clinic-admin/reports` | `pages/Reports.jsx` | ดูรายงานสถิติตามช่วงวันที่ อัตราไม่มาตามนัด เวลาตอบคำขอ ภาระงานหมอ กิจกรรมผู้ช่วยฯ และพิมพ์รายงาน |
 
@@ -27,4 +28,5 @@
 - `GET /roster`, `PUT /roster/:staffId/weekdays`, `POST /roster/:staffId/leaves`, `DELETE /roster/:staffId/leaves/:leaveId`
 - `GET /closures`, `POST /closures`, `DELETE /closures/:date`
 - `GET /settings`, `PUT /settings/hours`, `PUT /settings/services`
+- `GET /services`, `POST /services`, `PATCH /services/:code`
 - `GET /reports?from=YYYY-MM-DD&to=YYYY-MM-DD`

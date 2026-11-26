@@ -9,9 +9,9 @@ import {
 } from './bookingStore.js';
 import { confirmOnlineBooking } from './confirmOnlineBooking.js';
 import { availableOnlineSlots } from './onlineSlots.js';
-import { isServiceOnline } from '../clinic-admin/clinicSettings.js';
+import { isKnownService, isServiceOnline } from '../clinic-admin/clinicSettings.js';
 import { vetsOnDuty } from '../clinic-admin/rosterStore.js';
-import { BOOKING_SERVICES, isDateString, todayString, validateSlot } from './clinicSchedule.js';
+import { isDateString, todayString, validateSlot } from './clinicSchedule.js';
 import {
   bookingServiceLabel,
   normalizeBookingServiceCode,
@@ -26,7 +26,7 @@ import {
 import { resolveReservationCancellation } from './hotelStore.js';
 import { createPet, deletePet, findPet, listPets, updatePet } from './store.js';
 import { saveOwnerProfile } from './ownerStore.js';
-import { getCustomerSession } from '../auth/store.js';
+import { resolveCustomerIdentity } from '../auth/store.js';
 import { listGrantedCamerasForOwner } from '../super-admin/cctvAdmin.js';
 
 /**
@@ -57,14 +57,9 @@ function httpError(status, message) {
 /** Owner from Bearer session (preferred) or legacy x-owner-id during transition. */
 async function requireOwner(req, _res, next) {
   try {
-    const session = await getCustomerSession(req);
-    if (session?.user?.id) {
-      req.ownerId = session.user.id;
-      return next();
-    }
-    const headerId = req.get('x-owner-id')?.trim();
-    if (headerId) {
-      req.ownerId = headerId;
+    const identity = await resolveCustomerIdentity(req);
+    if (identity?.user?.id) {
+      req.ownerId = identity.user.id;
       return next();
     }
     return next(httpError(401, 'กรุณาเข้าสู่ระบบ'));
@@ -220,7 +215,7 @@ router.post('/bookings', wrap(async (req, res) => {
       const rowPet = petsById.get(pid);
       if (!rowPet) throw httpError(400, 'รายการสัตว์ไม่ตรงกับที่เลือก');
       const lineService = normalizeBookingServiceCode(row.service);
-      if (!Object.hasOwn(BOOKING_SERVICES, lineService)) throw httpError(400, 'กรุณาเลือกบริการ');
+      if (!isKnownService(lineService)) throw httpError(400, 'กรุณาเลือกบริการ');
       if (!isServiceOnline(lineService)) throw httpError(400, 'บริการนี้ปิดรับจองออนไลน์ชั่วคราว');
       petLines.push({
         petId: rowPet.id,
@@ -237,7 +232,7 @@ router.post('/bookings', wrap(async (req, res) => {
     }
   } else {
     const serviceCode = normalizeBookingServiceCode(service);
-    if (!Object.hasOwn(BOOKING_SERVICES, serviceCode)) throw httpError(400, 'กรุณาเลือกบริการ');
+    if (!isKnownService(serviceCode)) throw httpError(400, 'กรุณาเลือกบริการ');
     if (!isServiceOnline(serviceCode)) throw httpError(400, 'บริการนี้ปิดรับจองออนไลน์ชั่วคราว');
     petLines = petsOnBooking.map((p) => ({
       petId: p.id,

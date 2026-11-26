@@ -423,7 +423,7 @@ function SupportCaseInner({ caseData, patient, meta, startTreatment, saveVisit, 
   return (
     <section>
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 ma-no-print">
-        <Link to="/medical-assistant/medical-support" className="small text-decoration-none">
+        <Link to="/clinic-admin/medical-support" className="small text-decoration-none">
           <i className="bi bi-arrow-left me-1" />
           กลับไปหน้าคิวสนับสนุนการรักษา
         </Link>
@@ -1171,7 +1171,7 @@ export default function SupportCasePage() {
     return (
       <section>
         <div className="mb-3">
-          <Link to="/medical-assistant/medical-support" className="small text-decoration-none">
+          <Link to="/clinic-admin/medical-support" className="small text-decoration-none">
             <i className="bi bi-arrow-left me-1" />
             กลับไปหน้าคิวสนับสนุนการรักษา
           </Link>
@@ -1189,7 +1189,7 @@ export default function SupportCasePage() {
             <i className="bi bi-calendar-x" />
             <div>ไม่พบเคสที่ต้องการ</div>
             <div className="mt-3">
-              <Link to="/medical-assistant/medical-support" className="btn btn-sky">
+              <Link to="/clinic-admin/medical-support" className="btn btn-sky">
                 กลับไปหน้าสนับสนุนการรักษา
               </Link>
             </div>

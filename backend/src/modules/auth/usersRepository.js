@@ -71,6 +71,11 @@ export async function listActiveOwners() {
   return rows.map(mapUser);
 }
 
+export async function listAllUsers() {
+  const rows = await queryAll(`${SELECT_USER} ORDER BY role, first_name, last_name, email`);
+  return rows.map(mapUser);
+}
+
 export async function upsertUser(user) {
   const now = new Date().toISOString();
   const createdAt = user.createdAt || now;

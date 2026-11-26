@@ -1,51 +1,5 @@
-.adoption-staff {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  align-items: start;
-  gap: 1.25rem;
-  width: min(100%, 1440px);
-  margin: 0 auto;
-  padding: 1.5rem clamp(1rem, 3vw, 2rem);
+.adoption-staff-content-inner {
   color: #1d3a57;
-  min-height: 100%;
-}
-
-.nav-shell.adoption-nav-shell {
-  top: 0;
-}
-
-.adoption-staff-sidebar {
-  position: sticky;
-  top: 90px;
-  align-self: start;
-  padding: 0.5rem;
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 8px 26px rgba(29, 58, 87, 0.08);
-}
-
-.adoption-staff-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.adoption-staff-nav a {
-  padding: 0.7rem 0.85rem;
-  border-radius: 12px;
-  color: #1d3a57;
-  text-decoration: none;
-}
-
-.adoption-staff-nav a.active,
-.adoption-staff-nav a:hover {
-  background: #d6e9fc;
-  color: #2f7fc8;
-}
-
-.adoption-staff-content {
-  min-width: 0;
-  padding: 0.25rem 0;
 }
 
 .adoption-staff-page-title {
@@ -188,58 +142,7 @@
   font-size: 0.78rem;
 }
 
-.adoption-staff-login {
-  display: grid;
-  min-height: 65vh;
-  place-items: center;
-  padding: 1rem;
-}
-
-.adoption-staff-login-card {
-  width: min(100%, 460px);
-  padding: 2rem;
-  border-radius: 28px;
-  background: #fff;
-  box-shadow: 0 14px 40px rgba(29, 58, 87, 0.12);
-}
-
-.adoption-staff-login-card h1 {
-  margin: 0.8rem 0 0.4rem;
-  font-size: 1.6rem;
-}
-
-.adoption-staff-login-card > p {
-  color: #6a7f96;
-}
-
-.adoption-staff-home-link {
-  display: block;
-  margin-top: 1rem;
-  color: #2f7fc8;
-  text-align: center;
-}
-
 .adoption-staff-state {
   padding: 2rem;
   text-align: center;
-}
-
-@media (max-width: 767.98px) {
-  .adoption-staff {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-  }
-
-  .adoption-staff-sidebar {
-    position: static;
-  }
-
-  .adoption-staff-nav {
-    flex-direction: row;
-    overflow-x: auto;
-  }
-
-  .adoption-staff-nav a {
-    flex: 0 0 auto;
-  }
 }

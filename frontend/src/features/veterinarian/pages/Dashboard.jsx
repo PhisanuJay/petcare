@@ -86,7 +86,7 @@ function SlotAction({ a, busy, onAction }) {
         type="button"
         className="btn btn-sky btn-sm"
         disabled={busy || a.visit?.stage !== 'in_treatment'}
-        title={a.visit?.stage === 'in_treatment' ? '' : 'ปิดเคสได้หลังผู้ช่วยสัตวแพทย์ส่งเข้าห้องตรวจแล้ว'}
+        title={a.visit?.stage === 'in_treatment' ? '' : 'ปิดเคสได้หลังแอดมินคลินิกส่งเข้าห้องตรวจแล้ว'}
         onClick={() => onAction(a, 'completed')}
       >
         <i className="bi bi-check2-all me-1" />
