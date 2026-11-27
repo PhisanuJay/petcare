@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext.jsx';
 import { fetchOverview } from '../api.js';
@@ -25,24 +25,6 @@ const STATUS_TH = {
   reviewing: 'กำลังพิจารณา',
   submitted_app: 'ส่งคำร้อง',
 };
-
-function toneForAttention(key, value) {
-  if (!value) return 'is-ok';
-  if (key === 'tripsRunning') return 'is-info';
-  if (key === 'slipPending' || key === 'cancelRequested') return 'is-danger';
-  return 'is-warn';
-}
-
-function formatThaiDate(isoDate) {
-  if (!isoDate) return '';
-  const [y, m, d] = isoDate.split('-').map(Number);
-  if (!y || !m || !d) return isoDate;
-  return new Date(y, m - 1, d).toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
 
 function statusLabel(status) {
   return STATUS_TH[status] || status || '—';
@@ -73,26 +55,12 @@ export default function SuperAdminDashboardPage() {
     };
   }, [authToken]);
 
-  const attentionItems = useMemo(() => {
-    const a = data?.attention || {};
-    return [
-      { key: 'slipPending', label: 'สลิปรอตรวจ', value: a.slipPending || 0, hint: 'บัญชี + รับส่ง' },
-      { key: 'clinicPending', label: 'นัดรอยืนยัน', value: a.clinicPending || 0, hint: 'คลินิกวันนี้' },
-      { key: 'tripsRunning', label: 'ทริปกำลังวิ่ง', value: a.tripsRunning || 0, hint: 'รับส่งสด' },
-      { key: 'adoptionPending', label: 'คำร้องรอพิจารณา', value: a.adoptionPending || 0, hint: 'หาบ้าน' },
-      { key: 'cancelRequested', label: 'คำขอยกเลิก', value: a.cancelRequested || 0, hint: 'คลินิก + รับส่ง' },
-    ];
-  }, [data]);
-
-  const needsAction = attentionItems.reduce((sum, item) => sum + (item.value > 0 ? 1 : 0), 0);
-
   return (
     <div className="sa-dash">
       <header className="sa-dash__intro">
         <div>
           <p className="sa-dash__eyebrow">แผงควบคุมระบบ</p>
-          <h1>ต้องจัดการอะไรวันนี้</h1>
-         
+          <h1>ภาพรวมระบบวันนี้</h1>
         </div>
         <div className="sa-dash__intro-actions">
           <Link className="sa-btn sa-btn--ghost" to="/super-admin/reports">รายงานเต็ม</Link>
@@ -105,19 +73,6 @@ export default function SuperAdminDashboardPage() {
 
       {data ? (
         <>
-          <section className="sa-attention" aria-label="รายการที่ต้องจัดการ">
-            {attentionItems.map((item) => (
-              <article
-                key={item.key}
-                className={`sa-attention__card ${toneForAttention(item.key, item.value)}`}
-              >
-                <span className="sa-attention__label">{item.label}</span>
-                <strong className="sa-attention__value">{item.value}</strong>
-                <span className="sa-attention__hint">{item.hint}</span>
-              </article>
-            ))}
-          </section>
-
           <section className="sa-kpi" aria-label="สรุปโมดูล">
             <Link className="sa-kpi__card" to="/super-admin/reports">
               <span className="sa-kpi__icon" aria-hidden="true"><i className="bi bi-heart-pulse" /></span>

@@ -10,6 +10,7 @@ import { apptVetName, isSameVet, vetList } from '../data/clinicMeta.js';
 import {
   STAGE_LIST,
   STAGE_META,
+  STAGE_TAB_LIST,
   offsetDateKey,
 } from '../data/constants.js';
 import { useAppointments } from '../data/useAppointments.js';
@@ -95,13 +96,6 @@ function StatusActions({ appt, todayKey, onRequestAction, onReschedule }) {
     return (
       <div className="ca-actions ca-appt-actions">
         <span className="tag warn m-0">รอหมอปิดเคส</span>
-        <Link
-          to={`/clinic-admin/appointments?focus=${appt.id}`}
-          className="btn btn-soft btn-sm"
-          title="เปิดหน้าสนับสนุนการรักษา"
-        >
-          <i className="bi bi-bandaid" />
-        </Link>
       </div>
     );
   }
@@ -173,10 +167,17 @@ export default function AppointmentsPage() {
   const yesterdayKey = offsetDateKey(-1);
   const todayKey = offsetDateKey(0);
   const tomorrowKey = offsetDateKey(1);
+  const ALL_DATES = 'all';
 
   const [searchParams, setSearchParams] = useSearchParams();
   const paramDate = searchParams.get('date');
-  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(paramDate || '') ? paramDate : todayKey;
+  const selectedDate =
+    paramDate === ALL_DATES
+      ? ALL_DATES
+      : /^\d{4}-\d{2}-\d{2}$/.test(paramDate || '')
+        ? paramDate
+        : todayKey;
+  const showAllDates = selectedDate === ALL_DATES;
 
   const setSelectedDate = useCallback(
     (dateKey) => {
@@ -189,6 +190,7 @@ export default function AppointmentsPage() {
   const [stageFilter, setStageFilter] = useState('all');
   const [vetFilter, setVetFilter] = useState('all');
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
 
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -202,13 +204,19 @@ export default function AppointmentsPage() {
 
   const vets = useMemo(() => vetList(meta), [meta]);
 
-  const dayAppointments = useMemo(
-    () =>
-      appointments
-        .filter((a) => a.date === selectedDate)
-        .sort((a, b) => (a.time || '').localeCompare(b.time || '')),
-    [appointments, selectedDate],
-  );
+  const dayAppointments = useMemo(() => {
+    if (showAllDates) {
+      // Newest bookings first so recent reservations outside today/tomorrow stay visible.
+      return [...appointments].sort((a, b) => {
+        const byCreated = String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+        if (byCreated) return byCreated;
+        return `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`);
+      });
+    }
+    return appointments
+      .filter((a) => a.date === selectedDate)
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  }, [appointments, selectedDate, showAllDates]);
 
   const stageCounts = useMemo(() => {
     const counts = { all: dayAppointments.length };
@@ -219,24 +227,65 @@ export default function AppointmentsPage() {
     return counts;
   }, [dayAppointments]);
 
+  const matchesSearch = useCallback(
+    (a, q) => {
+      if (!q) return true;
+      const digits = q.replace(/\D/g, '');
+      const pat = patientsById.get(a.petId);
+      const fields = [
+        a.petName,
+        a.ownerName,
+        a.ownerPhone,
+        a.serviceLabel,
+        a.service,
+        apptVetName(a),
+        pat?.name,
+        pat?.ownerName,
+        pat?.ownerPhone,
+      ];
+      if (fields.some((v) => String(v || '').toLowerCase().includes(q))) return true;
+      if (digits.length >= 3) {
+        const phones = [a.ownerPhone, pat?.ownerPhone].map((v) => String(v || '').replace(/\D/g, ''));
+        if (phones.some((p) => p.includes(digits))) return true;
+      }
+      return false;
+    },
+    [patientsById],
+  );
+
+  const searchActive = Boolean(appliedQuery.trim());
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return dayAppointments.filter((a) => {
+    const q = appliedQuery.trim().toLowerCase();
+    const pool = q
+      ? [...appointments].sort((a, b) => {
+          const byCreated = String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+          if (byCreated) return byCreated;
+          return `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`);
+        })
+      : dayAppointments;
+    return pool.filter((a) => {
       if (stageFilter !== 'all' && a.stage !== stageFilter) return false;
       if (vetFilter !== 'all' && !isSameVet(a, vetFilter)) return false;
-      if (q) {
-        const hit = [a.petName, a.ownerName, a.ownerPhone, a.serviceLabel].some((v) =>
-          v?.toLowerCase().includes(q),
-        );
-        if (!hit) return false;
-      }
-      return true;
+      return matchesSearch(a, q);
     });
-  }, [dayAppointments, stageFilter, vetFilter, query]);
+  }, [appointments, dayAppointments, stageFilter, vetFilter, appliedQuery, matchesSearch]);
 
-  const hasActiveFilter = stageFilter !== 'all' || vetFilter !== 'all' || query.trim() !== '';
+  const showRowDate = showAllDates || searchActive;
+
+  const hasActiveFilter = stageFilter !== 'all' || vetFilter !== 'all' || searchActive;
   const hasData = Boolean(meta) || appointments.length > 0;
   const blockedByState = !hasData && (loading || Boolean(error));
+
+  function runSearch(event) {
+    event?.preventDefault?.();
+    setAppliedQuery(query.trim());
+  }
+
+  function clearSearch() {
+    setQuery('');
+    setAppliedQuery('');
+  }
 
   function openConfirm(type, appt) {
     setConfirmError('');
@@ -284,9 +333,11 @@ export default function AppointmentsPage() {
     setStageFilter('all');
     setVetFilter('all');
     setQuery('');
+    setAppliedQuery('');
   }
 
   const dateTabs = [
+    { label: 'ทั้งหมด', value: ALL_DATES },
     { label: 'เมื่อวาน', value: yesterdayKey },
     { label: 'วันนี้', value: todayKey },
     { label: 'พรุ่งนี้', value: tomorrowKey },
@@ -370,7 +421,7 @@ export default function AppointmentsPage() {
                 type="date"
                 className="form-control ca-appt-date"
                 aria-label="เลือกวันที่"
-                value={selectedDate}
+                value={showAllDates ? '' : selectedDate}
                 onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
               />
 
@@ -391,7 +442,7 @@ export default function AppointmentsPage() {
                 })}
               </select>
 
-              <div className="input-group ca-search-group">
+              <form className="input-group ca-search-group" onSubmit={runSearch}>
                 <span className="input-group-text">
                   <i className="bi bi-search" />
                 </span>
@@ -403,7 +454,15 @@ export default function AppointmentsPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
-              </div>
+                {appliedQuery ? (
+                  <button type="button" className="btn btn-soft" onClick={clearSearch}>
+                    ล้าง
+                  </button>
+                ) : null}
+                <button type="submit" className="btn btn-sky">
+                  ค้นหา
+                </button>
+              </form>
             </div>
 
             <div className="pill-tabs ca-scroll-tabs mb-0" role="group" aria-label="กรองตามสถานะ">
@@ -415,7 +474,7 @@ export default function AppointmentsPage() {
                 ทั้งหมด
                 <span className="count">{stageCounts.all}</span>
               </button>
-              {STAGE_LIST.map((s) => (
+              {STAGE_TAB_LIST.map((s) => (
                 <button
                   key={s.value}
                   type="button"
@@ -431,7 +490,11 @@ export default function AppointmentsPage() {
             <div className="ca-appt-board__head">
               <div className="section-label mb-0">
                 <i className="bi bi-calendar2-week" />
-                ตารางนัดวันที่ {formatDate(selectedDate)}
+                {searchActive
+                  ? `ผลการค้นหา “${appliedQuery.trim()}”`
+                  : showAllDates
+                    ? 'ตารางนัดทั้งหมด'
+                    : `ตารางนัดวันที่ ${formatDate(selectedDate)}`}
                 <span className="ca-appt-board__count">{filtered.length} รายการ</span>
               </div>
               {hasActiveFilter && (
@@ -445,11 +508,15 @@ export default function AppointmentsPage() {
               <div className="empty-box">
                 <i className="bi bi-calendar-x" />
                 <div>
-                  {dayAppointments.length === 0
-                    ? `ยังไม่มีนัดหมายในวันที่ ${formatDate(selectedDate)}`
-                    : 'ไม่พบนัดหมายที่ตรงกับตัวกรอง'}
+                  {searchActive
+                    ? 'ไม่พบนัดหมายที่ตรงกับคำค้น'
+                    : dayAppointments.length === 0
+                      ? showAllDates
+                        ? 'ยังไม่มีนัดหมายในระบบ'
+                        : `ยังไม่มีนัดหมายในวันที่ ${formatDate(selectedDate)}`
+                      : 'ไม่พบนัดหมายที่ตรงกับตัวกรอง'}
                 </div>
-                {dayAppointments.length > 0 && hasActiveFilter && (
+                {hasActiveFilter && (
                   <div className="mt-3">
                     <button type="button" className="btn btn-soft" onClick={clearFilters}>
                       ล้างตัวกรอง
@@ -498,9 +565,13 @@ export default function AppointmentsPage() {
                                 <strong>{appt.time}</strong>
                                 <span>น.</span>
                               </div>
-                              <div className="ca-appt-duration">
-                                {durationMin ? `${durationMin} นาที` : '—'}
-                              </div>
+                              {showRowDate ? (
+                                <div className="ca-appt-duration">{formatDate(appt.date)}</div>
+                              ) : (
+                                <div className="ca-appt-duration">
+                                  {durationMin ? `${durationMin} นาที` : '—'}
+                                </div>
+                              )}
                             </td>
                             <td>
                               <div className="ca-appt-pet">
@@ -601,6 +672,9 @@ export default function AppointmentsPage() {
                       <article className="ca-appt-card" key={appt.id}>
                         <header className="ca-appt-card__head">
                           <div className="ca-appt-time">
+                            {showRowDate ? (
+                              <div className="ca-appt-duration mb-1">{formatDate(appt.date)}</div>
+                            ) : null}
                             <strong>{appt.time}</strong>
                             <span>น.</span>
                             {durationMin ? (

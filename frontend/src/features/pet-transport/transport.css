@@ -2280,6 +2280,23 @@
   grid-template-columns: 1fr;
 }
 
+.tp-filters__search {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.tp-filters__search input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.tp-filters__meta {
+  margin: 0.65rem 0 0;
+  font-size: 0.88rem;
+}
+
 @media (min-width: 720px) {
   .tp-filters__grid {
     grid-template-columns: 2fr 1fr auto;

@@ -154,16 +154,46 @@ async function ownerContacts() {
 
 /** Pet fields for the list (no photo: it can be large). `ownerName` lets the pickers show whose pet it is. */
 function patientListItem(pet, bookings, ownerName = '') {
-  const { id, name, species, breed, sex, birthDate, weight, allergies, chronicDiseases } = pet;
+  const { id, name, species, breed, sex, birthDate, weight, allergies, chronicDiseases, createdAt, updatedAt } = pet;
   // `visited`: the pet has a confirmed or finished appointment, i.e. it has been brought to the clinic
   // (the vet records the treatment during a confirmed visit, before closing it).
   const visited = bookings.some((b) => b.status === 'confirmed' || b.status === 'completed');
-  return { id, name, species, breed, sex, birthDate, weight, allergies, chronicDiseases, ownerName, visited, ...visitStats(bookings) };
+  return {
+    id,
+    name,
+    species,
+    breed,
+    sex,
+    birthDate,
+    weight,
+    allergies,
+    chronicDiseases,
+    createdAt: createdAt || '',
+    updatedAt: updatedAt || '',
+    ownerName,
+    visited,
+    ...visitStats(bookings),
+  };
 }
+
+/** Pet ids on a booking (primary + multi-pet companions). */
+function bookingPetIds(booking) {
+  const ids = Array.isArray(booking.petIds) && booking.petIds.length
+    ? booking.petIds.map(String)
+    : [];
+  if (booking.petId) ids.push(String(booking.petId));
+  return [...new Set(ids.filter(Boolean))];
+}
+
+const bookingIncludesPet = (booking, petId) => bookingPetIds(booking).includes(String(petId));
 
 const byPetId = (bookings) => {
   const map = new Map();
-  for (const b of bookings) map.set(b.petId, [...(map.get(b.petId) ?? []), b]);
+  for (const b of bookings) {
+    for (const petId of bookingPetIds(b)) {
+      map.set(petId, [...(map.get(petId) ?? []), b]);
+    }
+  }
   return map;
 };
 
@@ -183,7 +213,7 @@ router.get('/patients/:id', wrap(async (req, res) => {
   const pet = await getPetById(req.params.id);
   if (!pet) throw httpError(404, 'ไม่พบข้อมูลสัตว์เลี้ยง');
   const [allBookings, contactOf] = await Promise.all([listVetBookings(), ownerContacts()]);
-  const bookings = allBookings.filter((b) => b.petId === pet.id);
+  const bookings = allBookings.filter((b) => bookingIncludesPet(b, pet.id));
   const { ownerId, ...record } = pet;
   res.json({
     ...record,

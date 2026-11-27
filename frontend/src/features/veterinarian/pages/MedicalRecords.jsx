@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import VetLayout from '../components/VetLayout.jsx';
 import VetPageHeader from '../components/VetPageHeader.jsx';
 import { useOwners, usePatient } from '../usePatients.js';
+import { BOOKING_STATUS } from '../../pet-owner/bookingOptions.js';
 import { ageText, formatDate, labelOf, speciesOf, PARASITE_TYPES } from '../../pet-owner/petUtils.js';
 
 /**
@@ -12,11 +13,37 @@ import { ageText, formatDate, labelOf, speciesOf, PARASITE_TYPES } from '../../p
 
 const byDateDesc = (a, b) => (b.date || '').localeCompare(a.date || '');
 
+/** Newest registered pet first (then most recently updated). */
+function petNewestKey(pet) {
+  return pet.createdAt || pet.updatedAt || '';
+}
+
+function ownerNewestKey(owner) {
+  const pets = owner.pets ?? [];
+  return pets.reduce((latest, pet) => {
+    const key = petNewestKey(pet);
+    return key > latest ? key : latest;
+  }, owner.lastVisit || '');
+}
+
 function buildHistory(patient) {
   return [
     ...(patient.treatments ?? []).map((row) => ({ kind: 'treatment', row })),
     ...(patient.parasites ?? []).map((row) => ({ kind: 'parasite', row })),
-  ].sort((a, b) => byDateDesc(a.row, b.row));
+    ...(patient.appointments ?? []).map((row) => ({ kind: 'appointment', row })),
+  ].sort((a, b) => {
+    const byDate = byDateDesc(a.row, b.row);
+    if (byDate) return byDate;
+    const aTime = a.row.time || a.row.createdAt || '';
+    const bTime = b.row.time || b.row.createdAt || '';
+    return String(bTime).localeCompare(String(aTime));
+  });
+}
+
+function kindMeta(kind) {
+  if (kind === 'parasite') return { icon: 'bi-bug', label: 'ถ่ายพยาธิ / เห็บหมัด', title: 'รายละเอียดการให้ยา' };
+  if (kind === 'appointment') return { icon: 'bi-calendar2-check', label: 'นัดหมายคลินิก', title: 'รายละเอียดนัดหมาย' };
+  return { icon: 'bi-journal-medical', label: 'ตรวจ / รักษา', title: 'รายละเอียดการรักษา' };
 }
 
 function DetailRow({ label, value }) {
@@ -41,7 +68,8 @@ function RecordDetailModal({ item, onClose }) {
 
   if (!item) return null;
   const { kind, row: t } = item;
-  const title = kind === 'parasite' ? 'รายละเอียดการให้ยา' : 'รายละเอียดการรักษา';
+  const meta = kindMeta(kind);
+  const bookingStatus = BOOKING_STATUS[t.status] ?? { label: t.status || '', tone: '' };
 
   return (
     <>
@@ -59,10 +87,13 @@ function RecordDetailModal({ item, onClose }) {
             <div className="d-flex justify-content-between align-items-start gap-2 mb-3 pb-2 border-bottom">
               <div>
                 <div id="vet-record-detail-title" className="section-label mb-1">
-                  <i className={`bi ${kind === 'parasite' ? 'bi-bug' : 'bi-journal-medical'}`} aria-hidden="true" />
-                  {title}
+                  <i className={`bi ${meta.icon}`} aria-hidden="true" />
+                  {meta.title}
                 </div>
-                <div className="small text-muted">{formatDate(t.date)}</div>
+                <div className="small text-muted">
+                  {formatDate(t.date)}
+                  {t.time ? ` · ${t.time} น.` : ''}
+                </div>
               </div>
               <button type="button" className="btn-close" aria-label="ปิด" onClick={onClose} />
             </div>
@@ -78,7 +109,7 @@ function RecordDetailModal({ item, onClose }) {
                   <DetailRow label="การรักษา / ยาที่ได้รับ" value={t.treatment} />
                   <DetailRow label="นัดติดตามอาการ" value={t.followUp ? formatDate(t.followUp) : ''} />
                 </>
-              ) : (
+              ) : kind === 'parasite' ? (
                 <>
                   <DetailRow label="วันที่ให้ยา" value={formatDate(t.date)} />
                   <DetailRow label="ประเภท" value={labelOf(PARASITE_TYPES, t.type)} />
@@ -86,11 +117,22 @@ function RecordDetailModal({ item, onClose }) {
                   <DetailRow label="สัตวแพทย์" value={t.vet} />
                   <DetailRow label="สถานที่" value={t.place} />
                 </>
+              ) : (
+                <>
+                  <DetailRow label="วันเวลานัด" value={`${formatDate(t.date)}${t.time ? ` · ${t.time} น.` : ''}`} />
+                  <DetailRow label="บริการ" value={t.serviceLabel || t.service} />
+                  <DetailRow label="สถานะ" value={bookingStatus.label} />
+                  <DetailRow label="สัตวแพทย์" value={t.vetName} />
+                  <DetailRow label="หมายเหตุเจ้าของ" value={t.note} />
+                  <DetailRow label="หมายเหตุคลินิก" value={t.clinicNote} />
+                </>
               )}
-              <DetailRow
-                label="แหล่งบันทึก"
-                value={t.source === 'vet' ? 'บันทึกโดยคลินิก' : 'บันทึกโดยเจ้าของ'}
-              />
+              {kind !== 'appointment' && (
+                <DetailRow
+                  label="แหล่งบันทึก"
+                  value={t.source === 'vet' ? 'บันทึกโดยคลินิก' : 'บันทึกโดยเจ้าของ'}
+                />
+              )}
             </dl>
 
             <div className="d-flex justify-content-end mt-3 pt-2 border-top">
@@ -113,7 +155,7 @@ function HistoryList({ history }) {
     return (
       <div className="empty-box py-3">
         <i className="bi bi-journal-medical" />
-        ยังไม่มีประวัติ
+        ยังไม่มีประวัติ — บันทึกการรักษาจากหน้านัดหมายหลังตรวจเสร็จ
       </div>
     );
   }
@@ -123,6 +165,8 @@ function HistoryList({ history }) {
       <div className="timeline">
         {history.map((item) => {
           const { kind, row: t } = item;
+          const meta = kindMeta(kind);
+          const bookingStatus = BOOKING_STATUS[t.status] ?? { label: t.status || '', tone: '' };
           return (
             <button
               type="button"
@@ -133,14 +177,17 @@ function HistoryList({ history }) {
               <div className="date d-flex flex-wrap align-items-center gap-2">
                 <span>
                   {formatDate(t.date)}
+                  {t.time ? ` · ${t.time} น.` : ''}
                   {kind === 'treatment' && (t.vet || t.clinic) && ` · ${[t.vet, t.clinic].filter(Boolean).join(' · ')}`}
                   {kind === 'parasite' && (t.vet || t.place) && ` · ${[t.vet, t.place].filter(Boolean).join(' · ')}`}
                 </span>
                 <span className="tag">
-                  <i className={`bi ${kind === 'parasite' ? 'bi-bug' : 'bi-journal-medical'} me-1`} />
-                  {kind === 'parasite' ? 'ถ่ายพยาธิ / เห็บหมัด' : 'ตรวจ / รักษา'}
+                  <i className={`bi ${meta.icon} me-1`} />
+                  {meta.label}
                 </span>
-                {t.source === 'vet' ? (
+                {kind === 'appointment' ? (
+                  <span className={`tag ${bookingStatus.tone}`}>{bookingStatus.label}</span>
+                ) : t.source === 'vet' ? (
                   <span className="tag ok">บันทึกโดยคลินิก</span>
                 ) : (
                   <span className="tag">บันทึกโดยเจ้าของ</span>
@@ -153,11 +200,13 @@ function HistoryList({ history }) {
                   {t.symptoms && t.diagnosis && <div className="small text-muted">อาการ: {t.symptoms}</div>}
                   {t.treatment && <div className="small">การรักษา: {t.treatment}</div>}
                 </>
-              ) : (
+              ) : kind === 'parasite' ? (
                 <div className="fw-medium">
                   {labelOf(PARASITE_TYPES, t.type)}
                   {t.product && <span className="fw-normal text-muted"> · {t.product}</span>}
                 </div>
+              ) : (
+                <div className="fw-medium">{t.serviceLabel || t.service || 'นัดหมายคลินิก'}</div>
               )}
 
               <div className="small text-sky mt-2">
@@ -178,8 +227,15 @@ function PatientPicker({ owners, loading, onSelect, onlyOwnerId = '', onShowAll 
   const q = query.trim().toLowerCase();
   const shown = owners
     .filter((o) => !onlyOwnerId || o.id === onlyOwnerId)
-    .map((o) => ({ ...o, pets: o.pets.filter((p) => p.visited) }))
+    .map((o) => ({
+      ...o,
+      pets: o.pets
+        .filter((p) => p.visited)
+        .slice()
+        .sort((a, b) => petNewestKey(b).localeCompare(petNewestKey(a))),
+    }))
     .filter((o) => o.pets.length > 0)
+    .sort((a, b) => ownerNewestKey(b).localeCompare(ownerNewestKey(a)))
     .filter(
       (o) =>
         !q ||
@@ -228,6 +284,13 @@ function PatientPicker({ owners, loading, onSelect, onlyOwnerId = '', onShowAll 
                         <span className="small text-muted d-block">
                           {species.label}
                           {p.breed ? ` · ${p.breed}` : ''} · {ageText(p.birthDate)}
+                        </span>
+                        <span className="small text-muted d-block">
+                          {p.lastVisit
+                            ? `มารักษาล่าสุด ${formatDate(p.lastVisit)}`
+                            : p.nextAppointment?.date
+                              ? `มีนัด ${formatDate(p.nextAppointment.date)}`
+                              : 'ยังไม่มีบันทึกการรักษา'}
                         </span>
                       </span>
                       <i className="bi bi-chevron-right person-go" />

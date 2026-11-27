@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import CaModal from '../../clinic-admin/components/CaModal.jsx';
 import { formatDate, speciesOf } from '../../pet-owner/petUtils.js';
 import {
   apptVetId,
@@ -11,20 +12,27 @@ import {
 import { todayString } from '../data/constants.js';
 import { findConflict, suggestSlots } from '../data/schedule.js';
 
+function serviceLines(label, petName = '') {
+  if (!label) return [];
+  const prefix = petName ? `${petName}:` : '';
+  return String(label)
+    .split(/\s*·\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      if (prefix && part.startsWith(prefix)) {
+        return part.slice(prefix.length).trim() || part;
+      }
+      return part;
+    });
+}
+
 function RescheduleModalInner({ appointment, appointments, meta, onClose, onReschedule }) {
   const todayKey = todayString();
   const [date, setDate] = useState(() => appointment.date || todayKey);
   const [time, setTime] = useState(() => appointment.time || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    const onKeyDown = (e) => {
-      if (e.key === 'Escape' && !submitting) onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [submitting, onClose]);
 
   const vetId = apptVetId(appointment);
   const vetName = apptVetName(appointment);
@@ -74,6 +82,13 @@ function RescheduleModalInner({ appointment, appointments, meta, onClose, onResc
     [appointments, vetRef, date, durationMin, appointment.id, meta],
   );
 
+  const services = useMemo(
+    () => serviceLines(appointment.serviceLabel || appointment.service, appointment.petName),
+    [appointment.serviceLabel, appointment.service, appointment.petName],
+  );
+
+  const unchanged = date === appointment.date && time === appointment.time;
+
   function handleDateChange(e) {
     const nextDate = e.target.value;
     setDate(nextDate);
@@ -98,6 +113,10 @@ function RescheduleModalInner({ appointment, appointments, meta, onClose, onResc
       setError('กรุณาเลือกวันที่และเวลาใหม่');
       return;
     }
+    if (unchanged) {
+      setError('วันเวลาใหม่ตรงกับนัดเดิม กรุณาเลือกช่วงอื่น');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -110,197 +129,189 @@ function RescheduleModalInner({ appointment, appointments, meta, onClose, onResc
   }
 
   const sp = speciesOf(appointment.petSpecies);
+  const canSubmit =
+    !submitting && !clinicClosedOnDate && !conflict && Boolean(date && time) && !unchanged;
 
   return (
-    <>
-      <div
-        className="modal d-block ma-modal"
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        onClick={() => !submitting && onClose()}
-      >
-        <div className="modal-dialog modal-lg modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
-          <div className="modal-content ma-modal-card">
-            <div className="d-flex justify-content-between align-items-start mb-3">
-              <div className="section-label mb-0">
-                <i className="bi bi-calendar-event" />
-                เปลี่ยนวันเวลานัด
-              </div>
-              <button
-                type="button"
-                className="btn-close"
-                aria-label="ปิด"
+    <CaModal
+      open
+      title="เปลี่ยนวันเวลานัด"
+      icon="bi-calendar-event"
+      size="lg"
+      submitting={submitting}
+      error={error}
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn btn-soft" disabled={submitting} onClick={onClose}>
+            ยกเลิก
+          </button>
+          <button type="submit" form="ca-resched-form" className="btn btn-sky" disabled={!canSubmit}>
+            {submitting && (
+              <span className="spinner-border spinner-border-sm me-1" aria-hidden="true" />
+            )}
+            <i className="bi bi-check2 me-1" aria-hidden="true" />
+            บันทึกวันเวลาใหม่
+          </button>
+        </>
+      }
+    >
+      <div className="ca-resched">
+        <div className="ca-resched__summary">
+          <div className="ca-resched__pet">
+            <span className="ca-resched__emoji" aria-hidden="true">
+              {sp.emoji}
+            </span>
+            <div className="ca-resched__pet-copy">
+              <strong>
+                {appointment.petName}
+                <span className="ca-resched__species"> ({sp.label})</span>
+              </strong>
+              <span>
+                {appointment.ownerName || '—'}
+                {appointment.ownerPhone ? ` · ${appointment.ownerPhone}` : ''}
+              </span>
+            </div>
+          </div>
+
+          <div className="ca-resched__current">
+            <div className="ca-resched__current-label">วันเวลาเดิม</div>
+            <div className="ca-resched__current-value">
+              {formatDate(appointment.date)} · {appointment.time} น.
+            </div>
+            <div className="ca-resched__current-meta">
+              {vetName || 'ยังไม่ระบุสัตวแพทย์'}
+              {durationMin ? ` · ${durationMin} นาที` : ''}
+            </div>
+          </div>
+        </div>
+
+        {services.length > 0 && (
+          <div className="ca-resched__services">
+            <div className="ca-resched__services-label">บริการ</div>
+            <ul className="ca-resched__service-list">
+              {services.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {closureInfo && (
+          <div className="alert-soft danger mb-0" role="status">
+            <i className="bi bi-calendar-x" aria-hidden="true" />
+            <span>คลินิกปิดทำการวันที่เลือก: {closureInfo.reason} กรุณาเลือกวันอื่น</span>
+          </div>
+        )}
+
+        {!closureInfo && !dayHours && (
+          <div className="alert-soft warn mb-0" role="status">
+            <i className="bi bi-clock" aria-hidden="true" />
+            <span>คลินิกไม่เปิดทำการในวันที่เลือก กรุณาเลือกวันอื่น</span>
+          </div>
+        )}
+
+        {vetOffDutyOnDate && (
+          <div className="alert-soft warn mb-0" role="status">
+            <i className="bi bi-exclamation-triangle" aria-hidden="true" />
+            <span>{vetName} ไม่ได้เข้าเวรในวันที่เลือก</span>
+          </div>
+        )}
+
+        {conflict && (
+          <div className="alert-soft warn mb-0" role="status">
+            <i className="bi bi-exclamation-triangle" aria-hidden="true" />
+            <span>
+              {vetName} มีนัดซ้อนในช่วงเวลา {conflict.rangeText} ({conflict.petName})
+            </span>
+          </div>
+        )}
+
+        <form id="ca-resched-form" onSubmit={handleSubmit} noValidate>
+          <div className="ca-resched__form">
+            <div>
+              <label className="form-label" htmlFor="resched-date">
+                วันที่ใหม่ <span className="text-danger">*</span>
+              </label>
+              <input
+                id="resched-date"
+                type="date"
+                className="form-control"
+                min={todayKey}
                 disabled={submitting}
-                onClick={onClose}
+                value={date}
+                onChange={handleDateChange}
               />
             </div>
 
-            <div className="info-grid mb-3">
-              <div className="info-item">
-                <div className="k">สัตว์เลี้ยง</div>
-                <div className="v">
-                  <span className="me-1" aria-hidden="true">{sp.emoji}</span>
-                  {appointment.petName} ({sp.label})
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="k">เจ้าของ / เบอร์โทร</div>
-                <div className="v">
-                  {appointment.ownerName || '—'} · {appointment.ownerPhone || '—'}
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="k">บริการ</div>
-                <div className="v">{appointment.serviceLabel || appointment.service}</div>
-              </div>
-              <div className="info-item">
-                <div className="k">วันเวลาเดิม</div>
-                <div className="v">
-                  {formatDate(appointment.date)} · {appointment.time} น.
-                </div>
-              </div>
-              <div className="info-item">
-                <div className="k">สัตวแพทย์</div>
-                <div className="v">
-                  {vetName ? `${vetName} (${durationMin} นาที)` : 'ยังไม่ระบุ'}
-                </div>
-              </div>
+            <div>
+              <label className="form-label" htmlFor="resched-time">
+                เวลาใหม่ <span className="text-danger">*</span>
+              </label>
+              <select
+                id="resched-time"
+                className="form-select"
+                disabled={submitting || slotOptions.length === 0}
+                value={time}
+                onChange={(e) => {
+                  setTime(e.target.value);
+                  setError('');
+                }}
+              >
+                {slotOptions.length === 0 ? (
+                  <option value="">ไม่มีช่วงเวลาว่างในวันนี้</option>
+                ) : (
+                  slotOptions.map((slot) => (
+                    <option key={slot} value={slot}>
+                      {slot} น.
+                    </option>
+                  ))
+                )}
+              </select>
             </div>
+          </div>
 
-            {error && (
-              <div className="alert-soft danger mb-3" role="alert">
-                <i className="bi bi-exclamation-circle" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {closureInfo && (
-              <div className="alert-soft danger mb-3" role="status">
-                <i className="bi bi-calendar-x" />
-                <span>คลินิกปิดทำการวันที่เลือก: {closureInfo.reason} กรุณาเลือกวันอื่น</span>
-              </div>
-            )}
-
-            {!closureInfo && !dayHours && (
-              <div className="alert-soft warn mb-3" role="status">
-                <i className="bi bi-clock" />
-                <span>คลินิกไม่เปิดทำการในวันที่เลือก กรุณาเลือกวันอื่น</span>
-              </div>
-            )}
-
-            {vetOffDutyOnDate && (
-              <div className="alert-soft warn mb-3" role="status">
-                <i className="bi bi-exclamation-triangle" />
-                <span>{vetName} ไม่ได้เข้าเวรในวันที่เลือก</span>
-              </div>
-            )}
-
-            {conflict && (
-              <div className="alert-soft warn mb-3">
-                <i className="bi bi-exclamation-triangle" />
-                <span>
-                  {vetName} มีนัดซ้อนในช่วงเวลา {conflict.rangeText} ({conflict.petName})
-                </span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} noValidate>
-              <div className="row g-3">
-                <div className="col-12 col-sm-6">
-                  <label className="form-label" htmlFor="resched-date">
-                    วันที่ใหม่ <span className="text-danger">*</span>
-                  </label>
-                  <input
-                    id="resched-date"
-                    type="date"
-                    className="form-control"
-                    min={todayKey}
+          <div className="ca-resched__suggest">
+            <div className="form-label mb-2">เวลาว่างที่แนะนำ</div>
+            {suggested.length > 0 ? (
+              <div className="ca-resched__slots">
+                {suggested.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
                     disabled={submitting}
-                    value={date}
-                    onChange={handleDateChange}
-                  />
-                </div>
-
-                <div className="col-12 col-sm-6">
-                  <label className="form-label" htmlFor="resched-time">
-                    เวลาใหม่ <span className="text-danger">*</span>
-                  </label>
-                  <select
-                    id="resched-time"
-                    className="form-select"
-                    disabled={submitting || slotOptions.length === 0}
-                    value={time}
-                    onChange={(e) => {
-                      setTime(e.target.value);
+                    className={`ca-resched__slot${time === slot ? ' is-active' : ''}`}
+                    onClick={() => {
+                      setTime(slot);
                       setError('');
                     }}
                   >
-                    {slotOptions.length === 0 ? (
-                      <option value="">ไม่มีช่วงเวลาว่างในวันนี้</option>
-                    ) : (
-                      slotOptions.map((slot) => (
-                        <option key={slot} value={slot}>
-                          {slot} น.
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
+                    {slot} น.
+                  </button>
+                ))}
               </div>
-
-              <div className="mt-3">
-                <div className="form-label mb-2">เวลาว่างที่แนะนำ</div>
-                {suggested.length > 0 ? (
-                  <div className="ma-slot-list">
-                    {suggested.map((slot) => (
-                      <button
-                        key={slot}
-                        type="button"
-                        disabled={submitting}
-                        className={`btn btn-sm ${time === slot ? 'btn-sky' : 'btn-soft'}`}
-                        onClick={() => {
-                          setTime(slot);
-                          setError('');
-                        }}
-                      >
-                        {slot} น.
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="small text-muted">
-                    {clinicClosedOnDate
-                      ? 'คลินิกปิดทำการในวันที่เลือก'
-                      : date < todayKey
-                        ? 'วันที่เลือกผ่านมาแล้ว กรุณาเลือกวันนี้หรือวันถัดไป'
-                        : 'ไม่มีเวลาว่างแนะนำในวันที่เลือก'}
-                  </div>
-                )}
+            ) : (
+              <div className="small text-muted">
+                {clinicClosedOnDate
+                  ? 'คลินิกปิดทำการในวันที่เลือก'
+                  : date < todayKey
+                    ? 'วันที่เลือกผ่านมาแล้ว กรุณาเลือกวันนี้หรือวันถัดไป'
+                    : 'ไม่มีเวลาว่างแนะนำในวันที่เลือก'}
               </div>
-
-              <div className="d-flex justify-content-end gap-2 mt-4">
-                <button type="button" className="btn btn-soft" disabled={submitting} onClick={onClose}>
-                  ยกเลิก
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-sky"
-                  disabled={submitting || clinicClosedOnDate || !date || !time || Boolean(conflict)}
-                >
-                  {submitting && (
-                    <span className="spinner-border spinner-border-sm me-1" aria-hidden="true" />
-                  )}
-                  <i className="bi bi-check2 me-1" />
-                  บันทึกวันเวลาใหม่
-                </button>
-              </div>
-            </form>
+            )}
           </div>
-        </div>
+
+          {!unchanged && date && time && (
+            <div className="ca-resched__preview" aria-live="polite">
+              <i className="bi bi-arrow-right-circle" aria-hidden="true" />
+              <span>
+                จะเปลี่ยนเป็น <strong>{formatDate(date)} · {time} น.</strong>
+              </span>
+            </div>
+          )}
+        </form>
       </div>
-      <div className="modal-backdrop show ma-modal-backdrop" />
-    </>
+    </CaModal>
   );
 }
 

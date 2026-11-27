@@ -18,6 +18,7 @@ export default function PatientsPage() {
   const [speciesFilter, setSpeciesFilter] = useState('all');
   const [sortBy, setSortBy] = useState('next');
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
 
   const counts = useMemo(() => {
     let upcoming = 0;
@@ -31,17 +32,20 @@ export default function PatientsPage() {
   }, [patients]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = appliedQuery.trim().toLowerCase();
+    const digits = q.replace(/\D/g, '');
 
     const list = patients.filter((p) => {
       if (tab === 'upcoming' && !p.nextAppointment) return false;
       if (speciesFilter !== 'all' && p.species !== speciesFilter) return false;
 
       if (q) {
-        const hit = [p.name, p.breed, p.ownerName, p.ownerPhone].some((v) =>
-          v?.toLowerCase().includes(q),
-        );
-        if (!hit) return false;
+        const fields = [p.name, p.breed, p.ownerName, p.ownerPhone, speciesOf(p.species).label];
+        const textHit = fields.some((v) => String(v || '').toLowerCase().includes(q));
+        const phoneHit =
+          digits.length >= 3 &&
+          String(p.ownerPhone || '').replace(/\D/g, '').includes(digits);
+        if (!textHit && !phoneHit) return false;
       }
       return true;
     });
@@ -58,16 +62,26 @@ export default function PatientsPage() {
       }
       return (a.name || '').localeCompare(b.name || '', 'th');
     });
-  }, [patients, tab, speciesFilter, sortBy, query]);
+  }, [patients, tab, speciesFilter, sortBy, appliedQuery]);
 
-  const hasActiveFilter = tab !== 'all' || speciesFilter !== 'all' || query.trim() !== '';
+  const hasActiveFilter = tab !== 'all' || speciesFilter !== 'all' || Boolean(appliedQuery.trim());
   const hasData = patients.length > 0;
   const blockedByState = !hasData && (loading || Boolean(error));
+
+  function runSearch(event) {
+    event?.preventDefault?.();
+    setAppliedQuery(query.trim());
+  }
+
+  function clearSearch() {
+    setQuery('');
+    setAppliedQuery('');
+  }
 
   function clearFilters() {
     setTab('all');
     setSpeciesFilter('all');
-    setQuery('');
+    clearSearch();
   }
 
   function openDetail(petId) {
@@ -131,7 +145,7 @@ export default function PatientsPage() {
             </div>
 
             <div className="ca-filter-bar">
-              <div className="input-group ca-search-group">
+              <form className="input-group ca-search-group" onSubmit={runSearch}>
                 <span className="input-group-text">
                   <i className="bi bi-search" />
                 </span>
@@ -143,7 +157,15 @@ export default function PatientsPage() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
-              </div>
+                {appliedQuery ? (
+                  <button type="button" className="btn btn-soft" onClick={clearSearch}>
+                    ล้าง
+                  </button>
+                ) : null}
+                <button type="submit" className="btn btn-sky">
+                  ค้นหา
+                </button>
+              </form>
 
               <select
                 className="form-select ca-patients-select"

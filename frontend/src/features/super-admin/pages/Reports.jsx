@@ -89,8 +89,8 @@ export default function ReportsPage() {
           <div className="sa-card">
             <h2>รับส่ง</h2>
             <div className="sa-metric">
-              <strong>{ov.transport?.slipPending ?? 0}</strong>
-              <span>สลิปรอตรวจ · ทริปวิ่ง {ov.transport?.tripsRunning ?? 0}</span>
+              <strong>{ov.transport?.bookingsTotal ?? 0}</strong>
+              <span>จองทั้งหมด · ทริปวิ่ง {ov.transport?.tripsRunning ?? 0}</span>
             </div>
           </div>
           <div className="sa-card">

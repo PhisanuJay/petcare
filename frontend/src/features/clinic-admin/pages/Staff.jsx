@@ -38,6 +38,7 @@ export default function Staff() {
   const { show, toast } = useCaToast();
 
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [showInactive, setShowInactive] = useState(false);
 
@@ -71,17 +72,26 @@ export default function Staff() {
 
   const filteredStaff = useMemo(() => {
     const list = staffList ?? [];
-    const q = query.trim().toLowerCase();
+    const q = appliedQuery.trim().toLowerCase();
     return list.filter((member) => {
       if (!showInactive && !member.active) return false;
       if (roleFilter !== 'all' && member.role !== roleFilter) return false;
       if (!q) return true;
-      return (
-        member.name.toLowerCase().includes(q) ||
-        member.email.toLowerCase().includes(q)
+      return [member.name, member.email, member.role].some((v) =>
+        String(v || '').toLowerCase().includes(q),
       );
     });
-  }, [staffList, query, roleFilter, showInactive]);
+  }, [staffList, appliedQuery, roleFilter, showInactive]);
+
+  function runSearch(event) {
+    event?.preventDefault?.();
+    setAppliedQuery(query.trim());
+  }
+
+  function clearSearch() {
+    setQuery('');
+    setAppliedQuery('');
+  }
 
   const roleCounts = useMemo(() => {
     const list = (staffList ?? []).filter((m) => showInactive || m.active);
@@ -278,7 +288,7 @@ export default function Staff() {
         {staffList && (
           <div className="card-soft">
             <div className="ca-filter-bar mb-3">
-              <div className="ca-search-group">
+              <form className="ca-search-group" onSubmit={runSearch}>
                 <label className="visually-hidden" htmlFor="ca-staff-search">
                   ค้นหาชื่อหรืออีเมลเจ้าหน้าที่
                 </label>
@@ -294,8 +304,16 @@ export default function Staff() {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                   />
+                  {appliedQuery ? (
+                    <button type="button" className="btn btn-soft" onClick={clearSearch}>
+                      ล้าง
+                    </button>
+                  ) : null}
+                  <button type="submit" className="btn btn-sky">
+                    ค้นหา
+                  </button>
                 </div>
-              </div>
+              </form>
 
               <div className="pill-tabs ca-scroll-tabs" role="tablist" aria-label="กรองตามตำแหน่ง">
                 {ROLE_TABS.map((tab) => (

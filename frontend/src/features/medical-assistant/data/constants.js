@@ -20,6 +20,11 @@ export const STAGE_META = {
 
 export const STAGE_LIST = Object.values(STAGE_META);
 
+/** สถานะที่แสดงเป็นแท็บกรองบนหน้านัดหมาย (ไม่รวมปฏิเสธ/ยกเลิก — จัดการที่หน้าคำขอจอง) */
+export const STAGE_TAB_LIST = STAGE_LIST.filter(
+  (s) => s.value !== 'rejected' && s.value !== 'cancelled',
+);
+
 export const FINAL_STAGES = ['completed', 'no_show', 'rejected', 'cancelled'];
 
 export const TRIAGE_LEVELS = {

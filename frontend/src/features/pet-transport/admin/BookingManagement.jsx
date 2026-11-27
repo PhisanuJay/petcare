@@ -68,6 +68,7 @@ export default function BookingManagement() {
     return TABS.some((item) => item.id === initialTab) ? initialTab : 'all';
   });
   const [q, setQ] = useState('');
+  const [appliedQ, setAppliedQ] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
@@ -87,21 +88,51 @@ export default function BookingManagement() {
     return base;
   }, [paidBookings]);
 
+  function bookingMatches(b, needle) {
+    if (!needle) return true;
+    const digits = needle.replace(/\D/g, '');
+    const petNames = Array.isArray(b.petNames) ? b.petNames.join(' ') : '';
+    const fields = [
+      b.id,
+      shortBookingId(b.id),
+      b.petName,
+      petNames,
+      b.ownerName,
+      b.ownerPhone,
+      b.serviceType,
+      serviceLabel(b.serviceType),
+      driversLabel(b),
+      ...(b.trips || []).flatMap((t) => [t.fromLabel, t.toLabel, t.driver?.name, t.driverId]),
+    ];
+    if (fields.some((v) => String(v || '').toLowerCase().includes(needle))) return true;
+    if (digits.length >= 3) {
+      const phone = String(b.ownerPhone || '').replace(/\D/g, '');
+      if (phone.includes(digits)) return true;
+    }
+    return false;
+  }
+
   const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
+    const needle = appliedQ.trim().toLowerCase();
     return paidBookings.filter((b) => {
       if (tab !== 'all' && bookingBucket(b) !== tab) return false;
       if (dateFilter) {
         const trip = primaryTrip(b);
         if (dayKey(trip?.pickupTime) !== dateFilter) return false;
       }
-      if (needle) {
-        const hay = `${b.id} ${b.petName || ''} ${b.ownerName || ''}`.toLowerCase();
-        if (!hay.includes(needle)) return false;
-      }
-      return true;
+      return bookingMatches(b, needle);
     });
-  }, [paidBookings, tab, q, dateFilter]);
+  }, [paidBookings, tab, appliedQ, dateFilter]);
+
+  function runSearch(event) {
+    event?.preventDefault?.();
+    setAppliedQ(q.trim());
+  }
+
+  function clearSearch() {
+    setQ('');
+    setAppliedQ('');
+  }
 
   function flashOk(text) {
     setErr('');
@@ -164,16 +195,26 @@ export default function BookingManagement() {
       </div>
 
       <div className="tp-card tp-filters">
-        <div className="tp-form tp-filters__grid">
+        <form className="tp-form tp-filters__grid" onSubmit={runSearch}>
           <div className="field">
             <label htmlFor="bm-q">ค้นหา</label>
-            <input
-              id="bm-q"
-              type="search"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="ชื่อสัตว์ / เจ้าของ / เลข Booking"
-            />
+            <div className="tp-filters__search">
+              <input
+                id="bm-q"
+                type="search"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="ชื่อสัตว์ / เจ้าของ / เลข Booking"
+              />
+              {appliedQ ? (
+                <button type="button" className="btn btn-soft" onClick={clearSearch}>
+                  ล้าง
+                </button>
+              ) : null}
+              <button type="submit" className="btn btn-sky">
+                ค้นหา
+              </button>
+            </div>
           </div>
           <div className="field">
             <label htmlFor="bm-date">วันที่นัดรับ</label>
@@ -190,7 +231,7 @@ export default function BookingManagement() {
               type="button"
               className="btn btn-soft"
               onClick={() => {
-                setQ('');
+                clearSearch();
                 setDateFilter('');
                 setTab('all');
               }}
@@ -198,7 +239,12 @@ export default function BookingManagement() {
               ล้างตัวกรอง
             </button>
           </div>
-        </div>
+        </form>
+        {appliedQ ? (
+          <p className="tp-muted tp-filters__meta">
+            ผลการค้นหา “{appliedQ}” · {filtered.length} รายการ
+          </p>
+        ) : null}
       </div>
 
       <div className="tp-table-wrap">

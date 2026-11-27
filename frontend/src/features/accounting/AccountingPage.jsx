@@ -6,11 +6,6 @@ import { PAY_KIND, PAY_KIND_LABEL, PAY_STATUS, usePayments } from '../payments/s
 import { useTransport } from '../pet-transport/useTransport.js';
 import { fileToResizedDataUrl, newId } from '../../shared/utils/storage.js';
 import {
-  CANCELLATION_STATUS,
-  completeCancellationRefund,
-  useCancellationRequests,
-} from '../cancellations/store.js';
-import {
   listBankAccounts,
   listLedgerRows,
   parseAccountsCsv,
@@ -79,7 +74,6 @@ export default function AccountingPage() {
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
   const { all } = usePayments('accountant');
-  const cancellations = useCancellationRequests('accountant');
   const {
     bookings: transportBookings,
     loading: transportLoading,
@@ -89,11 +83,6 @@ export default function AccountingPage() {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [kind, setKind] = useState('all');
-  const [refundSlips, setRefundSlips] = useState({});
-  const [refundNotes, setRefundNotes] = useState({});
-  const [refundError, setRefundError] = useState('');
-  const [refundNotice, setRefundNotice] = useState('');
-  const [refunding, setRefunding] = useState({});
   const [accounts, setAccounts] = useState(() => listBankAccounts());
   const [ledger, setLedger] = useState(() => listLedgerRows());
   const [selectedAccountId, setSelectedAccountId] = useState('');
@@ -120,9 +109,6 @@ export default function AccountingPage() {
   const [expenseMsg, setExpenseMsg] = useState('');
   const [expenseError, setExpenseError] = useState('');
   const printedAt = formatWhen(new Date().toISOString());
-  const pendingRefunds = cancellations.filter(
-    (item) => item.status === CANCELLATION_STATUS.awaitingRefund,
-  );
 
   const paidTransport = transportBookings.filter(
     (booking) => booking.paymentStatus === 'paid' && booking.status !== 'cancelled',
@@ -269,41 +255,6 @@ export default function AccountingPage() {
     () => ledger.filter((row) => row.accountId === activeAccountId),
     [ledger, activeAccountId],
   );
-
-  async function onRefundFile(event, id) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    setRefundError('');
-    try {
-      const slip = await fileToResizedDataUrl(file, 960, 0.82);
-      setRefundSlips((current) => ({ ...current, [id]: slip }));
-    } catch (error) {
-      setRefundError(error.message || 'อ่านรูปหลักฐานไม่สำเร็จ');
-    }
-  }
-
-  async function finishRefund(request) {
-    setRefundError('');
-    setRefundNotice('');
-    setRefunding((current) => ({ ...current, [request.id]: true }));
-    try {
-      const refundAmount = Number(request.refundAmount) || 0;
-      await completeCancellationRefund(request.id, {
-        receipt: refundSlips[request.id] || '',
-        accountantNote: refundNotes[request.id] || (
-          refundAmount === 0 ? 'ไม่มีเงินที่ฝ่ายบัญชียืนยันแล้วให้คืน' : ''
-        ),
-      });
-      setRefundNotice(refundAmount > 0
-        ? `บันทึกการคืนเงินของ ${request.ownerName || request.petName} แล้ว`
-        : `ปิดรายการของ ${request.ownerName || request.petName} โดยไม่ต้องโอนคืนแล้ว`);
-    } catch (error) {
-      setRefundError(error.message || 'บันทึกการคืนเงินไม่สำเร็จ');
-    } finally {
-      setRefunding((current) => ({ ...current, [request.id]: false }));
-    }
-  }
 
   function addAccount(event) {
     event.preventDefault();
@@ -469,14 +420,6 @@ export default function AccountingPage() {
       active: tab === 'expenses',
       onClick: () => setTab('expenses'),
       badge: expenses.filter((row) => row.status !== EXPENSE_STATUS.cancelled).length || null,
-    },
-    {
-      id: 'refunds',
-      label: 'คืนเงิน',
-      icon: 'bi-cash-coin',
-      active: tab === 'refunds',
-      onClick: () => setTab('refunds'),
-      badge: pendingRefunds.length || null,
     },
     { id: 'report', label: 'รายงาน', icon: 'bi-bar-chart-line', active: tab === 'report', onClick: () => setTab('report') },
   ];
@@ -894,81 +837,6 @@ export default function AccountingPage() {
                   )}
                 </section>
               </div>
-            </>
-          ) : null}
-
-          {tab === 'refunds' ? (
-            <>
-              <header className="acct-mast">
-                <h1>คืนเงินให้ลูกค้า</h1>
-                <p>ดำเนินการตามคำขอที่แอดมินอนุมัติ แนบหลักฐานหลังโอนเงิน</p>
-              </header>
-              {refundError ? <div className="acct-alert acct-alert--error" role="alert">{refundError}</div> : null}
-              {refundNotice ? <div className="acct-alert acct-alert--success" role="status">{refundNotice}</div> : null}
-              {pendingRefunds.length === 0 ? (
-                <div className="acct-card"><p>ไม่มีรายการรอคืนเงิน</p></div>
-              ) : (
-                <div className="acct-refund-list">
-                  {pendingRefunds.map((request) => {
-                    const amount = Number(request.refundAmount) || 0;
-                    return (
-                      <article className="acct-refund-card" key={request.id}>
-                        <header>
-                          <div>
-                            <span className="acct-chip">{PAY_KIND_LABEL[request.kind]}</span>
-                            <h2>{request.title || request.petName || 'รายการจอง'}</h2>
-                            <p>{request.petName || 'ไม่ระบุสัตว์เลี้ยง'} · {request.ownerName || 'ไม่ระบุชื่อลูกค้า'}</p>
-                          </div>
-                          <strong className="acct-refund-amount">{baht(amount)}</strong>
-                        </header>
-                        <p className="acct-refund-reason">เหตุผล: {request.reason}</p>
-                        {request.adminNote ? <p className="acct-refund-reason">หมายเหตุแอดมิน: {request.adminNote}</p> : null}
-                        <dl>
-                          <div><dt>ธนาคาร</dt><dd>{request.bankName}</dd></div>
-                          <div><dt>เลขบัญชี</dt><dd>{request.bankAccount}</dd></div>
-                          <div><dt>เบอร์ติดต่อ</dt><dd>{request.contactPhone}</dd></div>
-                        </dl>
-                        {amount > 0 ? (
-                          <>
-                            <label className="pay-file">
-                              <input type="file" accept="image/*" onChange={(event) => onRefundFile(event, request.id)} />
-                              <span>{refundSlips[request.id] ? 'เปลี่ยนรูปหลักฐาน' : 'แนบสลิปการโอนคืน'}</span>
-                            </label>
-                            {refundSlips[request.id] ? (
-                              <img className="pay-slip" src={refundSlips[request.id]} alt="ตัวอย่างหลักฐานการคืนเงิน" />
-                            ) : null}
-                          </>
-                        ) : (
-                          <p className="acct-refund-no-payment">
-                            ไม่มีรายการชำระที่บัญชียืนยันแล้ว แต่ต้องปิดคำขอในคิวนี้
-                          </p>
-                        )}
-                        <label className="form-label" htmlFor={`refund-note-${request.id}`}>หมายเหตุถึงลูกค้า</label>
-                        <input
-                          id={`refund-note-${request.id}`}
-                          className="form-control"
-                          maxLength={500}
-                          value={refundNotes[request.id] || ''}
-                          onChange={(event) => setRefundNotes((current) => ({
-                            ...current,
-                            [request.id]: event.target.value,
-                          }))}
-                        />
-                        <div className="acct-actions">
-                          <button
-                            type="button"
-                            className="btn btn-sky"
-                            disabled={refunding[request.id] || (amount > 0 && !refundSlips[request.id])}
-                            onClick={() => finishRefund(request)}
-                          >
-                            {amount > 0 ? 'ยืนยันโอนและส่งหลักฐาน' : 'ยืนยันว่าไม่มีเงินต้องคืน'}
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              )}
             </>
           ) : null}
 

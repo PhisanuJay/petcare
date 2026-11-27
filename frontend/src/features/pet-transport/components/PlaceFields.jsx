@@ -282,58 +282,6 @@ export default function PlaceFields({
           </div>
         </aside>
       ) : null}
-
-        <div className="field">
-          <label>Zone</label>
-          <div className="tp-zone-badge" aria-live="polite">
-            {zoneMeta ? (
-              <>
-                <strong>{zoneMeta.label}</strong>
-                <span className="tp-muted"> · ฿{zoneMeta.price} ฐาน</span>
-              </>
-            ) : (
-              <span className="tp-muted">
-                {catalogLocked ? 'เลือกรายการเพื่อดู Zone' : 'เลือกแขวงเพื่อดู Zone'}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="field">
-          <label htmlFor={`${prefix}-address`}>รายละเอียดที่อยู่</label>
-          <textarea
-            id={`${prefix}-address`}
-            rows={2}
-            value={value.address || ''}
-            readOnly={catalogLocked || locked}
-            onChange={(e) => onChange({ ...value, address: e.target.value })}
-            placeholder="บ้านเลขที่ ซอย ถนน จุดสังเกต"
-          />
-          {catalogLocked && !locked && (
-            <p className="tp-muted">ที่อยู่จากคลินิกในระบบ — แก้ไขไม่ได้</p>
-          )}
-        </div>
-
-        <div className="field">
-          <label htmlFor={`${prefix}-map`}>ลิงก์แผนที่ (Google Maps)</label>
-          <input
-            id={`${prefix}-map`}
-            type="url"
-            inputMode="url"
-            value={value.mapUrl || ''}
-            readOnly={catalogLocked || locked}
-            onChange={(e) => onChange({ ...value, mapUrl: e.target.value })}
-            placeholder="วางลิงก์จาก Google Maps เช่น https://maps.google.com/..."
-          />
-          {!catalogLocked && !locked ? (
-            <p className="tp-muted">ช่วยให้คนขับเปิดเส้นทางไปยังจุดรับ–ส่งได้ทันที</p>
-          ) : null}
-          {value.mapUrl && !catalogLocked && !locked ? (
-            <p className="tp-muted" style={{ marginTop: '0.35rem' }}>
-              <a href={value.mapUrl} target="_blank" rel="noreferrer">เปิดดูลิงก์นี้</a>
-            </p>
-          ) : null}
-        </div>
       </div>
     </div>
   );

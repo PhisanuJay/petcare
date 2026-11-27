@@ -70,6 +70,7 @@ export default function Services() {
   const { show, toast } = useCaToast();
 
   const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [modal, setModal] = useState(null); // 'create' | 'edit'
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -78,15 +79,24 @@ export default function Services() {
   const [busyCode, setBusyCode] = useState('');
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = appliedQuery.trim().toLowerCase();
     if (!q) return services;
-    return services.filter((svc) => (
-      svc.code.includes(q)
-      || svc.label.toLowerCase().includes(q)
-      || (svc.labelDog || '').toLowerCase().includes(q)
-      || (svc.labelCat || '').toLowerCase().includes(q)
-    ));
-  }, [services, query]);
+    return services.filter((svc) =>
+      [svc.code, svc.label, svc.labelDog, svc.labelCat].some((v) =>
+        String(v || '').toLowerCase().includes(q),
+      ),
+    );
+  }, [services, appliedQuery]);
+
+  function runSearch(event) {
+    event?.preventDefault?.();
+    setAppliedQuery(query.trim());
+  }
+
+  function clearSearch() {
+    setQuery('');
+    setAppliedQuery('');
+  }
 
   function openCreate() {
     setEditing(null);
@@ -232,7 +242,7 @@ export default function Services() {
 
         <div className="card-soft ca-services-board">
           <div className="ca-filter-bar">
-            <div className="input-group ca-search-group">
+            <form className="input-group ca-search-group" onSubmit={runSearch}>
               <span className="input-group-text">
                 <i className="bi bi-search" />
               </span>
@@ -245,12 +255,15 @@ export default function Services() {
                 placeholder="ค้นหาชื่อหรือรหัสบริการ"
                 aria-label="ค้นหาบริการ"
               />
-            </div>
-            {query.trim() ? (
-              <button type="button" className="btn btn-soft btn-sm" onClick={() => setQuery('')}>
-                ล้างคำค้น
+              {appliedQuery ? (
+                <button type="button" className="btn btn-soft" onClick={clearSearch}>
+                  ล้าง
+                </button>
+              ) : null}
+              <button type="submit" className="btn btn-sky">
+                ค้นหา
               </button>
-            ) : null}
+            </form>
           </div>
 
           <div className="ca-services-board__head">
@@ -265,8 +278,8 @@ export default function Services() {
             <div className="empty-box">
               <i className="bi bi-search" />
               <div>{services.length === 0 ? 'ยังไม่มีบริการในระบบ' : 'ไม่พบบริการตามคำค้น'}</div>
-              {query.trim() ? (
-                <button type="button" className="btn btn-soft mt-3" onClick={() => setQuery('')}>
+              {appliedQuery.trim() ? (
+                <button type="button" className="btn btn-soft mt-3" onClick={clearSearch}>
                   ล้างคำค้น
                 </button>
               ) : (

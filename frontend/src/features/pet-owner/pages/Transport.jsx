@@ -491,7 +491,7 @@ export default function TransportPage({
       ) : (
         <>
           <PlaceFields
-            prefix="ที่อยู่รับ–ส่งหลัก (บ้าน)"
+            prefix="ที่อยู่รับ (บ้าน)"
             value={homePlace}
             onChange={setHomePlace}
             clinics={clinics}
@@ -500,30 +500,6 @@ export default function TransportPage({
             hubZonesMap={hubCheckout}
           />
           <ClinicPlaceSummary title="ปลายทาง (คลินิก)" value={clinicPlace} clinics={clinics} />
-          <div className="tp-places-leg">
-            <PlacePointChoice
-              title="จุดรับ"
-              sameLabel="ที่อยู่หลัก"
-              otherLabel="ที่อยู่อื่น"
-              useAlternate={alternatePickup}
-              onUseAlternate={setAlternatePickup}
-              sameBody={(
-                <p className="tp-place-same-summary tp-place-same-summary--inline tp-muted small mb-0">
-                  รับที่ที่อยู่หลักที่กรอกด้านบน
-                </p>
-              )}
-              otherBody={(
-                <PlaceFields
-                  prefix="จุดรับ (ที่อยู่อื่น)"
-                  value={pickupCustom}
-                  onChange={setPickupCustom}
-                  clinics={clinics}
-                  allowedKinds={['home', 'custom']}
-                  hideZoneBadge={hubCheckout}
-                />
-              )}
-            />
-          </div>
         </>
       )}
     </div>
