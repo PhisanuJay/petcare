@@ -20,7 +20,7 @@ export default function AppShell() {
               <Link to="/veterinarian">Veterinarian</Link>
             </li>
             <li>
-              <Link to="/medical-assistant">Medical Assistant</Link>
+              <Link to="/clinic-admin">Clinic Admin</Link>
             </li>
             <li>
               <Link to="/pet-profile">Pet Profile</Link>
@@ -29,16 +29,19 @@ export default function AppShell() {
               <Link to="/pet-hotel">Pet Hotel</Link>
             </li>
             <li>
-              <Link to="/pet-transport">Pet Transport</Link>
+              <Link to="/pet-transport">Pet Transport (Driver)</Link>
             </li>
             <li>
-              <Link to="/adoption">Adoption</Link>
+              <Link to="/admin/transport">Admin Transport</Link>
+            </li>
+            <li>
+              <Link to="/adoption">Adoption Staff</Link>
             </li>
             <li>
               <Link to="/admin">Admin</Link>
             </li>
             <li>
-              <Link to="/super-admin">Super Admin</Link>
+              <Link to="/super-admin">Super Admin (CCTV)</Link>
             </li>
           </ul>
         </nav>

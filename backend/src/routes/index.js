@@ -1,14 +1,19 @@
 import { Router } from 'express';
 
+import authRouter from '../modules/auth/routes.js';
 import petOwnerRouter from '../modules/pet-owner/routes.js';
 import veterinarianRouter from '../modules/veterinarian/routes.js';
 import medicalAssistantRouter from '../modules/medical-assistant/routes.js';
 import petProfileRouter from '../modules/pet-profile/routes.js';
 import petHotelRouter from '../modules/pet-hotel/routes.js';
 import petTransportRouter from '../modules/pet-transport/routes.js';
+import paymentsRouter from '../modules/payments/routes.js';
 import adoptionRouter from '../modules/adoption/routes.js';
 import adminRouter from '../modules/admin/routes.js';
+import clinicAdminRouter from '../modules/clinic-admin/routes.js';
 import superAdminRouter from '../modules/super-admin/routes.js';
+import cctvAuthRouter from '../modules/super-admin/cctvAuth.js';
+import cctvAdminRouter from '../modules/super-admin/cctvAdmin.js';
 
 /**
  * Mount each role module under its own API prefix.
@@ -17,14 +22,19 @@ import superAdminRouter from '../modules/super-admin/routes.js';
 export function registerRoutes(app) {
   const api = Router();
 
+  api.use('/auth', authRouter);
   api.use('/pet-owner', petOwnerRouter);
   api.use('/veterinarian', veterinarianRouter);
   api.use('/medical-assistant', medicalAssistantRouter);
   api.use('/pet-profile', petProfileRouter);
   api.use('/pet-hotel', petHotelRouter);
   api.use('/pet-transport', petTransportRouter);
+  api.use('/payments', paymentsRouter);
   api.use('/adoption', adoptionRouter);
   api.use('/admin', adminRouter);
+  api.use('/cctv-admin', cctvAdminRouter);
+  api.use('/clinic-admin', clinicAdminRouter);
+  api.use('/cctv-auth', cctvAuthRouter);
   api.use('/super-admin', superAdminRouter);
 
   app.use('/api', api);

@@ -30,6 +30,57 @@ export const labelOf = (options, value) => options.find((o) => o.value === value
 
 export const speciesOf = (value) => SPECIES.find((s) => s.value === value) ?? SPECIES.at(-1);
 
+/** Stock photo when the profile has no upload (paths under `public/pets/`). */
+export const PET_DEFAULT_PHOTO = {
+  dog: '/pets/default-dog.jpg',
+  cat: '/pets/default-cat.jpg',
+  rabbit: '/pets/default-rabbit.jpg',
+  bird: '/pets/default-bird.jpg',
+  rodent: '/pets/default-rodent.jpg',
+  reptile: '/pets/default-reptile.jpg',
+  other: '/pets/default-other.jpg',
+};
+
+export function petPhotoSrc(pet) {
+  if (!pet) return PET_DEFAULT_PHOTO.other;
+  const photo = typeof pet.photo === 'string' ? pet.photo.trim() : '';
+  if (photo) return photo;
+  const key = speciesOf(pet.species).value;
+  return PET_DEFAULT_PHOTO[key] ?? PET_DEFAULT_PHOTO.other;
+}
+
+const THAI_SPECIES = {
+  สุนัข: 'dog',
+  แมว: 'cat',
+  กระต่าย: 'rabbit',
+  นก: 'bird',
+};
+
+/** Stock photo for a species code, Thai label, or English value. */
+export function speciesDefaultPhoto(species) {
+  if (!species) return PET_DEFAULT_PHOTO.other;
+  const normalized = THAI_SPECIES[species] || species;
+  const match = SPECIES.find((s) => s.value === normalized || s.label === normalized);
+  return PET_DEFAULT_PHOTO[match?.value ?? 'other'];
+}
+
+/** Adoption / listing card when `photo` is missing. */
+export function animalListingPhoto(animal) {
+  const uploaded = typeof animal?.photo === 'string' ? animal.photo.trim() : '';
+  if (uploaded) return uploaded;
+  if (Array.isArray(animal?.photos)) {
+    const first = animal.photos.find((item) => typeof item === 'string' && item.trim());
+    if (first) return first.trim();
+  }
+  return speciesDefaultPhoto(animal?.species);
+}
+
+export function bookingPetPhotoSrc(booking) {
+  const uploaded = typeof booking?.petPhoto === 'string' ? booking.petPhoto.trim() : '';
+  if (uploaded) return uploaded;
+  return speciesDefaultPhoto(booking?.petSpecies);
+}
+
 export function formatDate(value) {
   if (!value) return '-';
   const d = new Date(value);
@@ -64,16 +115,32 @@ export function daysUntil(value) {
 }
 
 /**
+ * Only the most recent dose of each vaccine (or parasite treatment type) should remind: once the next
+ * dose has been given, the older row's "next date" is no longer due. Rows without a name are kept as is.
+ */
+function latestDoses(rows, keyOf) {
+  const latest = new Map();
+  rows.forEach((row, index) => {
+    const key = keyOf(row) || `#${index}`;
+    const current = latest.get(key);
+    if (!current || (row.date ?? '') >= (current.date ?? '')) latest.set(key, row);
+  });
+  return [...latest.values()];
+}
+
+const nameKey = (value) => String(value ?? '').trim().toLowerCase();
+
+/**
  * Upcoming / overdue care items (vaccines, parasite prevention) across the given pets,
  * sorted by due date.
  */
 export function careReminders(pets) {
   const items = [];
   for (const pet of pets) {
-    for (const v of pet.vaccines ?? []) {
+    for (const v of latestDoses(pet.vaccines ?? [], (row) => nameKey(row.name))) {
       if (v.nextDate) items.push({ pet, kind: 'vaccine', title: `วัคซีน ${v.name || ''}`.trim(), date: v.nextDate });
     }
-    for (const p of pet.parasites ?? []) {
+    for (const p of latestDoses(pet.parasites ?? [], (row) => nameKey(row.type))) {
       if (p.nextDate) items.push({ pet, kind: 'parasite', title: labelOf(PARASITE_TYPES, p.type), date: p.nextDate });
     }
   }

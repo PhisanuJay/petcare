@@ -1,11 +1,14 @@
 # Super Admin
 
-**ผู้รับผิดชอบ:** ฟ่าง
+**ผู้รับผิดชอบ:** ฟ่าง (Xsup404)
 
-**Flow (Page 17):**
-`Dashboard → Users → Roles & Permissions → Providers → Pricing → Promotions → Reports → Settings`
+Super Admin ที่ใช้งานคือระบบกล้อง เปิดที่ `/super-admin/*` จาก `HotelCctvMount.jsx`
 
-ไฟล์หน้าอยู่ใน `pages/` — ผูก route ที่ `src/routes/roleRoutes.jsx`
+## Pet Hotel CCTV
 
+งานระบบกล้องโรงแรมอยู่ที่โฟลเดอร์แยก:
+
+- Frontend: `hotel-cctv/` เปิดที่ `/super-admin/*`
+- API ที่รันจริง: `D:\CCTV\backend` พอร์ต 3000
 
 Backend คู่กัน: `backend/src/modules/super-admin/`

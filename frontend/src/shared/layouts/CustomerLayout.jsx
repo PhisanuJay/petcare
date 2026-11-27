@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import CustomerNavbar from './CustomerNavbar.jsx';
-import CustomerFooter from './CustomerFooter.jsx';
 
 function useScrollToHash() {
   const { pathname, hash } = useLocation();
@@ -26,7 +25,6 @@ export default function CustomerLayout() {
       <main>
         <Outlet />
       </main>
-      <CustomerFooter />
     </div>
   );
 }

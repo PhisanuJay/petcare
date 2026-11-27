@@ -44,7 +44,8 @@ export default function AuthCard({ title, subtitle, children }) {
   );
 }
 
-/** Only allow in-app redirect targets. */
+/** Only allow in-app redirect targets. Pass fallback=null to mean “no next”. */
 export function safeNext(next, fallback = '/') {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : fallback;
+  if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  return fallback;
 }

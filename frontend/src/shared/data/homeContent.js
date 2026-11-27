@@ -3,7 +3,7 @@ import vet2 from '../../assets/vet-2.jpg';
 import vet3 from '../../assets/vet-3.jpg';
 import vet4 from '../../assets/vet-4.jpg';
 
-/** Mock content for the home page until the backend provides real data. */
+/** Static marketing copy for the landing page (not live DB records). */
 
 export const STATS = [
   { num: '12+', label: 'ปีที่เปิดให้บริการ' },
@@ -13,39 +13,94 @@ export const STATS = [
 ];
 
 export const SERVICES = [
-  { icon: 'bi-clipboard2-pulse', title: 'ตรวจสุขภาพ', desc: 'ตรวจร่างกาย ตรวจเลือด', bg: '#dcecfc', fg: '#2f7fc8' },
-  { icon: 'bi-capsule', title: 'ฉีดวัคซีน', desc: 'แจ้งเตือนนัดอัตโนมัติ', bg: '#dff5e8', fg: '#2a9d64' },
-  { icon: 'bi-bandaid', title: 'ผ่าตัด / ทำหมัน', desc: 'ห้องผ่าตัดมาตรฐาน', bg: '#e6e3ff', fg: '#5b52d6' },
-  { icon: 'bi-emoji-smile', title: 'ทันตกรรม', desc: 'ขูดหินปูน ดูแลช่องปาก', bg: '#fff1c9', fg: '#c48f00' },
-  { icon: 'bi-scissors', title: 'อาบน้ำ ตัดขน', desc: 'สปาโดยมืออาชีพ', bg: '#f6e0ff', fg: '#a454d6' },
-  { icon: 'bi-building', title: 'โรงแรมสัตว์', desc: 'ดูแลตลอด 24 ชม.', bg: '#dff3fb', fg: '#1f97c7' },
+  {
+    icon: 'bi-clipboard2-pulse',
+    title: 'ตรวจสุขภาพ',
+    desc: 'ตรวจร่างกาย เลือด และปรึกษาคุณหมอตามอาการ',
+    bg: '#dcecfc',
+    fg: '#2f7fc8',
+    href: '/pet-owner/services',
+    cta: 'จองคิวตรวจ',
+  },
+  {
+    icon: 'bi-capsule',
+    title: 'ฉีดวัคซีน',
+    desc: 'แพ็กวัคซีนครบตามวัย พร้อมแจ้งเตือนนัดถัดไป',
+    bg: '#dff5e8',
+    fg: '#2a9d64',
+    href: '/pet-owner/services',
+    cta: 'จองฉีดวัคซีน',
+  },
+  {
+    icon: 'bi-bandaid',
+    title: 'ผ่าตัด / ทำหมัน',
+    desc: 'ห้องผ่าตัดมาตรฐาน มีทีมเฝ้าระวังหลังทำหัตถการ',
+    bg: '#e8eefc',
+    fg: '#3d5a98',
+    href: '/pet-owner/services',
+    cta: 'ปรึกษาคิวผ่าตัด',
+  },
+  {
+    icon: 'bi-emoji-smile',
+    title: 'ทันตกรรม',
+    desc: 'ขูดหินปูน ตรวจช่องปาก และดูแลฟันให้สะอาด',
+    bg: '#fff1c9',
+    fg: '#c48f00',
+    href: '/pet-owner/services',
+    cta: 'จองทันตกรรม',
+  },
+  {
+    icon: 'bi-building',
+    title: 'โรงแรมสัตว์',
+    desc: 'ฝากน้องได้ทั้งวัน มี CCTV และคุณหมอดูแล 24 ชม.',
+    bg: '#dff3fb',
+    fg: '#1f97c7',
+    href: '/#hotel',
+    cta: 'ดูห้องพัก',
+  },
 ];
 
 export const HOTEL_ROOMS = [
   {
-    name: 'Standard',
-    price: 450,
-    icon: 'bi-house-door',
+    name: 'SizeS',
+    price: 380,
+    image: '/rooms/size-s.jpg',
+    icon: 'bi-box',
     bg: '#e7f1ff',
     fg: '#2f7fc8',
-    features: ['ห้องส่วนตัวสำหรับน้องเล็ก', 'อาหาร 2 มื้อ ตามที่เจ้าของกำหนด', 'ทำความสะอาดวันละ 2 ครั้ง', 'ส่งรูปอัปเดตทุกวัน'],
+    sizeHint: 'เหมาะน้องเล็ก เช่น แมว / สุนัขจิ๋ว',
+    features: ['กรงขนาด S ส่วนตัว', 'อาหาร 2 มื้อตามเจ้าของกำหนด', 'ทำความสะอาดวันละ 2 ครั้ง', 'ส่งรูปอัปเดตทุกวัน'],
   },
   {
-    name: 'Deluxe',
-    price: 750,
-    icon: 'bi-building',
+    name: 'SizeM',
+    price: 580,
+    image: '/rooms/size-m.jpg',
+    icon: 'bi-house-door',
     bg: '#dff3fb',
     fg: '#1f97c7',
     featured: true,
-    features: ['ห้องกว้าง มีคอนโดแมว / ของเล่น', 'แอร์ 24 ชั่วโมง', 'ดูน้องผ่าน CCTV ในแอป', 'พาเล่น / เดินเล่นวันละ 2 รอบ'],
+    sizeHint: 'น้องขนาดกลางเล็ก — ยอดนิยม',
+    features: ['กรงขนาด M กว้างสบาย', 'แอร์ตลอด 24 ชม.', 'ดูน้องผ่าน CCTV ในแอป', 'พาเล่นวันละ 2 รอบ'],
   },
   {
-    name: 'Suite',
-    price: 1200,
+    name: 'SizeL',
+    price: 880,
+    image: '/rooms/size-l.jpg',
+    icon: 'bi-building',
+    bg: '#e8f5ee',
+    fg: '#2a9d64',
+    sizeHint: 'น้องกลาง–ใหญ่ ต้องการพื้นที่มาก',
+    features: ['กรงขนาด L โล่ง', 'ของเล่นและที่นอนนุ่ม', 'CCTV รายกรง', 'รายงานพฤติกรรมรายวัน'],
+  },
+  {
+    name: 'SizeXL',
+    price: 1280,
+    image: '/rooms/size-xl.jpg',
     icon: 'bi-stars',
     bg: '#e6e3ff',
     fg: '#5b52d6',
-    features: ['ห้องสวีทพร้อมโซฟาและที่นอนนุ่ม', 'พี่เลี้ยงดูแลใกล้ชิด', 'CCTV + วิดีโอคอลหาน้องได้', 'อาบน้ำก่อนกลับบ้านฟรี'],
+    sizeHint: 'น้องใหญ่หรือต้องการพื้นที่มากเป็นพิเศษ',
+    features: ['กรงขนาด XL', 'พี่เลี้ยงดูแลใกล้ชิด', 'CCTV + อัปเดตวิดีโอ', 'อาบน้ำก่อนรับกลับ (ตามแพ็ก)'],
   },
 ];
 
@@ -56,45 +111,46 @@ export const HOTEL_PERKS = [
   { icon: 'bi-truck', title: 'บริการรับ-ส่งถึงบ้าน', desc: 'สะดวก ไม่ต้องเดินทาง' },
 ];
 
+/** Teaser cards on homepage — full list from GET /api/adoption/animals */
 export const ADOPT_ANIMALS = [
   {
     name: 'น้องถั่วเหลือง',
-    emoji: '🐕',
-    bg: '#fff1c9',
-    breed: 'สุนัขพันธุ์ผสม',
-    sex: 'female',
+    breed: 'พันธุ์ผสม',
     age: '1 ปี',
     personality: 'ขี้อ้อน ชอบเล่นกับเด็ก',
+    sex: 'female',
+    photo: '/adoption/adopt-001.jpg',
+    bg: '#fff1c9',
     tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
   },
   {
     name: 'น้องมะลิ',
-    emoji: '🐈',
-    bg: '#e7f1ff',
-    breed: 'แมวขาวมณี',
-    sex: 'female',
+    breed: 'ขาวมณี',
     age: '8 เดือน',
     personality: 'เรียบร้อย ชอบนอนตัก',
+    sex: 'female',
+    photo: '/adoption/adopt-002.jpg',
+    bg: '#e7f1ff',
     tags: ['ฉีดวัคซีนแล้ว'],
   },
   {
     name: 'น้องดำ',
-    emoji: '🐶',
-    bg: '#dff5e8',
-    breed: 'สุนัขพันธุ์ไทย',
-    sex: 'male',
+    breed: 'ไทย',
     age: '2 ปี',
-    personality: 'ฉลาด เฝ้าบ้านเก่ง',
+    personality: 'ฉลาด เป็นมิตรกับคนคุ้นเคย',
+    sex: 'male',
+    photo: '/adoption/adopt-003.jpg',
+    bg: '#dff5e8',
     tags: ['ฉีดวัคซีนแล้ว', 'ทำหมันแล้ว'],
   },
   {
     name: 'น้องส้มโอ',
-    emoji: '🐱',
-    bg: '#ffe6d9',
     breed: 'แมวส้ม',
-    sex: 'male',
     age: '3 เดือน',
-    personality: 'ซน ขี้เล่น เข้ากับแมวอื่นได้',
+    personality: 'ซน ขี้เล่น เข้ากับแมวตัวอื่นได้',
+    sex: 'male',
+    photo: '/adoption/adopt-004.jpg',
+    bg: '#ffe6d9',
     tags: ['ถ่ายพยาธิแล้ว'],
   },
 ];
@@ -120,10 +176,18 @@ export const VETS = [
   { img: vet4, name: 'น.สพ.ธนกฤต มีเมตตา', spec: 'ผิวหนัง' },
 ];
 
+export const HOTEL_STAY_PROMO = {
+  percent: 15,
+  minNights: 3,
+  until: '2026-12-31',
+  title: 'พักโรงแรม 3 คืนขึ้นไป',
+  desc: 'ทุกประเภทห้อง ถึง 31 ธ.ค.',
+};
+
 export const PROMOS = [
   { big: '20%', small: 'OFF', bg: 'var(--sky)', title: 'แพ็กเกจวัคซีนลูกสัตว์', desc: 'ครบชุด 3 เข็ม ถึง 30 พ.ย.', cta: 'เก็บคูปอง' },
   { big: '990', small: 'บาท', bg: '#7bc8a4', title: 'ตรวจสุขภาพประจำปี', desc: 'เลือด + ร่างกาย + ปรึกษาหมอ', cta: 'เก็บคูปอง' },
-  { big: '15%', small: 'โรงแรม', bg: '#b69cf0', title: 'พักโรงแรม 3 คืนขึ้นไป', desc: 'ทุกประเภทห้อง ถึง 31 ธ.ค.', cta: 'เก็บคูปอง' },
+  { big: `${HOTEL_STAY_PROMO.percent}%`, small: 'โรงแรม', bg: '#b69cf0', title: HOTEL_STAY_PROMO.title, desc: HOTEL_STAY_PROMO.desc, cta: 'เก็บคูปอง' },
 ];
 
 export const REVIEWS = [
@@ -132,7 +196,7 @@ export const REVIEWS = [
     text: 'คุณหมออธิบายละเอียดมาก น้องหมาที่บ้านไม่กลัวเลย จองคิวออนไลน์สะดวกสุดๆ',
     name: 'คุณมายด์',
     pet: 'เจ้าของน้องข้าวตัง',
-    emoji: '🐶',
+    photo: '/pets/default-dog.jpg',
     bg: '#dcecfc',
   },
   {
@@ -140,7 +204,7 @@ export const REVIEWS = [
     text: 'ฝากน้องแมวไว้โรงแรม 5 วัน เปิดดู CCTV ได้ตลอด มีส่งรูปอัปเดตทุกวัน ประทับใจค่ะ',
     name: 'คุณแพรว',
     pet: 'เจ้าของน้องส้มจี๊ด',
-    emoji: '🐱',
+    photo: '/pets/default-cat.jpg',
     bg: '#dff5e8',
   },
   {
@@ -148,7 +212,7 @@ export const REVIEWS = [
     text: 'รับน้องดำมาจากโครงการหาบ้าน ทีมงานช่วยแนะนำการดูแลดีมาก ตอนนี้น้องเป็นสมาชิกครอบครัวแล้วครับ',
     name: 'คุณบอส',
     pet: 'เจ้าของน้องดำ',
-    emoji: '🐕',
+    photo: '/adoption/adopt-004.jpg',
     bg: '#e6e3ff',
   },
 ];

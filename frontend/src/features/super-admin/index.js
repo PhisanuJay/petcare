@@ -1,9 +1,6 @@
-/** Super Admin module — Owner: ฟ่าง */
+/** Super Admin module — overview + CCTV (ฟ่าง / Xsup404) */
 export { default as DashboardPage } from './pages/Dashboard.jsx';
 export { default as UsersPage } from './pages/Users.jsx';
-export { default as RolesPermissionsPage } from './pages/RolesPermissions.jsx';
-export { default as ProvidersPage } from './pages/Providers.jsx';
-export { default as PricingPage } from './pages/Pricing.jsx';
-export { default as PromotionsPage } from './pages/Promotions.jsx';
 export { default as ReportsPage } from './pages/Reports.jsx';
-export { default as SettingsPage } from './pages/Settings.jsx';
+export { default as SuperAdminLayout } from './layout/SuperAdminLayout.jsx';
+export { default as HotelCctvMount } from './HotelCctvMount.jsx';

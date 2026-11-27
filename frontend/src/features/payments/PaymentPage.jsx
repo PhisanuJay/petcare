@@ -1,0 +1,184 @@
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useParams } from 'react-router-dom';
+import QRCode from 'qrcode';
+import { fileToResizedDataUrl } from '../../shared/utils/storage.js';
+import { useAuth } from '../auth/AuthContext.jsx';
+import { PAY_ACCOUNT, promptPayPayload } from './promptpay.js';
+import { PAY_KIND, PAY_KIND_LABEL, PAY_STATUS, getPayment, submitSlip, usePayments } from './store.js';
+import './payment.css';
+
+function baht(value) {
+  return `฿${Number(value).toLocaleString('th-TH')}`;
+}
+
+export default function PaymentPage() {
+  const { paymentId } = useParams();
+  const { currentUser } = useAuth();
+  const { all } = usePayments(currentUser?.id);
+  const payment = all.find((row) => row.id === paymentId) || getPayment(paymentId, currentUser?.id);
+  const [qr, setQr] = useState('');
+  const [slip, setSlip] = useState('');
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!payment || payment.kind === PAY_KIND.transport) return undefined;
+    let gone = false;
+    const amount = Number(payment.total ?? payment.deposit);
+    if (!Number.isFinite(amount) || amount <= 0) return undefined;
+    QRCode.toDataURL(promptPayPayload(PAY_ACCOUNT.promptpay, amount), {
+      margin: 1,
+      width: 280,
+      color: { dark: '#17324d', light: '#ffffff' },
+    }).then((url) => {
+      if (!gone) setQr(url);
+    }).catch(() => {
+      if (!gone) setQr('');
+    });
+    return () => {
+      gone = true;
+    };
+  }, [payment]);
+
+  if (
+    payment?.ownerId === currentUser?.id
+    && payment.kind === PAY_KIND.transport
+    && payment.refId
+  ) {
+    return <Navigate to={`/pet-owner/transport/${payment.refId}`} replace />;
+  }
+
+  if (!payment || payment.ownerId !== currentUser?.id) {
+    return (
+      <div className="pay-page page-wrap">
+        <div className="container">
+          <div className="pay-card">
+            <h1>ไม่พบรายการชำระเงิน</h1>
+            <Link to="/pet-owner/history">กลับไปประวัติการจอง</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const locked = [
+    PAY_STATUS.approved,
+    PAY_STATUS.review,
+    PAY_STATUS.cancelled,
+  ].includes(payment.status);
+  const preview = slip || payment.slip;
+
+  async function onFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setError('');
+    try {
+      setSlip(await fileToResizedDataUrl(file, 960, 0.82));
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    setError('');
+    try {
+      await submitSlip(payment.id, currentUser.id, slip || payment.slip);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function copyAccount() {
+    try {
+      await navigator.clipboard.writeText(PAY_ACCOUNT.promptpay);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="pay-page page-wrap">
+      <div className="container">
+        <header className="pay-mast">
+          <p>ชำระเงิน</p>
+          <h1>{payment.title || PAY_KIND_LABEL[payment.kind]}</h1>
+          <span>{PAY_KIND_LABEL[payment.kind] || payment.kind}</span>
+        </header>
+        <div className="pay-layout">
+          <section className="pay-card">
+            <h2>รายละเอียดการจอง</h2>
+            {Array.isArray(payment.lines) && payment.lines.length > 0 ? (
+              <ul className="pay-hub-lines">
+                {payment.lines.map((line) => (
+                  <li key={`${line.kind}-${line.refId}`}>
+                    <strong>{PAY_KIND_LABEL[line.kind] || line.kind}</strong>
+                    {' · '}
+                    {line.label}
+                    {' · '}
+                    {baht(line.total)}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="pay-detail">{payment.detail}</p>
+            )}
+            <dl>
+              <div><dt>ยอดชำระ</dt><dd>{payment.total == null ? 'รอประเมิน' : baht(payment.total ?? payment.deposit)}</dd></div>
+            </dl>
+            <p className="pay-note">สลิปต้องตรงกับยอดด้านบน ฝ่ายบัญชีเป็นคนอนุมัติ</p>
+          </section>
+          <section className="pay-card">
+            {payment.status === PAY_STATUS.approved ? (
+              <div className="pay-done">
+                <h2>อนุมัติแล้ว</h2>
+                <p>ฝ่ายบัญชีตรวจสลิปเรียบร้อย การจองนี้ใช้ได้</p>
+                <Link className="btn btn-sky" to="/pet-owner/history">ดูประวัติการจอง</Link>
+              </div>
+            ) : null}
+            {payment.status === PAY_STATUS.review ? (
+              <div className="pay-done">
+                <h2>ส่งสลิปแล้ว</h2>
+                <p>สถานะตอนนี้คือ ยังไม่อนุมัติ จนกว่าฝ่ายบัญชีจะตรวจยอด</p>
+                {payment.slip ? <img src={payment.slip} alt="สลิปที่ส่งแล้ว" /> : null}
+                <Link className="btn btn-soft" to="/pet-owner/history">ไปหน้าประวัติ</Link>
+              </div>
+            ) : null}
+            {payment.status === PAY_STATUS.cancelled ? (
+              <div className="pay-done">
+                <h2>รายการชำระเงินถูกยกเลิก</h2>
+                <p>คำขอยกเลิกการจองอยู่ระหว่างดำเนินการ</p>
+                <Link className="btn btn-soft" to="/pet-owner/history">ไปประวัติการจอง</Link>
+              </div>
+            ) : null}
+            {!locked || payment.status === PAY_STATUS.rejected ? (
+              <form onSubmit={onSubmit}>
+                <h2>สแกนชำระเงิน</h2>
+                {payment.status === PAY_STATUS.rejected ? (
+                  <p className="pay-warn">สลิปยังไม่ผ่าน{payment.note ? ` · ${payment.note}` : ''} แนบสลิปใหม่ได้</p>
+                ) : null}
+                <div className="pay-qr">
+                  {qr ? <img src={qr} alt={`QR ชำระ ${baht(payment.total ?? payment.deposit)}`} /> : <p>กำลังสร้าง QR</p>}
+                </div>
+                <p className="pay-account">
+                  <span>{PAY_ACCOUNT.bank} · {PAY_ACCOUNT.name}</span>
+                  <strong>{PAY_ACCOUNT.promptpay}</strong>
+                  <button type="button" onClick={copyAccount}>{copied ? 'คัดลอกแล้ว' : 'คัดลอกเลข'}</button>
+                </p>
+                <label className="pay-file">
+                  <input type="file" accept="image/*" onChange={onFile} />
+                  <span>{preview ? 'เปลี่ยนรูปสลิป' : 'แนบสลิปการโอน'}</span>
+                </label>
+                {preview ? <img className="pay-slip" src={preview} alt="ตัวอย่างสลิป" /> : null}
+                {error ? <p className="pay-warn">{error}</p> : null}
+                <button className="btn btn-sky" type="submit" disabled={!preview}>ยืนยันการชำระ</button>
+              </form>
+            ) : null}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}

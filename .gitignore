@@ -28,3 +28,9 @@ out/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# SQLite databases
+backend/data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

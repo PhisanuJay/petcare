@@ -40,6 +40,16 @@ function NotFound() {
 
 export default function PetFormPage() {
   const { petId } = useParams();
+  const { loading } = usePets();
+  if (petId && loading) {
+    return (
+      <div className="page-wrap">
+        <div className="container">
+          <div className="card-soft empty-box">กำลังโหลดข้อมูล...</div>
+        </div>
+      </div>
+    );
+  }
   return <PetFormInner key={petId ?? 'new'} petId={petId} />;
 }
 
@@ -48,9 +58,21 @@ function PetFormInner({ petId }) {
   const navigate = useNavigate();
   const existing = petId ? getPet(petId) : null;
 
-  const [form, setForm] = useState(() => ({ ...emptyPet(), ...existing }));
+  // Records written by the clinic (source 'vet') are read-only for owners and kept by the backend,
+  // so they are left out of the editable lists here.
+  const ownRows = (rows) => (rows ?? []).filter((r) => r.source !== 'vet');
+  const [form, setForm] = useState(() => {
+    const initial = { ...emptyPet(), ...existing };
+    return {
+      ...initial,
+      vaccines: ownRows(initial.vaccines),
+      treatments: ownRows(initial.treatments),
+      parasites: ownRows(initial.parasites),
+    };
+  });
   const [tab, setTab] = useState('general');
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   if (petId && !existing) return <NotFound />;
 
@@ -70,7 +92,7 @@ function PetFormInner({ petId }) {
     }
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     if (!form.name.trim()) {
       setTab('general');
@@ -82,16 +104,19 @@ function PetFormInner({ petId }) {
     delete data.ownerId;
     delete data.createdAt;
     delete data.updatedAt;
+    setSaving(true);
+    setError('');
     try {
       if (existing) {
-        updatePet(existing.id, data);
+        await updatePet(existing.id, data);
         navigate(`/pet-owner/my-pets/${existing.id}`);
       } else {
-        const pet = addPet(data);
+        const pet = await addPet(data);
         navigate(`/pet-owner/my-pets/${pet.id}`);
       }
     } catch (err) {
       setError(err.message);
+      setSaving(false);
     }
   }
 
@@ -256,7 +281,7 @@ function PetFormInner({ petId }) {
             <Link to={existing ? `/pet-owner/my-pets/${existing.id}` : '/pet-owner/my-pets'} className="btn btn-soft">
               ยกเลิก
             </Link>
-            <button type="submit" className="btn btn-sky">
+            <button type="submit" className="btn btn-sky" disabled={saving}>
               <i className="bi bi-check2 me-1" />
               {existing ? 'บันทึกการแก้ไข' : 'บันทึกสัตว์เลี้ยง'}
             </button>

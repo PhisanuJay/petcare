@@ -33,25 +33,32 @@ export function AboutSection() {
   );
 }
 
-export function ServicesSection() {
+export function ServicesSection({ go }) {
   return (
     <section id="services" className="pc-section pt-0">
       <div className="container">
         <div className="title-wrap">
           <span className="chip">บริการของเรา</span>
           <h2>น้องต้องการอะไร เรามีให้</h2>
+          <p className="mb-0">จากตรวจสุขภาพถึงฝากโรงแรม — จองคิวหรือดูห้องพักได้จากที่นี่</p>
         </div>
-        <div className="row g-2">
+        <div className="svc-grid">
           {SERVICES.map((s) => (
-            <div className="col-6 col-md-4 col-lg-2" key={s.title}>
-              <div className="svc">
-                <div className="circle" style={{ background: s.bg, color: s.fg }}>
-                  <i className={`bi ${s.icon}`} />
-                </div>
-                <div className="mitr">{s.title}</div>
-                <div className="small text-muted">{s.desc}</div>
+            <a
+              key={s.title}
+              className="svc"
+              href={s.href}
+              onClick={s.href?.startsWith('/pet-owner') && go ? go(s.href) : undefined}
+            >
+              <div className="circle" style={{ background: s.bg, color: s.fg }} aria-hidden="true">
+                <i className={`bi ${s.icon}`} />
               </div>
-            </div>
+              <div className="svc-copy">
+                <div className="mitr">{s.title}</div>
+                <p>{s.desc}</p>
+                {s.cta ? <span className="svc-cta">{s.cta}</span> : null}
+              </div>
+            </a>
           ))}
         </div>
       </div>
@@ -156,7 +163,7 @@ export function ReviewsSection() {
                 <div className="stars mb-2">{'★'.repeat(r.stars) + '☆'.repeat(5 - r.stars)}</div>
                 {r.text}
                 <div className="reviewer">
-                  <span className="av" style={{ background: r.bg }}>{r.emoji}</span>
+                  <img className="av av-photo" src={r.photo} alt="" style={{ background: r.bg }} loading="lazy" decoding="async" />
                   <div>
                     <div className="fw-medium">{r.name}</div>
                     <div className="small text-muted">{r.pet}</div>

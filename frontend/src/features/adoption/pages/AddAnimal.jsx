@@ -1,18 +1,8 @@
-/**
- * Placeholder — Add Animal
- * Role: Adoption
- * Owner: ปร่ย
- * Source: Page 17 sitemap (Thanik Sapnonwai)
- *
- * TODO: implement UI and business logic later.
- */
+import { Navigate } from 'react-router-dom';
+import { useAdoptionBasePath } from '../useAdoptionBasePath.js';
+
+/** เพิ่มสัตว์ทำที่ประกาศของเจ้าของ — แอดมินไปหน้ารายการประกาศ */
 export default function AddAnimalPage() {
-  return (
-    <section>
-      <h1>Add Animal</h1>
-      <p>Role: Adoption</p>
-      <p>Owner: ปร่ย</p>
-      <p>Placeholder page — not implemented yet.</p>
-    </section>
-  );
+  const base = useAdoptionBasePath();
+  return <Navigate to={`${base}/animals`} replace />;
 }

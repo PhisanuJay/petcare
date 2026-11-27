@@ -1,0 +1,148 @@
+.adoption-staff-content-inner {
+  color: #1d3a57;
+}
+
+.adoption-staff-page-title {
+  margin-bottom: 1.5rem;
+}
+
+.adoption-staff-page-title h1 {
+  margin-bottom: 0.35rem;
+  color: #1d3a57;
+  font-size: 1.8rem;
+}
+
+.adoption-staff-page-title p {
+  margin: 0;
+  color: #6a7f96;
+}
+
+.adoption-staff-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+}
+
+.adoption-staff-section-heading {
+  margin: 2rem 0 1rem;
+}
+
+.adoption-staff-section-heading h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.adoption-staff-stat,
+.adoption-staff-card,
+.adoption-staff-panel {
+  padding: 1.3rem;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(29, 58, 87, 0.07);
+}
+
+.adoption-staff-stat span {
+  color: #6a7f96;
+  font-size: 0.9rem;
+}
+
+.adoption-staff-stat strong {
+  display: block;
+  margin-top: 0.4rem;
+  color: #2f7fc8;
+  font-size: 2rem;
+}
+
+.adoption-staff-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.adoption-staff-card h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.adoption-staff-muted {
+  color: #6a7f96;
+}
+
+.adoption-staff-status {
+  display: inline-flex;
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: #fff1c9;
+  color: #8a6400;
+  font-size: 0.82rem;
+}
+
+.adoption-staff-status.approved,
+.adoption-staff-status.available {
+  background: #dff5e8;
+  color: #237a4f;
+}
+
+.adoption-staff-status.rejected,
+.adoption-staff-status.adopted {
+  background: #fdecec;
+  color: #a12a2a;
+}
+
+.adoption-staff-status.closed {
+  background: #e9eef4;
+  color: #536579;
+}
+
+.adoption-staff-animal-photo,
+.adoption-staff-document-photo {
+  display: block;
+  max-width: 100%;
+  border-radius: 16px;
+  object-fit: cover;
+  background: #f1f7ff;
+}
+
+.adoption-staff-animal-photo {
+  width: 110px;
+  height: 110px;
+}
+
+.adoption-staff-animal-photo.adoption-staff-animal-placeholder {
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+}
+
+.adoption-staff-document-photo {
+  max-height: 320px;
+}
+
+.adoption-staff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.adoption-staff-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.75rem;
+}
+
+.adoption-staff-detail {
+  padding: 0.75rem 0.9rem;
+  border-radius: 14px;
+  background: #f1f7ff;
+  overflow-wrap: anywhere;
+}
+
+.adoption-staff-detail span {
+  display: block;
+  color: #6a7f96;
+  font-size: 0.78rem;
+}
+
+.adoption-staff-state {
+  padding: 2rem;
+  text-align: center;
+}

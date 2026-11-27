@@ -20,9 +20,9 @@ export default function HomePage() {
     <>
       <HeroSection go={go} />
       <AboutSection />
-      <ServicesSection />
+      <ServicesSection go={go} />
       <HotelSection go={go} />
-      <AdoptionSection go={go} />
+      <AdoptionSection />
       <WhySection />
       <VetsSection />
       <PromoSection go={go} />

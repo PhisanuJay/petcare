@@ -5,6 +5,12 @@ export const STORAGE_KEYS = {
   users: 'petcare_users',
   session: 'petcare_session',
   pets: 'petcare_pets',
+  transport: 'petcare_transport',
+  transportActor: 'petcare_transport_actor',
+  hotelBookings: 'petcare_hotel_bookings',
+  payments: 'petcare_payments',
+  clinicBookings: 'petcare_clinic_bookings',
+  cancellations: 'petcare_cancellations',
 };
 
 export function readJSON(key, fallback, store = localStorage) {

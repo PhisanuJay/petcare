@@ -1,0 +1,13 @@
+.hotel-pricing-note,
+.hotel-pricing-error {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.hotel-pricing-note {
+  color: #617386;
+}
+
+.hotel-pricing-error {
+  color: #a33a34;
+}

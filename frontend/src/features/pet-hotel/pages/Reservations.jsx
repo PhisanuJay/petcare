@@ -1,18 +1,10 @@
-/**
- * Placeholder — Reservations
- * Role: Pet Hotel
- * Owner: ฟ่าง, เจ
- * Source: Page 17 sitemap (Thanik Sapnonwai)
- *
- * TODO: implement UI and business logic later.
- */
+import PetHotelOpsNotice from '../components/PetHotelOpsNotice.jsx';
+
 export default function ReservationsPage() {
   return (
-    <section>
-      <h1>Reservations</h1>
-      <p>Role: Pet Hotel</p>
-      <p>Owner: ฟ่าง, เจ</p>
-      <p>Placeholder page — not implemented yet.</p>
-    </section>
+    <PetHotelOpsNotice
+      title="Reservations"
+      subtitle="การจองใหม่อยู่ที่ hotel_stays — เจ้าของสัตว์จองผ่านเมนูฝากโรงแรม"
+    />
   );
 }

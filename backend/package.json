@@ -6,10 +6,15 @@
   "description": "PetCare API — role-based modules (Page 17)",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "db:ping": "node -e \"import('./src/config/index.js'); import('./src/db/mssql.js').then(async m=>{await m.getPool(); console.log(m.connectionLabel()); await m.closePool();})\""
   },
   "dependencies": {
+    "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
-    "express": "^5.0.0"
+    "express": "^5.0.0",
+    "mssql": "^11.0.3",
+    "multer": "^2.5.0",
+    "uuid": "^14.0.3"
   }
 }

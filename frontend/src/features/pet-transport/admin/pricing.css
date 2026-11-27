@@ -1,0 +1,278 @@
+.tp-pricing {
+  display: grid;
+  gap: 20px;
+  color: #172b3f;
+}
+
+.tp-pricing__head {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.tp-pricing__head > p {
+  margin: 0;
+  color: #2f7fc8;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.tp-pricing__head h1 {
+  margin: 0;
+  color: #17324d;
+  font-size: 30px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.tp-pricing__head > span {
+  color: #617386;
+  font-size: 14px;
+}
+
+.tp-pricing__section {
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid rgba(29, 58, 87, 0.1);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.tp-pricing__section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.tp-pricing__section-head h2 {
+  margin: 0;
+  color: #17324d;
+  font-size: 19px;
+  font-weight: 500;
+}
+
+.tp-pricing__section-head p {
+  margin: 4px 0 0;
+  color: #617386;
+  font-size: 13px;
+}
+
+.tp-pricing__section-head > span {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f2f6fa;
+  color: #526579;
+  font-size: 12px;
+}
+
+.tp-pricing__zone-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tp-pricing__zone-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.9fr);
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(29, 58, 87, 0.08);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.tp-pricing__zone-copy > span {
+  color: #17324d;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.tp-pricing__zone-copy > p {
+  margin: 4px 0 0;
+  color: #617386;
+  font-size: 12px;
+}
+
+.tp-pricing__price-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #526579;
+  font-size: 12px;
+}
+
+.tp-pricing__input-wrap {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid #d5dee7;
+  border-radius: 9px;
+  background: #fff;
+  color: #617386;
+}
+
+.tp-pricing__input-wrap:focus-within {
+  border-color: #2f7fc8;
+  box-shadow: 0 0 0 3px rgba(47, 127, 200, 0.15);
+}
+
+.tp-pricing__input-wrap b {
+  color: #526579;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.tp-pricing__input-wrap input {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #17324d;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tp-pricing__input-wrap input:focus-visible {
+  outline: none;
+}
+
+.tp-pricing__input-wrap small {
+  flex: none;
+  color: #718196;
+  font-size: 12px;
+}
+
+.tp-pricing__form-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(29, 58, 87, 0.08);
+}
+
+.tp-pricing__form-foot p,
+.tp-pricing__note {
+  margin: 0;
+  color: #617386;
+  font-size: 13px;
+}
+
+.tp-pricing__room-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tp-pricing__room-card {
+  display: grid;
+  align-content: start;
+  gap: 20px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(29, 58, 87, 0.08);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.tp-pricing__room-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.tp-pricing__room-title > span {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 9px;
+  background: #e8f2fb;
+  color: #28699e;
+  font-size: 16px;
+}
+
+.tp-pricing__room-title h3 {
+  margin: 0;
+  color: #17324d;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.tp-pricing__room-title p {
+  margin: 3px 0 0;
+  color: #617386;
+  font-size: 12px;
+}
+
+.tp-pricing__matrix .tp-table-wrap {
+  overflow-x: auto;
+}
+
+.tp-pricing__matrix .tp-table {
+  min-width: 420px;
+  margin-bottom: 12px;
+}
+
+.tp-pricing__matrix .tp-table th:last-child,
+.tp-pricing__matrix .tp-table td:last-child {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tp-pricing__matrix .tp-table td:last-child {
+  color: #17324d;
+  font-weight: 500;
+}
+
+.tp-pricing__note {
+  margin-top: 12px;
+}
+
+@media (max-width: 800px) {
+  .tp-pricing__zone-grid,
+  .tp-pricing__room-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .tp-pricing {
+    gap: 16px;
+  }
+
+  .tp-pricing__head h1 {
+    font-size: 26px;
+  }
+
+  .tp-pricing__section {
+    padding: 16px;
+  }
+
+  .tp-pricing__zone-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .tp-pricing__form-foot {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .tp-pricing__form-foot .btn {
+    width: 100%;
+  }
+}

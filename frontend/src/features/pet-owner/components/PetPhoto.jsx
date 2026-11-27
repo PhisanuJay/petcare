@@ -1,7 +1,7 @@
-import { speciesOf } from '../petUtils.js';
+import { petPhotoSrc } from '../petUtils.js';
 
-export default function PetPhoto({ pet, size = '' }) {
+export default function PetPhoto({ pet, size = '', style }) {
   const cls = `pet-photo ${size}`;
-  if (pet?.photo) return <img className={cls} src={pet.photo} alt={pet.name} />;
-  return <span className={cls}>{speciesOf(pet?.species).emoji}</span>;
+  const alt = pet?.name?.trim() ? pet.name : 'สัตว์เลี้ยง';
+  return <img className={cls} style={style} src={petPhotoSrc(pet)} alt={alt} loading="lazy" decoding="async" />;
 }

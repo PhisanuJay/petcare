@@ -1,0 +1,650 @@
+/*
+ * Veterinarian inner pages (everything except the dashboard): banner, cards, chips, lists, forms,
+ * tables and charts. Same blue theme as the rest of the site, with soft depth and motion.
+ * Scoped to .vet-inner (every vet page except the dashboard, see VetLayout); loaded after vet.css.
+ */
+
+/* ---------- Page banner ---------- */
+.vet-inner .vet-pagehead {
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+  border-radius: 28px;
+  padding: 1.3rem 1.6rem;
+  margin-bottom: 1.6rem;
+  background: linear-gradient(120deg, #5aa9e6 0%, #3a8bd4 55%, #2f7fc8 100%);
+  box-shadow: 0 14px 30px rgba(var(--shadow), 0.16);
+}
+.vet-inner .vet-pagehead::before,
+.vet-inner .vet-pagehead::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  pointer-events: none;
+}
+.vet-inner .vet-pagehead::before {
+  width: 220px;
+  height: 220px;
+  right: -50px;
+  top: -100px;
+}
+.vet-inner .vet-pagehead::after {
+  width: 120px;
+  height: 120px;
+  right: 170px;
+  bottom: -70px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.vet-inner .vet-pagehead > * {
+  position: relative;
+  z-index: 1;
+}
+.vet-inner .vet-pagehead h1 {
+  line-height: 1.4;
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0;
+  color: #fff;
+}
+.vet-inner .vet-pagehead p {
+  margin: 0.15rem 0 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.92rem;
+}
+.vet-inner .vet-pagehead .head-icon {
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+}
+.vet-inner .vet-pagehead .head-actions .btn,
+.vet-inner .vet-pagehead .head-actions a.btn {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+}
+.vet-inner .vet-pagehead .head-actions .btn:hover,
+.vet-inner .vet-pagehead .head-actions a.btn:hover {
+  background: rgba(255, 255, 255, 0.32);
+  color: #fff;
+}
+
+/* ---------- Motion (skipped for people who ask for less) ---------- */
+@keyframes vet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes vet-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vet-inner .page-wrap .container > .vet-pagehead,
+  .vet-inner .page-wrap .container > .card-soft,
+  .vet-inner .page-wrap .container > .row > [class*='col'] > .card-soft,
+  .vet-inner .page-wrap .container > .row > [class*='col'] > .stat {
+    animation: vet-rise 0.4s ease backwards;
+  }
+  .vet-inner .page-wrap .container > .row > [class*='col']:nth-child(2) > * {
+    animation-delay: 0.06s;
+  }
+  .vet-inner .page-wrap .container > .row > [class*='col']:nth-child(3) > * {
+    animation-delay: 0.12s;
+  }
+  .vet-inner .page-wrap .container > .row > [class*='col']:nth-child(4) > * {
+    animation-delay: 0.18s;
+  }
+  .vet-inner .viz-bar-fill {
+    animation: vet-grow 0.7s ease backwards;
+    transform-origin: left;
+  }
+}
+
+/* ---------- Cards, labels, empty states ---------- */
+.vet-inner .page-wrap .card-soft {
+  border: 1px solid rgba(214, 233, 252, 0.7);
+  transition: box-shadow 0.2s ease;
+}
+.vet-inner .page-wrap .card-soft:hover {
+  box-shadow: 0 14px 34px rgba(var(--shadow), 0.1);
+}
+.vet-inner .section-label i {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--baby);
+  color: var(--sky-dark);
+  font-size: 1rem;
+}
+.vet-inner .empty-box {
+  border: 2px dashed var(--baby);
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fbfdff, var(--cloud));
+}
+.vet-inner .empty-box i {
+  color: var(--sky);
+  opacity: 0.6;
+}
+
+/* ---------- Buttons and filter chips ---------- */
+.vet-inner .btn-sky {
+  background: linear-gradient(135deg, #5aa9e6, #3a8bd4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.vet-inner .btn-sky:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(47, 127, 200, 0.4);
+}
+.vet-inner .btn-soft {
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.vet-inner .btn-soft:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(var(--shadow), 0.1);
+}
+.vet-inner .btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+.vet-inner .btn:focus-visible,
+.vet-inner .vet-person:focus-visible {
+  outline: 3px solid rgba(90, 169, 230, 0.55);
+  outline-offset: 2px;
+}
+.vet-inner .vet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.vet-inner .vet-chip {
+  border-radius: 999px;
+  padding: 0.35rem 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1.5px solid transparent;
+}
+.vet-inner .vet-chip.btn-soft {
+  background: #fff;
+  border-color: var(--baby);
+  color: var(--ink);
+}
+.vet-inner .vet-chip.btn-soft:hover {
+  border-color: var(--sky);
+}
+.vet-inner .vet-chip .chip-count {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-left: 0.4rem;
+  padding: 0 0.4em;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: rgba(29, 58, 87, 0.08);
+}
+.vet-inner .vet-chip.btn-sky .chip-count {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ---------- Appointment cards ---------- */
+.vet-inner .vet-appt {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.2s ease;
+}
+.vet-inner .vet-appt:hover {
+  transform: translateY(-2px);
+}
+.vet-inner .vet-appt::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 7px;
+  background: linear-gradient(180deg, #5aa9e6, #2f7fc8);
+}
+.vet-inner .vet-appt.st-completed::before {
+  background: linear-gradient(180deg, #4cc38a, #2a9d64);
+}
+.vet-inner .vet-appt.st-no_show::before {
+  background: linear-gradient(180deg, #ee7a80, #d0494f);
+}
+.vet-inner .vet-appt .appt-time {
+  min-width: 84px;
+  text-align: center;
+  padding: 0.55rem 0.4rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, var(--cloud), var(--baby));
+  color: var(--sky-dark);
+}
+.vet-inner .vet-appt.st-completed .appt-time {
+  background: linear-gradient(180deg, #f1fbf5, #dff5e8);
+  color: #237a4f;
+}
+.vet-inner .vet-appt.st-no_show .appt-time {
+  background: linear-gradient(180deg, #fff6f6, #fdecec);
+  color: #c53030;
+}
+
+/* ---------- Customer and pet lists ---------- */
+.vet-inner .vet-person {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  background: #fff;
+  border: 1.5px solid var(--baby);
+  border-radius: 20px;
+  padding: 0.75rem 0.9rem;
+  text-align: left;
+  color: var(--ink);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.vet-inner .vet-person:hover {
+  transform: translateX(3px);
+  border-color: var(--sky);
+  box-shadow: 0 8px 18px rgba(var(--shadow), 0.1);
+}
+.vet-inner .vet-person .person-avatar {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Mitr', sans-serif;
+  font-size: 1.15rem;
+  color: #fff;
+  background: linear-gradient(135deg, #5aa9e6, #2f7fc8);
+  box-shadow: 0 6px 14px rgba(47, 127, 200, 0.3);
+}
+.vet-inner .vet-person img.person-avatar,
+.vet-inner img.person-avatar.pet {
+  object-fit: cover;
+  padding: 0;
+  font-size: 0;
+  background: #e8f2fc;
+}
+.vet-inner .vet-person .person-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.vet-inner .vet-person .person-go {
+  color: var(--sky);
+  transition: transform 0.15s ease;
+}
+.vet-inner .vet-person:hover .person-go {
+  transform: translateX(3px);
+}
+.vet-inner .vet-person.selected {
+  background: linear-gradient(135deg, #5aa9e6, #3a8bd4);
+  border-color: transparent;
+  color: #fff;
+}
+.vet-inner .vet-person.selected .text-muted,
+.vet-inner .vet-person.selected .person-go {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+.vet-inner .vet-person.selected .person-avatar {
+  background: #fff;
+  box-shadow: none;
+}
+
+/* ---------- Forms ---------- */
+.vet-inner .form-control,
+.vet-inner .form-select {
+  background-color: #fbfdff;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+.vet-inner .form-control:hover:not(:focus),
+.vet-inner .form-select:hover:not(:focus) {
+  border-color: #b9d4ee;
+}
+.vet-inner .form-control:focus,
+.vet-inner .form-select:focus {
+  background-color: #fff;
+}
+
+/* ---------- Tables ---------- */
+.vet-inner .table {
+  --bs-table-bg: transparent;
+  border-color: var(--baby);
+}
+.vet-inner .table > thead > tr > th {
+  font-weight: 500;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--cloud);
+  border-bottom: 0;
+  white-space: nowrap;
+}
+.vet-inner .table > thead > tr > th:first-child {
+  border-radius: 12px 0 0 12px;
+}
+.vet-inner .table > thead > tr > th:last-child {
+  border-radius: 0 12px 12px 0;
+}
+.vet-inner .table > tbody > tr {
+  transition: background 0.12s ease;
+}
+.vet-inner .table > tbody > tr:hover > * {
+  background: var(--cloud);
+}
+
+/* ---------- Health history timeline ---------- */
+.vet-inner .timeline::before {
+  background: linear-gradient(180deg, var(--sky), var(--baby));
+}
+.vet-inner .tl-item {
+  background: var(--cloud);
+  border-radius: 18px;
+  padding: 0.7rem 1rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.vet-inner .tl-item:hover {
+  transform: translateX(3px);
+  box-shadow: 0 8px 18px rgba(var(--shadow), 0.08);
+}
+.vet-inner .tl-item::before {
+  top: 14px;
+  box-shadow: 0 0 0 4px rgba(90, 169, 230, 0.18);
+}
+.vet-inner button.tl-item--button {
+  display: block;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.vet-inner button.tl-item--button:focus-visible {
+  outline: 2px solid var(--sky);
+  outline-offset: 2px;
+}
+.vet-inner .text-sky {
+  color: var(--sky-dark);
+}
+.vet-inner .vet-record-detail {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+.vet-inner .vet-record-detail__row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  background: var(--cloud);
+}
+.vet-inner .vet-record-detail__row dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.vet-inner .vet-record-detail__row dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Contact card ---------- */
+.vet-inner .vet-contact {
+  background: linear-gradient(135deg, #f7fbff, var(--cloud));
+  border: 1px solid var(--baby);
+  border-radius: 22px;
+  padding: 1rem 1.1rem;
+}
+.vet-inner .vet-contact .contact-name {
+  font-family: 'Mitr', sans-serif;
+  font-size: 1.1rem;
+}
+.vet-inner .vet-contact a {
+  color: var(--sky-dark);
+  text-decoration: none;
+}
+.vet-inner .vet-contact a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- Reports ---------- */
+.vet-inner .viz-col > span {
+  background: linear-gradient(180deg, #5aa9e6, #2a78d6);
+  transition: background 0.15s ease;
+}
+.vet-inner .viz-col:hover > span,
+.vet-inner .viz-col:focus-visible > span,
+.vet-inner .viz-col.active > span {
+  background: linear-gradient(180deg, #2f7fc8, #184f95);
+}
+.vet-inner .viz-bar-fill {
+  background: linear-gradient(90deg, #5aa9e6, #2a78d6);
+}
+.vet-inner details.card-soft > summary {
+  list-style: none;
+}
+.vet-inner details.card-soft > summary::-webkit-details-marker {
+  display: none;
+}
+.vet-inner details.card-soft[open] > summary {
+  margin-bottom: 0.5rem;
+}
+
+.vet-inner .vet-person .person-avatar.pet {
+  background: #fff;
+  font-size: 1.5rem;
+  box-shadow: 0 4px 10px rgba(var(--shadow), 0.12);
+}
+.vet-inner .vet-person.selected .person-avatar.pet {
+  background: #fff;
+}
+
+/* ====================== Round 2: depth, banner chips, stats, placeholders ====================== */
+
+/* Soft colour wash behind the pages, tighter gap under the navbar */
+.vet-inner {
+  background:
+    radial-gradient(520px 320px at 100% 0%, rgba(90, 169, 230, 0.16), transparent 70%),
+    radial-gradient(460px 300px at 0% 55%, rgba(182, 156, 240, 0.1), transparent 70%),
+    radial-gradient(520px 340px at 100% 100%, rgba(120, 200, 164, 0.1), transparent 70%),
+    #f4f9ff;
+}
+.vet-inner .page-wrap {
+  padding-top: 26px;
+}
+
+/* Navbar: lift on hover */
+.vet-inner .pc-navbar .nav-link,
+.vet-inner .pc-navbar .btn {
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.vet-inner .pc-navbar .nav-link:hover {
+  transform: translateY(-1px);
+}
+
+/* Banner: stat chips (glass) */
+.vet-inner .vet-pagehead {
+  background-image:
+    radial-gradient(circle at 62% 160%, rgba(255, 255, 255, 0.14) 0 120px, transparent 121px),
+    linear-gradient(120deg, #5aa9e6 0%, #3a8bd4 55%, #2f7fc8 100%);
+}
+.vet-inner .head-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.95rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #fff;
+  font-size: 0.88rem;
+  backdrop-filter: blur(3px);
+}
+.vet-inner .head-stat .stat-num {
+  font-family: 'Mitr', sans-serif;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+.vet-inner .head-stat .stat-label {
+  opacity: 0.92;
+}
+
+/* Right-hand "pick something" panel */
+.vet-inner .vet-placeholder {
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-align: center;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(90, 169, 230, 0.12), transparent 60%),
+    #fff;
+}
+.vet-inner .vet-placeholder .placeholder-icon {
+  width: 84px;
+  height: 84px;
+  border-radius: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.3rem;
+  margin-bottom: 0.6rem;
+  color: #fff;
+  background: linear-gradient(135deg, #5aa9e6, #2f7fc8);
+  box-shadow: 0 14px 28px rgba(47, 127, 200, 0.3);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vet-inner .vet-placeholder .placeholder-icon {
+    animation: vet-float 3.2s ease-in-out infinite;
+  }
+}
+@keyframes vet-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+/* Vaccines that are due */
+.vet-inner .vet-due {
+  position: relative;
+  overflow: hidden;
+  padding: 0.8rem 0.95rem 0.8rem 1.2rem;
+  border-radius: 20px;
+  background: var(--cloud);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.vet-inner .vet-due::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: linear-gradient(180deg, #f4c04a, #eda100);
+}
+.vet-inner .vet-due.overdue::before {
+  background: linear-gradient(180deg, #ee7a80, #d0494f);
+}
+.vet-inner .vet-due:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(var(--shadow), 0.1);
+}
+
+/* Report stat tiles */
+.vet-inner .vet-stat {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--baby);
+  border-radius: 24px;
+  padding: 1.1rem 1.2rem;
+  box-shadow: 0 8px 22px rgba(var(--shadow), 0.07);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.vet-inner .vet-stat:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px rgba(var(--shadow), 0.13);
+}
+.vet-inner .vet-stat .stat-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  margin-bottom: 0.5rem;
+  background: #dcecfc;
+  color: #2f7fc8;
+}
+.vet-inner .vet-stat .stat-icon.green {
+  background: #dff5e8;
+  color: #2a9d64;
+}
+.vet-inner .vet-stat .stat-icon.red {
+  background: #fdecec;
+  color: #d0494f;
+}
+.vet-inner .vet-stat .stat-icon.violet {
+  background: #e6e3ff;
+  color: #5b52d6;
+}
+.vet-inner .vet-stat .stat-num {
+  font-family: 'Mitr', sans-serif;
+  font-size: 2.2rem;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+/* The dashboard keeps its own hero; give it the same entrance as the other pages */
+@media (prefers-reduced-motion: no-preference) {
+  .vet-inner .page-wrap .container > .vet-hero {
+    animation: vet-rise 0.4s ease backwards;
+  }
+}
+
+/* Owner line above the record forms, soft alerts */
+.vet-inner .vet-ownerline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem 0.5rem 0.7rem;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--baby);
+  box-shadow: 0 6px 16px rgba(var(--shadow), 0.07);
+}
+.vet-inner .vet-ownerline > i {
+  font-size: 1.5rem;
+  color: var(--sky-dark);
+}
+.vet-inner .alert-soft {
+  box-shadow: 0 6px 16px rgba(var(--shadow), 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
